@@ -140,6 +140,8 @@
   "rtxremix.setting.community.wetGround.tip": "雨中露天的地面会变暗并泛起水光，致密的石头比疏松的泥土更亮，雨停后慢慢变干。有遮挡的地方保持干燥。社区版功能。",
   "rtxremix.setting.community.rainRipples": "雨滴涟漪",
   "rtxremix.setting.community.rainRipples.tip": "下雨时，雨滴在露天地面的薄水膜上激起有光泽的涟漪圈。开启时隐藏原版的雨滴溅射粒子。社区版功能。",
+  "rtxremix.setting.community.puddles": "积水坑",
+  "rtxremix.setting.community.puddles.tip": "雨越下越久，露天的土路、石头、木板等硬质地面上会汇出水坑，镜面般倒映天空和周围景物，地面变干时慢慢缩小。草地和沙子不会积水。社区版功能。",
   "rtxremix.setting.community.cloudTint": "云层明暗",
   "rtxremix.setting.community.cloudTint.tip": "雨天云变成风暴灰、夜晚变成暗蓝，不再一直是白色：夜里不再发光，雨里不再发棕。社区版功能。",
   "rtxremix.setting.community.realisticWater": "真实水体",

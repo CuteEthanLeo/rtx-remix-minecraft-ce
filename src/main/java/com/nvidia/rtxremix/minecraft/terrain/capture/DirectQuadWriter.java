@@ -9,6 +9,7 @@ package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import com.nvidia.rtxremix.minecraft.community.Puddles;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
@@ -376,7 +377,13 @@ public final class DirectQuadWriter {
             if (collectsRain) {
                 bk = WetSurfaces.wetKey(bk);
                 if (cat == ChunkManager.CAT_SOLID) {
-                    writeRainRipple(i);
+                    Identifier sprite = stageSpriteId[i];
+                    if (Puddles.pools(sprite != null ? sprite.getPath() : null)) {
+                        writeGroundDecal(i, ChunkManager.CAT_OVERLAY, Puddles.BUCKET,
+                                Puddles.LIFT, Puddles.TILE_BLOCKS);
+                    }
+                    writeGroundDecal(i, ChunkManager.CAT_RAIN, RainRipples.BUCKET,
+                            RainRipples.LIFT, RainRipples.TILE_BLOCKS);
                 }
             }
             final String bucketKey = bk;
@@ -406,10 +413,10 @@ public final class DirectQuadWriter {
     private final float[] rippleUvs = new float[8];
 
     /**
-     * Lays a raindrop-ripple decal over a staged quad that spans its whole
-     * block top, with UVs in world space so the ripples tile across blocks.
+     * Lays a decal over a staged quad that spans its whole block top, with UVs
+     * in world space so the decal tiles across blocks.
      */
-    private void writeRainRipple(int quad) {
+    private void writeGroundDecal(int quad, int category, String bucketKey, float lift, float tileBlocks) {
         float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
         float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
         for (int v = 0; v < 4; v++) {
@@ -424,12 +431,12 @@ public final class DirectQuadWriter {
             float y = stagePos[quad * 12 + v * 3 + 1];
             float z = stagePos[quad * 12 + v * 3 + 2];
             ripplePositions[v * 3] = x;
-            ripplePositions[v * 3 + 1] = y + RainRipples.LIFT;
+            ripplePositions[v * 3 + 1] = y + lift;
             ripplePositions[v * 3 + 2] = z;
-            rippleUvs[v * 2] = (sectionMinX + x) / RainRipples.TILE_BLOCKS;
-            rippleUvs[v * 2 + 1] = (sectionMinZ + z) / RainRipples.TILE_BLOCKS;
+            rippleUvs[v * 2] = (sectionMinX + x) / tileBlocks;
+            rippleUvs[v * 2 + 1] = (sectionMinZ + z) / tileBlocks;
         }
-        BucketBuffer bb = getBucket(ChunkManager.CAT_RAIN, RainRipples.BUCKET);
+        BucketBuffer bb = getBucket(category, bucketKey);
         bb.writeQuad(ripplePositions, 0, rippleUvs, 0, 0, 1, 0, 0xFFFFFFFF,
                 HardcodedVertex.packHalf2x16(0, 0), HardcodedVertex.packHalf2x16(1, 1));
     }

@@ -17,6 +17,7 @@ import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.TextureFormat;
 import com.nvidia.rtxremix.TexturePurpose;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import com.nvidia.rtxremix.minecraft.community.Puddles;
 import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
@@ -121,6 +122,8 @@ public class BlockTextureManager {
     private final RemixMaterial[] waterTintMaterials = new RemixMaterial[WaterLook.PALETTE_SIZE];
     private RemixMaterial shoreFoamMaterial;
     private RemixMaterial rainRippleMaterial;
+    private RemixMaterial puddleMaterial;
+    private PuddleMask puddleMask;
     private RemixTexture shoreFoamTexture;
     private RemixMaterial waterCameraMediumMaterial;
     private long waterNormalHandle;
@@ -766,6 +769,9 @@ public class BlockTextureManager {
     private void destroyWaterResources(RemixAPI api) {
         destroyManagedMaterial(rainRippleMaterial);
         rainRippleMaterial = null;
+        destroyManagedMaterial(puddleMaterial);
+        puddleMaterial = null;
+        puddleMask = null;
         destroyManagedMaterial(shoreFoamMaterial);
         shoreFoamMaterial = null;
         destroyManagedTexture(shoreFoamTexture);
@@ -816,6 +822,7 @@ public class BlockTextureManager {
             waterSurfaceMaterial = waterTintMaterials[0];
             buildShoreFoamMaterial(api);
             buildRainRippleMaterial(api);
+            buildPuddleMaterial(api);
 
             waterCameraMediumMaterial = createMaterialViaStore(MaterialInfo.builder()
                     .albedoTexture(waterWhiteTexture.getHandle())
@@ -850,6 +857,39 @@ public class BlockTextureManager {
     }
 
     public RemixMaterial getWaterSurfaceMaterial() { return waterSurfaceMaterial; }
+
+    /** The puddle decal material, or null when it could not be created. */
+    public RemixMaterial getPuddleMaterial() { return puddleMaterial; }
+
+    /**
+     * Builds the puddle decal: a near-mirror sheet of dark water whose alpha
+     * mask starts empty and grows with the ground's wetness.
+     */
+    private void buildPuddleMaterial(RemixAPI api) {
+        float[] depth = Puddles.depthField(PUDDLE_SEED);
+        byte[] empty = new byte[depth.length * 4];
+        Puddles.mask(depth, 0, empty);
+        RemixTexture texture = upload(api, "puddles", empty, Puddles.SIZE, Puddles.SIZE,
+                TextureFormat.RGBA8_UNORM, TexturePurpose.COLOR);
+        if (texture == null) {
+            LOGGER.warn("Failed to create the puddle texture; rain leaves no puddles");
+            return;
+        }
+        puddleMaterial = createMaterialViaStore(MaterialInfo.builder()
+                .albedoTexture(texture.getHandle())
+                .filterMode(1)
+                .opaqueExt(MaterialInfoOpaqueEXT.builder()
+                        .albedoConstant(1f, 1f, 1f)
+                        .roughnessConstant(0.02f)
+                        .metallicConstant(0f)
+                        .blendEnabled(true)
+                        .blendType(MaterialInfoOpaqueEXT.BLEND_TYPE_ALPHA)
+                        .build())
+                .build());
+        puddleMask = new PuddleMask(depth, texture);
+    }
+
+    private static final long PUDDLE_SEED = 0x5055_4444L;
 
     /** The raindrop-ripple decal material, or null when it could not be created. */
     public RemixMaterial getRainRippleMaterial() { return rainRippleMaterial; }
@@ -1173,6 +1213,9 @@ public class BlockTextureManager {
         RemixAPI api = renderer.getRemixApi();
         if (!initialized || wetAtlas == null || api == null) {
             return;
+        }
+        if (puddleMask != null) {
+            puddleMask.update(api, Puddles.isEnabled() ? level : 0);
         }
         int shown = wetAtlas.update(api, level, (name, data, w, h, format) -> upload(api, name, data, w, h,
                 format, format == TextureFormat.R8_UNORM ? TexturePurpose.DATA : TexturePurpose.COLOR));
@@ -1575,6 +1618,8 @@ public class BlockTextureManager {
             shoreFoamMaterial = null;
             shoreFoamTexture = null;
             rainRippleMaterial = null;
+            puddleMaterial = null;
+            puddleMask = null;
             waterSurfaceMaterial = null;
             waterCameraMediumMaterial = null;
             waterWhiteTexture = null;
