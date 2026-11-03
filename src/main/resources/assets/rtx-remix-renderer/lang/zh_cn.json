@@ -138,6 +138,8 @@
   "rtxremix.setting.community.overcastWeather.tip": "雨天和雷暴时天空变暗，柔和均匀的阴天光线取代“阳光照射感”，雨雾也有光可散射。关闭恢复官方天气光照。社区版功能。",
   "rtxremix.setting.community.wetGround": "湿润地面",
   "rtxremix.setting.community.wetGround.tip": "雨中露天的地面会变暗并泛起水光，致密的石头比疏松的泥土更亮，雨停后慢慢变干。有遮挡的地方保持干燥。社区版功能。",
+  "rtxremix.setting.community.rainRipples": "雨滴涟漪",
+  "rtxremix.setting.community.rainRipples.tip": "下雨时，雨滴在露天地面的薄水膜上激起有光泽的涟漪圈。开启时隐藏原版的雨滴溅射粒子。社区版功能。",
   "rtxremix.setting.community.cloudTint": "云层明暗",
   "rtxremix.setting.community.cloudTint.tip": "雨天云变成风暴灰、夜晚变成暗蓝，不再一直是白色：夜里不再发光，雨里不再发棕。社区版功能。",
   "rtxremix.setting.community.realisticWater": "真实水体",

@@ -26,6 +26,8 @@ import com.nvidia.rtxremix.minecraft.mixin.SpriteBillboardParticleAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.Particle;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import net.minecraft.client.particle.RainSplashParticle;
 import net.minecraft.client.particle.ParticleTextureSheet;
 import net.minecraft.client.particle.SpriteBillboardParticle;
 import net.minecraft.client.texture.Sprite;
@@ -177,6 +179,7 @@ public class RemixParticleRenderer {
                 float u1 = billboard.invokeGetMaxU();
                 float v1 = billboard.invokeGetMaxV();
 
+                if (particle instanceof RainSplashParticle && RainRipples.isEnabled()) continue;
                 int slot = bucket.assignSlot(particle, frame);
                 if (slot < 0) continue;
 

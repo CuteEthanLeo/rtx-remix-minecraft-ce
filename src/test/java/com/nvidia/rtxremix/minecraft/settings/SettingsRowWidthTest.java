@@ -111,7 +111,8 @@ class SettingsRowWidthTest {
             entry("rtxremix.setting.community.realisticWater", "OFF"),
             entry("rtxremix.setting.community.animatedWater", "OFF"),
             entry("rtxremix.setting.community.shoreFoam", "OFF"),
-            entry("rtxremix.setting.community.wetGround", "OFF"));
+            entry("rtxremix.setting.community.wetGround", "OFF"),
+            entry("rtxremix.setting.community.rainRipples", "OFF"));
 
     private final DefaultFont font = DefaultFont.load();
     private final Map<String, String> lang = loadLang();

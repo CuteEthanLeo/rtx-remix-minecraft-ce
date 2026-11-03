@@ -144,6 +144,8 @@
   "rtxremix.setting.community.overcastWeather.tip": "In rain and thunder the sky dims and a soft, even overcast light replaces the sunlit look, so the rain haze has light to glow in. Off restores the original weather lighting. Community Edition.",
   "rtxremix.setting.community.wetGround": "Wet Ground",
   "rtxremix.setting.community.wetGround.tip": "Ground open to the sky darkens and gains a water sheen in rain, more on dense stone than on porous dirt, and dries slowly once the rain stops. Covered ground stays dry. Community Edition.",
+  "rtxremix.setting.community.rainRipples": "Rain Ripples",
+  "rtxremix.setting.community.rainRipples.tip": "While it rains, raindrops spread glossy ripple rings over open ground under a thin film of water. Vanilla rain splash particles are hidden while this is on. Community Edition.",
   "rtxremix.setting.community.cloudTint": "Cloud Shading",
   "rtxremix.setting.community.cloudTint.tip": "Clouds darken to storm grey in rain and to a dim blue at night instead of staying white, so they no longer glow at night or look brown in rain. Community Edition.",
   "rtxremix.setting.community.realisticWater": "Realistic Water",

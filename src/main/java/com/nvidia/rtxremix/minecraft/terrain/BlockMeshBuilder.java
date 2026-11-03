@@ -10,6 +10,7 @@ package com.nvidia.rtxremix.minecraft.terrain;
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.MeshInfoSurfaceTriangles;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.terrain.capture.DirectQuadWriter;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
@@ -394,6 +395,7 @@ public final class BlockMeshBuilder {
         String baseName = isSss ? dryKey.substring(0, dryKey.length() - 4) : dryKey;
 
         if (DirectQuadWriter.SHORE_FOAM_BUCKET.equals(baseName)) return tex.getShoreFoamMaterial();
+        if (RainRipples.BUCKET.equals(baseName)) return tex.getRainRippleMaterial();
         if (WaterLook.isWaterBucket(baseName)) {
             return tex.getWaterSurfaceMaterial(WaterLook.indexOfBucketKey(baseName));
         }

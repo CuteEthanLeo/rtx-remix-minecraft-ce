@@ -19,9 +19,9 @@ package com.nvidia.rtxremix.minecraft.community;
 public final class OvercastSky {
 
     /** Overcast dome radiance relative to upstream. */
-    static final float DOME_SCALE = 0.55f;
+    static final float DOME_SCALE = 0.9f;
     /** Daytime sky-ambient boost at full weather, added to the player's day boost. */
-    static final float DAY_AMBIENT_AT_FULL_WEATHER = 0.6f;
+    static final float DAY_AMBIENT_AT_FULL_WEATHER = 0.25f;
 
     private OvercastSky() {}
 

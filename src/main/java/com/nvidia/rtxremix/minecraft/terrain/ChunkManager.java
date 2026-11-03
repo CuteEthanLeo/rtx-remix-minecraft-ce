@@ -81,7 +81,8 @@ public class ChunkManager {
     public static final int CAT_TRANSLUCENT = 2;
     public static final int CAT_OVERLAY     = 3;  // decal overlays, DECAL_STATIC + alpha blend
     public static final int CAT_WATER       = 4;  // water surfaces on their own pages, ANIMATED_WATER
-    public static final int CAT_COUNT       = 5;
+    public static final int CAT_RAIN        = 5;  // raindrop ripple decals, hidden while it does not rain
+    public static final int CAT_COUNT       = 6;
 
     /** Light cull distance in chunks when the user sets none. */
     public static final int DEFAULT_LIGHT_CULL_CHUNKS = 8;
@@ -1421,6 +1422,7 @@ public class ChunkManager {
                 // Water has its own pages so Remix can classify it as animated
                 // water: moving layered normals and water-aware denoiser history.
                 case CAT_WATER -> InstanceCategoryBit.ANIMATED_WATER;
+                case CAT_RAIN -> InstanceCategoryBit.DECAL_STATIC;
                 default -> 0;
             };
 
@@ -1479,7 +1481,7 @@ public class ChunkManager {
         InstalledMeshPage page = cursor.installedPages.get(cursor.nextActivation++);
         try (ProfileScope activationScope = ProfileScope.begin("activateTerrainPage")) {
             activationScope.meshCategory(page.category);
-            page.instance.setCategoryFlags(page.categoryFlags);
+            page.instance.setCategoryFlags(shownFlags(page));
             page.instance.drawFast(api);
         } catch (RuntimeException | Error failure) {
             LOGGER.error("Native terrain activation failed for category {}",
@@ -1802,6 +1804,35 @@ public class ChunkManager {
         return drawCalls;
     }
 
+    /** The flags a page is shown with: rain ripples stay hidden while it does not rain. */
+    private int shownFlags(InstalledMeshPage page) {
+        return page.category == CAT_RAIN && !rainRipplesVisible
+                ? page.categoryFlags | InstanceCategoryBit.HIDDEN
+                : page.categoryFlags;
+    }
+
+    /**
+     * Shows or hides every rain-ripple page. Only a change touches the
+     * retained instances, so this is cheap to call every frame.
+     */
+    public void setRainRipplesVisible(boolean visible) {
+        if (visible == rainRipplesVisible) return;
+        rainRipplesVisible = visible;
+        RemixAPI api = renderer.getRemixApi();
+        if (api == null || retainedInstancesHidden) return;
+        for (ColumnRenderState state : renderColumns.values()) {
+            for (InstalledMeshPage page : state.activePages) {
+                if (page.category != CAT_RAIN) continue;
+                RemixInstance instance = page.instance;
+                if (instance == null || instance.isDeletedFast()) continue;
+                instance.setCategoryFlags(shownFlags(page));
+                instance.drawFast(api);
+            }
+        }
+    }
+
+    private boolean rainRipplesVisible;
+
     /** Hides retained terrain instances while preserving cached meshes. */
     public void hideRetainedInstances() {
         RemixAPI api = renderer.getRemixApi();
@@ -1927,7 +1958,7 @@ public class ChunkManager {
     private static InstanceInfoBlendEXT blendExtForCategory(int cat) {
         return switch (cat) {
             case CAT_CUTOUT   -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaTest(128);
-            case CAT_OVERLAY  -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaBlend(1);
+            case CAT_OVERLAY, CAT_RAIN -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaBlend(1);
             default           -> InstanceInfoBlendEXT.textureTimesVertexColor();
         };
     }

@@ -125,7 +125,8 @@ public class SkyRenderer {
     public static final float DEFAULT_DAY_AMBIENT_BOOST = 0.0f;
     public static final boolean DEFAULT_SKY_AMBIENT_RECT_ENABLED = true;
     public static final float DEFAULT_MINIMUM_CELESTIAL_WEATHER_VISIBILITY = 0.0f;
-    public static final float DEFAULT_MIE_SCATTERING_ANISOTROPY = 0.9f;
+    /** Community Edition: 0.96 rather than 0.9, so the sun's glow stays a halo instead of washing out half the sky. */
+    public static final float DEFAULT_MIE_SCATTERING_ANISOTROPY = 0.96f;
     public static final float MAX_MIE_SCATTERING_ANISOTROPY = 0.99f;
     private static float nightAmbientBoost = DEFAULT_NIGHT_AMBIENT_BOOST;
     private static float dayAmbientBoost = DEFAULT_DAY_AMBIENT_BOOST;

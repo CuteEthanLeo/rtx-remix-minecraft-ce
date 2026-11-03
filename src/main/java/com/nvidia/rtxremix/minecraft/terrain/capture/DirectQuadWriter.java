@@ -8,6 +8,7 @@
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
@@ -228,6 +229,8 @@ public final class DirectQuadWriter {
 
     /** Resets all bucket buffers for a new section. */
     public void beginSection(int sectionMinX, int sectionMinY, int sectionMinZ) {
+        this.sectionMinX = sectionMinX;
+        this.sectionMinZ = sectionMinZ;
         for (BucketBuffer bb : bucketOrder) bb.reset();
         lastBucketCategory = -1;
         lastBucketKey = null;
@@ -367,9 +370,14 @@ public final class DirectQuadWriter {
             if (se != null && se.hasSSS && tex != null && tex.getAtlasMaterialSSS(layerType) != null) {
                 bk = sssBucketKeyForOriginalLayer(layer, bk);
             }
-            if (rainExposed && stageNy[i] > WetSurfaces.MIN_UP_NORMAL
-                    && (cat == ChunkManager.CAT_SOLID || cat == ChunkManager.CAT_CUTOUT)) {
+            boolean collectsRain = rainExposed && stageNy[i] > WetSurfaces.MIN_UP_NORMAL
+                    && (cat == ChunkManager.CAT_SOLID || cat == ChunkManager.CAT_CUTOUT)
+                    && !bk.endsWith("_sss");
+            if (collectsRain) {
                 bk = WetSurfaces.wetKey(bk);
+                if (cat == ChunkManager.CAT_SOLID) {
+                    writeRainRipple(i);
+                }
             }
             final String bucketKey = bk;
 
@@ -392,6 +400,39 @@ public final class DirectQuadWriter {
     }
 
     private boolean rainExposed;
+    private int sectionMinX;
+    private int sectionMinZ;
+    private final float[] ripplePositions = new float[12];
+    private final float[] rippleUvs = new float[8];
+
+    /**
+     * Lays a raindrop-ripple decal over a staged quad that spans its whole
+     * block top, with UVs in world space so the ripples tile across blocks.
+     */
+    private void writeRainRipple(int quad) {
+        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+        for (int v = 0; v < 4; v++) {
+            float x = stagePos[quad * 12 + v * 3];
+            float z = stagePos[quad * 12 + v * 3 + 2];
+            minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+            minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+        }
+        if (maxX - minX < 0.99f || maxZ - minZ < 0.99f) return;
+        for (int v = 0; v < 4; v++) {
+            float x = stagePos[quad * 12 + v * 3];
+            float y = stagePos[quad * 12 + v * 3 + 1];
+            float z = stagePos[quad * 12 + v * 3 + 2];
+            ripplePositions[v * 3] = x;
+            ripplePositions[v * 3 + 1] = y + RainRipples.LIFT;
+            ripplePositions[v * 3 + 2] = z;
+            rippleUvs[v * 2] = (sectionMinX + x) / RainRipples.TILE_BLOCKS;
+            rippleUvs[v * 2 + 1] = (sectionMinZ + z) / RainRipples.TILE_BLOCKS;
+        }
+        BucketBuffer bb = getBucket(ChunkManager.CAT_RAIN, RainRipples.BUCKET);
+        bb.writeQuad(ripplePositions, 0, rippleUvs, 0, 0, 1, 0, 0xFFFFFFFF,
+                HardcodedVertex.packHalf2x16(0, 0), HardcodedVertex.packHalf2x16(1, 1));
+    }
 
     private void classifyStagedQuads(int solidType) {
         for (int i = 0; i < stageCount; i++) {

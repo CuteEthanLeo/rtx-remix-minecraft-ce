@@ -29,6 +29,7 @@ import com.nvidia.rtxremix.minecraft.logic.ViewDistanceFade;
 import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.settings.PostProcessingSettings;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
@@ -900,7 +901,11 @@ public class RemixRenderer {
 
             if (RtxRemixMod.isWorldActive() && textureManager != null) {
                 try (ProfileScope ignored = ProfileScope.begin("WetSurfaces")) {
-                    textureManager.updateWetness(rainAtCamera(world, cameraPos, tickDelta));
+                    float rain = rainAtCamera(world, cameraPos, tickDelta);
+                    textureManager.updateWetness(rain);
+                    if (chunkManager != null) {
+                        chunkManager.setRainRipplesVisible(RainRipples.visible(rain));
+                    }
                 }
             }
 

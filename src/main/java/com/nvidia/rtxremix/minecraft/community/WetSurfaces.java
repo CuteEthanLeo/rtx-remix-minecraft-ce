@@ -99,7 +99,7 @@ public final class WetSurfaces {
         int pixels = dryRoughness.length;
         for (int i = 0; i < pixels; i++) {
             float p = (porosity[i] & 0xFF) / 255.0f;
-            float darken = 1.0f - w * (0.22f + 0.38f * p);
+            float darken = 1.0f - w * (0.12f + 0.28f * p);
             int i4 = i * 4;
             wetAlbedo[i4] = (byte) Math.round((dryAlbedo[i4] & 0xFF) * darken);
             wetAlbedo[i4 + 1] = (byte) Math.round((dryAlbedo[i4 + 1] & 0xFF) * darken);
@@ -107,12 +107,12 @@ public final class WetSurfaces {
             wetAlbedo[i4 + 3] = dryAlbedo[i4 + 3];
 
             float film = w * (1.0f - 0.55f * p);
-            float roughness = (dryRoughness[i] & 0xFF) * (1.0f - 0.72f * film);
+            float roughness = (dryRoughness[i] & 0xFF) * (1.0f - 0.5f * film);
             wetRoughness[i] = (byte) Math.round(Math.max(Math.min(MIN_WET_ROUGHNESS, dryRoughness[i] & 0xFF),
                     roughness));
         }
     }
 
     /** A wet film smooths a surface, but a block face never turns into a perfect mirror. */
-    private static final float MIN_WET_ROUGHNESS = 0.14f * 255.0f;
+    private static final float MIN_WET_ROUGHNESS = 0.3f * 255.0f;
 }

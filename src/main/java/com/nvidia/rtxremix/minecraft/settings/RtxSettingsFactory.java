@@ -19,6 +19,7 @@ import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
 import com.nvidia.rtxremix.minecraft.entity.RemixEntityPass;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 
@@ -276,6 +277,9 @@ public final class RtxSettingsFactory {
         list.add(RtxSetting.ofBool("community.wetGround", SettingGroup.COMMUNITY_WEATHER,
                 "rtxremix.setting.community.wetGround", "rtxremix.setting.community.wetGround.tip",
                 true, WetSurfaces::isEnabled, WetSurfaces::setEnabled));
+        list.add(RtxSetting.ofBool("community.rainRipples", SettingGroup.COMMUNITY_WEATHER,
+                "rtxremix.setting.community.rainRipples", "rtxremix.setting.community.rainRipples.tip",
+                true, RainRipples::isEnabled, RainRipples::setEnabled));
         list.add(communityLook(renderer, "community.cloudTint", SettingGroup.COMMUNITY_WEATHER,
                 CommunityLook.DEFAULT_CLOUD_TINT,
                 CommunityLook::isCloudTint, CommunityLook::setCloudTint));

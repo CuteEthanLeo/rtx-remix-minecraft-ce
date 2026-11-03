@@ -16,6 +16,7 @@ import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.TextureFormat;
 import com.nvidia.rtxremix.TexturePurpose;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
@@ -73,7 +74,12 @@ public class BlockTextureManager {
     private static final float COMMON_GLASS_IOR = 1.52f;
     private static final float THIN_SSS_MEASUREMENT_DISTANCE = 0.75f;
     private static final int THIN_SSS_DEFAULT_THICKNESS = Math.round(THIN_SSS_MEASUREMENT_DISTANCE * 255.0f);
-    private static final float DEFAULT_CUTOUT_SSS_TRANSMISSION_DISTANCE = THIN_SSS_MEASUREMENT_DISTANCE;
+    /**
+     * Community Edition: a quarter of a block rather than the full thin-SSS
+     * distance. At the longer distance grass and leaves let so much light
+     * through that they glowed brighter than the lit ground beside them.
+     */
+    private static final float DEFAULT_CUTOUT_SSS_TRANSMISSION_DISTANCE = 0.25f;
     private static final float DEFAULT_CUTOUT_SSS_ANISOTROPY = 0.0f;
     private static final float DEFAULT_CUTOUT_SSS_ALBEDO = 0.5f;
     public static final float DEFAULT_TERRAIN_EMISSION_MULTIPLIER = 1.0f;
@@ -114,6 +120,7 @@ public class BlockTextureManager {
     /** One surface material per {@link WaterLook} palette entry; entry 0 is {@link #waterSurfaceMaterial}. */
     private final RemixMaterial[] waterTintMaterials = new RemixMaterial[WaterLook.PALETTE_SIZE];
     private RemixMaterial shoreFoamMaterial;
+    private RemixMaterial rainRippleMaterial;
     private RemixTexture shoreFoamTexture;
     private RemixMaterial waterCameraMediumMaterial;
     private long waterNormalHandle;
@@ -757,6 +764,8 @@ public class BlockTextureManager {
     }
 
     private void destroyWaterResources(RemixAPI api) {
+        destroyManagedMaterial(rainRippleMaterial);
+        rainRippleMaterial = null;
         destroyManagedMaterial(shoreFoamMaterial);
         shoreFoamMaterial = null;
         destroyManagedTexture(shoreFoamTexture);
@@ -806,6 +815,7 @@ public class BlockTextureManager {
             }
             waterSurfaceMaterial = waterTintMaterials[0];
             buildShoreFoamMaterial(api);
+            buildRainRippleMaterial(api);
 
             waterCameraMediumMaterial = createMaterialViaStore(MaterialInfo.builder()
                     .albedoTexture(waterWhiteTexture.getHandle())
@@ -840,6 +850,40 @@ public class BlockTextureManager {
     }
 
     public RemixMaterial getWaterSurfaceMaterial() { return waterSurfaceMaterial; }
+
+    /** The raindrop-ripple decal material, or null when it could not be created. */
+    public RemixMaterial getRainRippleMaterial() { return rainRippleMaterial; }
+
+    /** Builds the ripple decal material from its procedural sprite sheets. */
+    private void buildRainRippleMaterial(RemixAPI api) {
+        RainRipples.Sheets sheets = RainRipples.generate(RAIN_RIPPLE_SEED);
+        int side = RainRipples.sheetSize();
+        RemixTexture albedo = upload(api, "rain_ripple_albedo", sheets.albedo(), side, side,
+                TextureFormat.RGBA8_UNORM, TexturePurpose.COLOR);
+        RemixTexture normal = upload(api, "rain_ripple_normal", sheets.normal(), side, side,
+                TextureFormat.RGBA8_UNORM, TexturePurpose.NORMAL_DX);
+        if (albedo == null || normal == null) {
+            LOGGER.warn("Failed to create the rain ripple textures; rain draws no ripples");
+            return;
+        }
+        rainRippleMaterial = createMaterialViaStore(MaterialInfo.builder()
+                .albedoTexture(albedo.getHandle())
+                .normalTexture(normal.getHandle())
+                .filterMode(1)
+                .spriteSheetRow(RainRipples.SHEET_SIDE)
+                .spriteSheetCol(RainRipples.SHEET_SIDE)
+                .spriteSheetFps(RainRipples.FRAMES_PER_SECOND)
+                .opaqueExt(MaterialInfoOpaqueEXT.builder()
+                        .albedoConstant(1f, 1f, 1f)
+                        .roughnessConstant(0.04f)
+                        .metallicConstant(0f)
+                        .blendEnabled(true)
+                        .blendType(MaterialInfoOpaqueEXT.BLEND_TYPE_ALPHA)
+                        .build())
+                .build());
+    }
+
+    private static final long RAIN_RIPPLE_SEED = 0x5241_494EL;
 
     /** The shore-foam decal material, or null when it could not be created. */
     public RemixMaterial getShoreFoamMaterial() { return shoreFoamMaterial; }
@@ -1530,6 +1574,7 @@ public class BlockTextureManager {
             Arrays.fill(waterTintMaterials, null);
             shoreFoamMaterial = null;
             shoreFoamTexture = null;
+            rainRippleMaterial = null;
             waterSurfaceMaterial = null;
             waterCameraMediumMaterial = null;
             waterWhiteTexture = null;
