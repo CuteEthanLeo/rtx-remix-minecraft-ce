@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.light;
 
@@ -12,6 +15,7 @@ import com.nvidia.rtxremix.LightInfoLightShaping;
 import com.nvidia.rtxremix.LightInfoSphereEXT;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
+import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.asset.RemixLight;
 import com.nvidia.rtxremix.minecraft.asset.RemixLightStore;
@@ -1091,9 +1095,11 @@ public class LightManager {
         float[] moonPosition = {-sunPosition[0], -sunPosition[1], -sunPosition[2]};
 
         float sunLuminance = BASE_SUN_LUMINANCE * sunIntensity;
-        float moonLuminance = BASE_MOON_LUMINANCE * moonIntensity;
+        float moonLuminance = BASE_MOON_LUMINANCE * moonIntensity * NightLight.moonLuminanceScale();
+        float[] moonTint = NightLight.moonTint();
         float[] sunSource = {sunLuminance, sunLuminance, sunLuminance};
-        float[] moonSource = {moonLuminance * 0.85f, moonLuminance * 0.9f, moonLuminance};
+        float[] moonSource = {
+                moonLuminance * moonTint[0], moonLuminance * moonTint[1], moonLuminance * moonTint[2]};
         float[] sunDirect = applyTransmittance(sunSource, directAtmosphereTransmittance(sunPosition[1]));
         float[] moonDirect = applyTransmittance(moonSource, directAtmosphereTransmittance(moonPosition[1]));
         sunDirect = scaleRadiance(sunDirect, weatherSunDirectScale(rainGradient, thunderGradient));

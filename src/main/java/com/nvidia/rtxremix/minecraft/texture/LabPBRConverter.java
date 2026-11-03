@@ -1,9 +1,13 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
@@ -26,11 +30,46 @@ public final class LabPBRConverter {
     public static final float DIFFUSION_SSS_RADIUS_SCALE = 100.0f;
     public static final float DIFFUSION_SSS_MAX_SAMPLE_RADIUS = 32.0f;
 
+    /**
+     * How a LabPBR perceptual smoothness becomes the roughness Remix samples.
+     *
+     * <p>Remix reads a roughness texture as perceptual roughness and squares it
+     * itself when shading, so {@link #PERCEPTUAL} is the faithful conversion.
+     * {@link #SQUARED} writes LabPBR's linear roughness instead, which Remix
+     * then squares a second time; it is the upstream look, kept selectable for
+     * packs authored against it.
+     */
+    public enum RoughnessEncoding {
+        PERCEPTUAL,
+        SQUARED
+    }
+
+    private static volatile RoughnessEncoding roughnessEncoding = RoughnessEncoding.PERCEPTUAL;
+
     private LabPBRConverter() {}
+
+    /**
+     * Selects the conversion used by every roughness builder from now on.
+     * Callers rebuild the affected textures themselves.
+     */
+    public static void setRoughnessEncoding(RoughnessEncoding encoding) {
+        roughnessEncoding = java.util.Objects.requireNonNull(encoding, "encoding");
+    }
+
+    public static RoughnessEncoding roughnessEncoding() {
+        return roughnessEncoding;
+    }
 
     // --- Per-pixel conversions (int 0-255 domain) ---
 
-    private static int smoothnessToRoughness(int s) {
+    static int smoothnessToRoughness(int s) {
+        return smoothnessToRoughness(s, roughnessEncoding);
+    }
+
+    static int smoothnessToRoughness(int s, RoughnessEncoding encoding) {
+        if (encoding == RoughnessEncoding.PERCEPTUAL) {
+            return clamp255(255 - s);
+        }
         double lin = 1.0 - s / 255.0;
         return clamp255((int) (lin * lin * 255.0));
     }
@@ -91,6 +130,16 @@ public final class LabPBRConverter {
     }
 
     /** Blits metallic R8 from _s green channel. */
+    /** Writes LabPBR porosity (the blue channel below 65) as 0..255; subsurface texels count as dense. */
+    public static void blitPorosity(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                int abgr = s.getColor(x % s.getWidth(), y % s.getHeight());
+                dst[(oy + y) * atlasW + (ox + x)] =
+                        (byte) WetSurfaces.porosityFromSpecularBlue((abgr >> 16) & 0xFF);
+            }
+    }
+
     public static void blitMetallic(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {

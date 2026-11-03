@@ -5,3 +5,11 @@ This product includes software developed at NVIDIA CORPORATION & AFFILIATES.
 
 Third-party software distributed with this project is listed, with the
 applicable licenses, in THIRD_PARTY_NOTICES.md.
+
+RTX Remix for Minecraft Community Edition
+Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
+
+The Community Edition is an unofficial derivative of RTX Remix for Minecraft
+(https://github.com/NVIDIAGameWorks/rtx-remix-minecraft). It is not affiliated
+with or endorsed by NVIDIA. Files changed from the upstream project carry a
+notice saying so; COMMUNITY.md lists every change.

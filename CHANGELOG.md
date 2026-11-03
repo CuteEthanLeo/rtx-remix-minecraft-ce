@@ -9,6 +9,31 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.1 - Unreleased
+
+The first Community Edition build, on upstream `a518eff`. Every change below
+has its own switch; COMMUNITY.md lists them.
+
+### Added
+
+- Rain-wet ground: rain-exposed upward faces darken and gain a water sheen by
+  LabPBR porosity, then dry slowly.
+- Shore foam, biome water colours, and Remix animated water on water surfaces.
+- A night sky of 4000 stars and a procedural Milky Way, with cooler, stronger
+  moonlight.
+- Optional motion blur in four quality steps.
+- A Simplified Chinese translation.
+
+### Changed
+
+- LabPBR smoothness converts to the perceptual roughness Remix expects, so
+  terrain is no longer glossier than authored.
+- Rain and thunder bring a denser, drifting haze, an overcast sky, and no
+  exposure lift; clouds follow the weather and time of day.
+- Night brings a thin haze; the night sky ambient defaults to 1.4.
+- Shipped confs that an install still has unedited are upgraded to the new
+  defaults.
+
 ## Unreleased
 
 ### Fixed

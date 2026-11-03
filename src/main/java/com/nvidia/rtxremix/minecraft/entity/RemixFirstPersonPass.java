@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.entity;
 
@@ -161,7 +164,9 @@ public final class RemixFirstPersonPass implements AutoCloseable {
         if (result == null) {
             return;
         }
-        submitter.submitEntity(result, cameraToWorld, InstanceCategoryBit.VIEW_MODEL,
+        // The hand moves with the camera, so camera-driven motion blur would only smear it.
+        submitter.submitEntity(result, cameraToWorld,
+                InstanceCategoryBit.VIEW_MODEL | InstanceCategoryBit.IGNORE_MOTION_BLUR,
                 RemixEntitySubmitter.NO_EXTRA_CATEGORIES);
     }
 

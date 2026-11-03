@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -42,6 +45,7 @@ final class RtxOptionFactory {
      */
     static final int SENTINEL_SLIDER_VALUE = 33;
     static final String UNFOCUSED_FRAMERATE_ID = "framerate.unfocused";
+    static final String MOTION_BLUR_ID = "post.motionBlur";
 
     private RtxOptionFactory() {}
 
@@ -261,6 +265,14 @@ final class RtxOptionFactory {
     }
 
     static Text intValueText(String settingId, int value) {
+        if (MOTION_BLUR_ID.equals(settingId)) {
+            return Text.translatable(switch (value) {
+                case CameraEffectsSettings.STANDARD -> "rtxremix.settings.value.motionBlur.standard";
+                case CameraEffectsSettings.HIGH -> "rtxremix.settings.value.motionBlur.high";
+                case CameraEffectsSettings.CINEMATIC -> "rtxremix.settings.value.motionBlur.cinematic";
+                default -> "rtxremix.settings.value.off";
+            });
+        }
         if (UNFOCUSED_FRAMERATE_ID.equals(settingId)) {
             // Vanilla's own Max Framerate wording, so the two read alike.
             return value == UnfocusedFramerateLimit.UNLIMITED

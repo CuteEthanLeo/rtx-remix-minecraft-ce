@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -93,11 +96,22 @@ class SettingsRowWidthTest {
             entry("rtxremix.setting.sky.nightAmbient", "10.00"),
             entry("rtxremix.setting.materials.terrainEmission", "50.00×"),
             entry("rtxremix.setting.materials.smoothReliefMaps", "OFF"),
+            entry("rtxremix.setting.materials.perceptualRoughness", "OFF"),
             entry("rtxremix.setting.post.exposure", "2.00"),
             entry("rtxremix.setting.post.shadows", "-5.00"),
             entry("rtxremix.setting.post.highlights", "10.00"),
             entry("rtxremix.setting.post.lowLightAdaptation", "-5.00"),
-            entry("rtxremix.setting.post.highLightAdaptation", "10.00"));
+            entry("rtxremix.setting.post.highLightAdaptation", "10.00"),
+            entry("rtxremix.setting.post.motionBlur", "Cinematic"),
+            entry("rtxremix.setting.post.motionBlurShutter", "1.00"),
+            entry("rtxremix.setting.post.motionBlurMaxSize", "0.10"),
+            entry("rtxremix.setting.community.overcastWeather", "OFF"),
+            entry("rtxremix.setting.community.cloudTint", "OFF"),
+            entry("rtxremix.setting.community.starryNight", "OFF"),
+            entry("rtxremix.setting.community.realisticWater", "OFF"),
+            entry("rtxremix.setting.community.animatedWater", "OFF"),
+            entry("rtxremix.setting.community.shoreFoam", "OFF"),
+            entry("rtxremix.setting.community.wetGround", "OFF"));
 
     private final DefaultFont font = DefaultFont.load();
     private final Map<String, String> lang = loadLang();

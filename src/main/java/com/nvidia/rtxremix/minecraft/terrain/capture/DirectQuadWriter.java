@@ -1,9 +1,14 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
+import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
@@ -279,10 +284,11 @@ public final class DirectQuadWriter {
         int layerType = BlockTextureManager.layerType(renderLayer);
         boolean isWater = spriteId == null;
 
-        int cat = isBlendedLayer(renderLayer) ? ChunkManager.CAT_TRANSLUCENT
+        int cat = isWater ? ChunkManager.CAT_WATER
+                : isBlendedLayer(renderLayer) ? ChunkManager.CAT_TRANSLUCENT
                                               : ChunkManager.CAT_SOLID;
 
-        String bk = isWater ? "water" : renderLayer;
+        String bk = isWater ? WaterLook.bucketKey(WaterLook.paletteIndex(color & 0xFFFFFF)) : renderLayer;
         BlockTextureManager.SpriteEntry se = (spriteId != null && tex != null)
                 ? tex.getSpriteById(spriteId) : null;
         if (se != null && se.hasSSS && tex != null && tex.getAtlasMaterialSSS(layerType) != null) {
@@ -300,13 +306,45 @@ public final class DirectQuadWriter {
         bb.writeQuad(positions, 0, uvs, 0, nx, ny, nz, color, boundsMin, boundsMax);
     }
 
+    /** Bucket of the shore-foam decal strips, resolved to the foam material. */
+    public static final String SHORE_FOAM_BUCKET = "shore_foam";
+
+    /**
+     * Writes one upward-facing shore-foam strip as a terrain decal. The strip's
+     * alpha comes from the foam texture, so the vertex colour is plain white.
+     */
+    public void writeShoreFoamQuad(float[] positions, float[] uvs) {
+        BucketBuffer bb = getBucket(ChunkManager.CAT_OVERLAY, SHORE_FOAM_BUCKET);
+        bb.writeQuad(positions, 0, uvs, 0, 0, 1, 0, 0xFFFFFFFF,
+                HardcodedVertex.packHalf2x16(0, 0), HardcodedVertex.packHalf2x16(1, 1));
+    }
+
     /**
      * Runs overlay detection on staged quads and flushes them all to
      * the appropriate bucket buffers. Call once per block after all
      * {@link #stageQuad} calls for that block.
      */
+    /**
+     * Marks the block being staged as open to the rain, so its upward-facing
+     * opaque quads go to the wet twin buckets. Cleared by {@link #flushBlock}.
+     */
+    public void setRainExposed(boolean exposed) {
+        rainExposed = exposed;
+    }
+
+    /** Whether any quad staged for the current block faces up enough to collect rain. */
+    public boolean hasStagedRainFacingQuad() {
+        for (int i = 0; i < stageCount; i++) {
+            if (stageNy[i] > WetSurfaces.MIN_UP_NORMAL) return true;
+        }
+        return false;
+    }
+
     public void flushBlock(BlockTextureManager tex) {
-        if (stageCount == 0) return;
+        if (stageCount == 0) {
+            rainExposed = false;
+            return;
+        }
         detectOverlays(tex);
 
         int solidType = BlockTextureManager.layerType("solid");
@@ -329,6 +367,10 @@ public final class DirectQuadWriter {
             if (se != null && se.hasSSS && tex != null && tex.getAtlasMaterialSSS(layerType) != null) {
                 bk = sssBucketKeyForOriginalLayer(layer, bk);
             }
+            if (rainExposed && stageNy[i] > WetSurfaces.MIN_UP_NORMAL
+                    && (cat == ChunkManager.CAT_SOLID || cat == ChunkManager.CAT_CUTOUT)) {
+                bk = WetSurfaces.wetKey(bk);
+            }
             final String bucketKey = bk;
 
             BucketBuffer bb = getBucket(cat, bucketKey);
@@ -346,7 +388,10 @@ public final class DirectQuadWriter {
         Arrays.fill(stageSpriteEntry, 0, stageCount, null);
         Arrays.fill(stageDiscarded, 0, stageCount, false);
         stageCount = 0;
+        rainExposed = false;
     }
+
+    private boolean rainExposed;
 
     private void classifyStagedQuads(int solidType) {
         for (int i = 0; i < stageCount; i++) {

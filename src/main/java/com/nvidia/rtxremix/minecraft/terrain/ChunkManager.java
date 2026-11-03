@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain;
 
@@ -77,7 +80,8 @@ public class ChunkManager {
     public static final int CAT_CUTOUT      = 1;  // cutout / cutout_mipped, alpha test (binary opacity)
     public static final int CAT_TRANSLUCENT = 2;
     public static final int CAT_OVERLAY     = 3;  // decal overlays, DECAL_STATIC + alpha blend
-    public static final int CAT_COUNT       = 4;
+    public static final int CAT_WATER       = 4;  // water surfaces on their own pages, ANIMATED_WATER
+    public static final int CAT_COUNT       = 5;
 
     /** Light cull distance in chunks when the user sets none. */
     public static final int DEFAULT_LIGHT_CULL_CHUNKS = 8;
@@ -1412,9 +1416,13 @@ public class ChunkManager {
             if (pendingPage == null) continue;
             int category = pendingPage.category();
             RemixMesh pendingMesh = pendingPage.mesh();
-            int categoryFlags = category == CAT_OVERLAY
-                    ? InstanceCategoryBit.DECAL_STATIC
-                    : 0;
+            int categoryFlags = switch (category) {
+                case CAT_OVERLAY -> InstanceCategoryBit.DECAL_STATIC;
+                // Water has its own pages so Remix can classify it as animated
+                // water: moving layered normals and water-aware denoiser history.
+                case CAT_WATER -> InstanceCategoryBit.ANIMATED_WATER;
+                default -> 0;
+            };
 
             RemixMesh mesh = null;
             RemixInstance instance = null;

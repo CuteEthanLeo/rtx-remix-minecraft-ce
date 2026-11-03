@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
@@ -13,6 +16,9 @@ import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.TextureFormat;
 import com.nvidia.rtxremix.TexturePurpose;
+import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
+import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterialStore;
@@ -95,9 +101,20 @@ public class BlockTextureManager {
     private final Map<Long, RemixMaterial> materials = new HashMap<>();
     private final RemixMaterial[] atlasMaterials = new RemixMaterial[LAYER_COUNT];
     private final RemixMaterial[] atlasMaterialsSSS = new RemixMaterial[LAYER_COUNT];
+    /** Twins of the opaque atlas materials for rain-exposed surfaces; see {@link WetSurfaces}. */
+    private final RemixMaterial[] atlasMaterialsWet = new RemixMaterial[LAYER_COUNT];
+    private final RemixMaterial[] atlasMaterialsSSSWet = new RemixMaterial[LAYER_COUNT];
+    private final WetSurfaces wetSurfaces = new WetSurfaces();
+    private WetAtlas wetAtlas;
+    private boolean wetTwinsShowWet;
+    private long lastWetnessNanos;
     private final List<RemixTexture> managedTextures = new ArrayList<>();
     private final List<RemixMaterial> managedMaterials = new ArrayList<>();
     private RemixMaterial waterSurfaceMaterial;
+    /** One surface material per {@link WaterLook} palette entry; entry 0 is {@link #waterSurfaceMaterial}. */
+    private final RemixMaterial[] waterTintMaterials = new RemixMaterial[WaterLook.PALETTE_SIZE];
+    private RemixMaterial shoreFoamMaterial;
+    private RemixTexture shoreFoamTexture;
     private RemixMaterial waterCameraMediumMaterial;
     private long waterNormalHandle;
     private boolean initialized, initFailed;
@@ -109,6 +126,8 @@ public class BlockTextureManager {
     private boolean cutoutSssAlbedoTextureEnabled = true;
     private float terrainEmissionMultiplier = DEFAULT_TERRAIN_EMISSION_MULTIPLIER;
     private float appliedTerrainEmissionMultiplier = DEFAULT_TERRAIN_EMISSION_MULTIPLIER;
+    private boolean perceptualRoughness = true;
+    private boolean shoreFoam = true;
     private boolean terrainEmissionMaterialsInitialized;
 
     /**
@@ -262,6 +281,8 @@ public class BlockTextureManager {
             buildSprites(api, spriteAtlas, labPBRVariants);
             if (!terrainEmissionMaterialsInitialized) {
                 appliedTerrainEmissionMultiplier = terrainEmissionMultiplier;
+                LabPBRConverter.setRoughnessEncoding(roughnessEncoding(perceptualRoughness));
+                ShoreFoam.setEnabled(shoreFoam);
             }
             buildAtlasMaterials(api, labPBRVariants);
             buildWaterMaterials(api);
@@ -413,6 +434,7 @@ public class BlockTextureManager {
         byte[] normalAtlas    = new byte[pixels * 4];
         byte[] heightAtlas    = new byte[pixels];
         byte[] roughnessAtlas = new byte[pixels];
+        byte[] porosityAtlas  = new byte[pixels];
         byte[] metallicAtlas  = new byte[pixels];
         byte[] emissiveAtlas  = new byte[pixels * 4];
         byte[] sssThicknessAtlas = new byte[pixels * 4];
@@ -420,6 +442,7 @@ public class BlockTextureManager {
 
         Arrays.fill(heightAtlas, (byte) 255);
         Arrays.fill(roughnessAtlas, (byte) 180);
+        Arrays.fill(porosityAtlas, (byte) WetSurfaces.DEFAULT_POROSITY);
         fillRGBA(sssThicknessAtlas, THIN_SSS_DEFAULT_THICKNESS, THIN_SSS_DEFAULT_THICKNESS,
                 THIN_SSS_DEFAULT_THICKNESS, 255);
         for (int i = 0; i < pixels; i++) {
@@ -447,6 +470,7 @@ public class BlockTextureManager {
                 }
                 if (sI != null) {
                     LabPBRConverter.blitRoughness(roughnessAtlas, atlasW, sI, se.pixX, se.pixY, se.pixW, se.pixH);
+                    LabPBRConverter.blitPorosity(porosityAtlas, atlasW, sI, se.pixX, se.pixY, se.pixW, se.pixH);
                     LabPBRConverter.blitMetallic(metallicAtlas, atlasW, sI, se.pixX, se.pixY, se.pixW, se.pixH);
                     if (LabPBRConverter.hasSSSData(sI)) {
                         LabPBRConverter.blitSSS(sssThicknessAtlas, atlasW, sI, se.pixX, se.pixY, se.pixW, se.pixH);
@@ -513,8 +537,15 @@ public class BlockTextureManager {
                 atlasMaterialsSSS[lt] = hasAnySSS ? createAtlasOpaqueMaterial(lt, normalTex, heightTex,
                         roughnessTex, metallicTex, emissiveTex,
                         sssTex, sssAlbedoTex) : null;
+                atlasMaterialsWet[lt] = createAtlasOpaqueMaterial(lt, normalTex, heightTex,
+                        roughnessTex, metallicTex, emissiveTex, null, null);
+                atlasMaterialsSSSWet[lt] = hasAnySSS ? createAtlasOpaqueMaterial(lt, normalTex, heightTex,
+                        roughnessTex, metallicTex, emissiveTex,
+                        sssTex, sssAlbedoTex) : null;
             }
         }
+        wetAtlas = new WetAtlas(atlasW, atlasH, albedoRGBA.clone(), roughnessAtlas, porosityAtlas);
+        wetTwinsShowWet = false;
         int sssCount = 0;
         StringBuilder sssSprites = new StringBuilder();
         for (SpriteEntry se : sprites) {
@@ -550,6 +581,17 @@ public class BlockTextureManager {
                                                RemixTexture sssTex,
                                                RemixTexture sssAlbedoTex,
                                                float emissionIntensity) {
+        return buildAtlasOpaqueMaterialInfo(lt, normalTex, heightTex, roughnessTex, metallicTex,
+                emissiveTex, sssTex, sssAlbedoTex, emissionIntensity, atlasAlbedo);
+    }
+
+    private MaterialInfo buildAtlasOpaqueMaterialInfo(int lt, RemixTexture normalTex,
+                                               RemixTexture heightTex, RemixTexture roughnessTex,
+                                               RemixTexture metallicTex, RemixTexture emissiveTex,
+                                               RemixTexture sssTex,
+                                               RemixTexture sssAlbedoTex,
+                                               float emissionIntensity,
+                                               RemixTexture albedoTex) {
         MaterialInfoOpaqueEXT.Builder ob = MaterialInfoOpaqueEXT.builder()
                 .albedoConstant(1f, 1f, 1f).roughnessConstant(1f).metallicConstant(1f)
                 .useDrawCallAlphaState(true);
@@ -561,7 +603,7 @@ public class BlockTextureManager {
                 lt == L_SOLID, sssTex, sssAlbedoTex));
 
         MaterialInfo.Builder mb = MaterialInfo.builder()
-                .albedoTexture(atlasAlbedo.getHandle()).filterMode(0);
+                .albedoTexture(albedoTex.getHandle()).filterMode(0);
         if (normalTex != null)   mb.normalTexture(normalTex.getHandle());
         if (emissiveTex != null) {
             mb.emissiveTexture(emissiveTex.getHandle())
@@ -715,6 +757,14 @@ public class BlockTextureManager {
     }
 
     private void destroyWaterResources(RemixAPI api) {
+        destroyManagedMaterial(shoreFoamMaterial);
+        shoreFoamMaterial = null;
+        destroyManagedTexture(shoreFoamTexture);
+        shoreFoamTexture = null;
+        for (int i = 1; i < waterTintMaterials.length; i++) {
+            destroyManagedMaterial(waterTintMaterials[i]);
+        }
+        Arrays.fill(waterTintMaterials, null);
         destroyManagedMaterial(waterSurfaceMaterial);
         waterSurfaceMaterial = null;
         destroyManagedMaterial(waterCameraMediumMaterial);
@@ -751,20 +801,11 @@ public class BlockTextureManager {
                 return;
             }
 
-            waterSurfaceMaterial = createMaterialViaStore(MaterialInfo.builder()
-                    .albedoTexture(waterWhiteTexture.getHandle())
-                    .normalTexture(waterNormalHandle)
-                    .filterMode(1)
-                    .spriteSheetRow(10)
-                    .spriteSheetCol(12)
-                    .spriteSheetFps(20)
-                    .translucentExt(MaterialInfoTranslucentEXT.builder()
-                            .refractiveIndex(waterIor)
-                            .transmittanceColor(waterTransmittanceR, waterTransmittanceG, waterTransmittanceB)
-                            .transmittanceMeasurementDistance(waterTransmittanceDistance)
-                            .useDiffuseLayer(false)
-                            .build())
-                    .build());
+            for (int i = 0; i < waterTintMaterials.length; i++) {
+                waterTintMaterials[i] = createMaterialViaStore(waterSurfaceInfo(i));
+            }
+            waterSurfaceMaterial = waterTintMaterials[0];
+            buildShoreFoamMaterial(api);
 
             waterCameraMediumMaterial = createMaterialViaStore(MaterialInfo.builder()
                     .albedoTexture(waterWhiteTexture.getHandle())
@@ -799,6 +840,79 @@ public class BlockTextureManager {
     }
 
     public RemixMaterial getWaterSurfaceMaterial() { return waterSurfaceMaterial; }
+
+    /** The shore-foam decal material, or null when it could not be created. */
+    public RemixMaterial getShoreFoamMaterial() { return shoreFoamMaterial; }
+
+    /**
+     * Builds the shore-foam decal material from its procedural sprite sheet.
+     * A failure leaves foam out rather than the water.
+     */
+    private void buildShoreFoamMaterial(RemixAPI api) {
+        shoreFoamTexture = upload(api, "shore_foam", ShoreFoam.sprite(SHORE_FOAM_SEED),
+                ShoreFoam.sheetWidth(), ShoreFoam.sheetHeight(),
+                TextureFormat.RGBA8_UNORM, TexturePurpose.COLOR);
+        if (shoreFoamTexture == null) {
+            LOGGER.warn("Failed to create the shore foam texture; water keeps no foam");
+            return;
+        }
+        shoreFoamMaterial = createMaterialViaStore(MaterialInfo.builder()
+                .albedoTexture(shoreFoamTexture.getHandle())
+                .filterMode(1)
+                .wrapMode(MaterialInfo.WRAP_MODE_REPEAT, MaterialInfo.WRAP_MODE_CLAMP)
+                .spriteSheetRow(ShoreFoam.SHEET_ROWS)
+                .spriteSheetCol(ShoreFoam.SHEET_COLUMNS)
+                .spriteSheetFps(ShoreFoam.FRAMES_PER_SECOND)
+                .opaqueExt(MaterialInfoOpaqueEXT.builder()
+                        .albedoConstant(1f, 1f, 1f)
+                        .roughnessConstant(0.55f)
+                        .metallicConstant(0f)
+                        .blendEnabled(true)
+                        .blendType(MaterialInfoOpaqueEXT.BLEND_TYPE_ALPHA)
+                        .build())
+                .build());
+    }
+
+    private static final long SHORE_FOAM_SEED = 0x464F_414DL;
+
+    /** The surface material of a {@link WaterLook} palette entry, or the default one when that entry is missing. */
+    public RemixMaterial getWaterSurfaceMaterial(int paletteIndex) {
+        RemixMaterial tinted = paletteIndex >= 0 && paletteIndex < waterTintMaterials.length
+                ? waterTintMaterials[paletteIndex] : null;
+        return tinted != null ? tinted : waterSurfaceMaterial;
+    }
+
+    /**
+     * Rewrites every water surface material in place after the water look
+     * changed, so terrain keeps its handles and needs no recapture.
+     */
+    public void refreshWaterOptics() {
+        for (int i = 0; i < waterTintMaterials.length; i++) {
+            RemixMaterial material = waterTintMaterials[i];
+            if (material != null && material.isAlive()) {
+                RemixMaterialStore.get().update(material, waterSurfaceInfo(i));
+            }
+        }
+    }
+
+    private MaterialInfo waterSurfaceInfo(int paletteIndex) {
+        WaterLook.Optics optics = WaterLook.optics(paletteIndex, new WaterLook.Optics(
+                waterTransmittanceR, waterTransmittanceG, waterTransmittanceB, waterTransmittanceDistance));
+        return MaterialInfo.builder()
+                .albedoTexture(waterWhiteTexture.getHandle())
+                .normalTexture(waterNormalHandle)
+                .filterMode(1)
+                .spriteSheetRow(10)
+                .spriteSheetCol(12)
+                .spriteSheetFps(20)
+                .translucentExt(MaterialInfoTranslucentEXT.builder()
+                        .refractiveIndex(waterIor)
+                        .transmittanceColor(optics.r(), optics.g(), optics.b())
+                        .transmittanceMeasurementDistance(optics.distance())
+                        .useDiffuseLayer(false)
+                        .build())
+                .build();
+    }
     public RemixMaterial getWaterCameraMediumMaterial() { return waterCameraMediumMaterial; }
     public static float getWaterTileSize() { return WATER_TILE_SIZE; }
     public float getWaterIor() { return waterIor; }
@@ -829,6 +943,45 @@ public class BlockTextureManager {
         }
         appliedTerrainEmissionMultiplier = terrainEmissionMultiplier;
         return true;
+    }
+
+    public boolean isPerceptualRoughness() { return perceptualRoughness; }
+
+    /**
+     * Stages the LabPBR roughness encoding. Like the emission multiplier, it
+     * reaches the textures only through {@link #commitMaterialSettings()}, which
+     * the settings screens call once per transaction.
+     */
+    public void setPerceptualRoughness(boolean perceptual) {
+        perceptualRoughness = perceptual;
+    }
+
+    /**
+     * Applies every staged material setting.
+     *
+     * @return whether anything changed, so the caller rebuilds materials and terrain once
+     */
+    public boolean commitMaterialSettings() {
+        boolean emissionChanged = commitTerrainEmissionMultiplier();
+        LabPBRConverter.RoughnessEncoding encoding = roughnessEncoding(perceptualRoughness);
+        boolean roughnessChanged = LabPBRConverter.roughnessEncoding() != encoding;
+        LabPBRConverter.setRoughnessEncoding(encoding);
+        boolean foamChanged = ShoreFoam.isEnabled() != shoreFoam;
+        ShoreFoam.setEnabled(shoreFoam);
+        return emissionChanged || roughnessChanged || foamChanged;
+    }
+
+    public boolean isShoreFoam() { return shoreFoam; }
+
+    /** Stages shore foam; it is captured with terrain, so it applies through {@link #commitMaterialSettings()}. */
+    public void setShoreFoam(boolean enabled) {
+        shoreFoam = enabled;
+    }
+
+    private static LabPBRConverter.RoughnessEncoding roughnessEncoding(boolean perceptual) {
+        return perceptual
+                ? LabPBRConverter.RoughnessEncoding.PERCEPTUAL
+                : LabPBRConverter.RoughnessEncoding.SQUARED;
     }
 
     float terrainEmissionIntensity() {
@@ -918,6 +1071,13 @@ public class BlockTextureManager {
         atlasMaterialsSSS[layerType] = createAtlasOpaqueMaterial(layerType, atlasNormalTex,
                 atlasHeightTex, atlasRoughnessTex, atlasMetallicTex, atlasEmissive, atlasSssTex,
                 atlasSssAlbedoTex);
+        destroyManagedMaterial(atlasMaterialsSSSWet[layerType]);
+        atlasMaterialsSSSWet[layerType] = createAtlasOpaqueMaterial(layerType, atlasNormalTex,
+                atlasHeightTex, atlasRoughnessTex, atlasMetallicTex, atlasEmissive, atlasSssTex,
+                atlasSssAlbedoTex);
+        if (wetTwinsShowWet) {
+            pointWetTwins(true);
+        }
     }
 
     private void forgetCachedCutoutSpriteMaterials() {
@@ -940,6 +1100,63 @@ public class BlockTextureManager {
         }
         buildWaterMaterials(api);
         return waterSurfaceMaterial != null && waterCameraMediumMaterial != null;
+    }
+
+    /** The rain-exposed twin of {@link #getAtlasMaterial}, or the dry material when there is none. */
+    public RemixMaterial getWetAtlasMaterial(int layerType) {
+        RemixMaterial wet = atlasMaterialsWet[layerType];
+        return wet != null ? wet : atlasMaterials[layerType];
+    }
+
+    /** The rain-exposed twin of {@link #getAtlasMaterialSSS}, or the dry material when there is none. */
+    public RemixMaterial getWetAtlasMaterialSSS(int layerType) {
+        RemixMaterial wet = atlasMaterialsSSSWet[layerType];
+        return wet != null ? wet : atlasMaterialsSSS[layerType];
+    }
+
+    /**
+     * Advances ground wetness from the rain at the camera and, when its level
+     * changes, rewrites the wet atlas and points the wet twins at it. Render
+     * thread only; call once per frame.
+     *
+     * @param rain rain strength where the camera is, 0 where it snows or never rains
+     */
+    public void updateWetness(float rain) {
+        long now = System.nanoTime();
+        float seconds = lastWetnessNanos == 0 ? 0.0f : Math.min(1.0f, (now - lastWetnessNanos) * 1.0e-9f);
+        lastWetnessNanos = now;
+        int level = wetSurfaces.advance(rain, seconds);
+        RemixAPI api = renderer.getRemixApi();
+        if (!initialized || wetAtlas == null || api == null) {
+            return;
+        }
+        int shown = wetAtlas.update(api, level, (name, data, w, h, format) -> upload(api, name, data, w, h,
+                format, format == TextureFormat.R8_UNORM ? TexturePurpose.DATA : TexturePurpose.COLOR));
+        if (shown < 0) {
+            return;
+        }
+        boolean showWet = shown > 0 && wetAtlas.wetAlbedo() != null && wetAtlas.wetRoughness() != null;
+        if (showWet != wetTwinsShowWet) {
+            pointWetTwins(showWet);
+        }
+    }
+
+    private void pointWetTwins(boolean wet) {
+        RemixTexture albedo = wet ? wetAtlas.wetAlbedo() : atlasAlbedo;
+        RemixTexture roughness = wet ? wetAtlas.wetRoughness() : atlasRoughnessTex;
+        for (int lt = 0; lt < LAYER_COUNT; lt++) {
+            if (atlasMaterialsWet[lt] != null && atlasMaterialsWet[lt].isAlive()) {
+                RemixMaterialStore.get().update(atlasMaterialsWet[lt], buildAtlasOpaqueMaterialInfo(lt,
+                        atlasNormalTex, atlasHeightTex, roughness, atlasMetallicTex, atlasEmissive,
+                        null, null, terrainEmissionIntensity(), albedo));
+            }
+            if (atlasMaterialsSSSWet[lt] != null && atlasMaterialsSSSWet[lt].isAlive()) {
+                RemixMaterialStore.get().update(atlasMaterialsSSSWet[lt], buildAtlasOpaqueMaterialInfo(lt,
+                        atlasNormalTex, atlasHeightTex, roughness, atlasMetallicTex, atlasEmissive,
+                        atlasSssTex, atlasSssAlbedoTex, terrainEmissionIntensity(), albedo));
+            }
+        }
+        wetTwinsShowWet = wet;
     }
 
     /** Returns the atlas-based material (no SSS) for the given layer type. */
@@ -1296,6 +1513,10 @@ public class BlockTextureManager {
         materials.clear(); sprites.clear(); spriteById.clear(); spriteLightColors.clear();
         Arrays.fill(atlasMaterials, null);
         Arrays.fill(atlasMaterialsSSS, null);
+        Arrays.fill(atlasMaterialsWet, null);
+        Arrays.fill(atlasMaterialsSSSWet, null);
+        wetAtlas = null;
+        wetTwinsShowWet = false;
         atlasNormalTex = null;
         atlasHeightTex = null;
         atlasRoughnessTex = null;
@@ -1306,6 +1527,9 @@ public class BlockTextureManager {
         if (api != null) {
             destroyWaterResources(api);
         } else {
+            Arrays.fill(waterTintMaterials, null);
+            shoreFoamMaterial = null;
+            shoreFoamTexture = null;
             waterSurfaceMaterial = null;
             waterCameraMediumMaterial = null;
             waterWhiteTexture = null;

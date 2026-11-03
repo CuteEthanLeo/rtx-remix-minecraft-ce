@@ -1,5 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
 # SPDX-License-Identifier: Apache-2.0
+#
+# Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
 
 """Apache-2.0 release compliance gates.
 
@@ -29,6 +32,10 @@ SPDX_LICENSE_LINE = "SPDX-License-Identifier: Apache-2.0"
 
 # Release compliance review requires this exact entity, trailing period included.
 NVIDIA_ENTITY = "NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+
+# Files written for the Community Edition carry its contributors instead; files
+# it changes keep the NVIDIA line and add this one beneath it.
+COMMUNITY_ENTITY = "RTX Remix for Minecraft Community Edition contributors"
 
 # The copyright line that must sit above the Apache body in the root LICENSE.
 LICENSE_FIRST_LINE = f"Copyright (c) 2024-2026 {NVIDIA_ENTITY}"
@@ -155,9 +162,11 @@ class SourceHeaderTests(unittest.TestCase):
         offenders = []
         for name in headered_sources():
             text = read_text(REPO_ROOT / name)
-            if "SPDX-FileCopyrightText" in text and NVIDIA_ENTITY not in text:
+            if "SPDX-FileCopyrightText" not in text:
+                continue
+            if NVIDIA_ENTITY not in text and COMMUNITY_ENTITY not in text:
                 offenders.append(name)
-        self.assertEqual([], offenders, f"SPDX headers must name '{NVIDIA_ENTITY}'")
+        self.assertEqual([], offenders, f"SPDX headers must name '{NVIDIA_ENTITY}' or '{COMMUNITY_ENTITY}'")
 
 
 class ScriptEncodingTests(unittest.TestCase):

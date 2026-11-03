@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
@@ -90,6 +93,26 @@ class LabPBRConverterTest {
         byte[] untouched = {(byte) 255, (byte) 100};
         LabPBRConverter.applyEmissionGain(untouched, 1.0f);
         assertEquals(100, untouched[1] & 0xFF, "gain 1 is a no-op");
+    }
+
+    @Test
+    void perceptualEncodingWritesTheSmoothnessComplementThatRemixSquaresOnce() {
+        // Remix squares a sampled roughness itself, so the faithful texel is 1 - s.
+        LabPBRConverter.RoughnessEncoding perceptual = LabPBRConverter.RoughnessEncoding.PERCEPTUAL;
+        assertEquals(255, LabPBRConverter.smoothnessToRoughness(0, perceptual));
+        assertEquals(128, LabPBRConverter.smoothnessToRoughness(127, perceptual));
+        assertEquals(0, LabPBRConverter.smoothnessToRoughness(255, perceptual));
+    }
+
+    @Test
+    void squaredEncodingKeepsTheUpstreamValues() {
+        LabPBRConverter.RoughnessEncoding squared = LabPBRConverter.RoughnessEncoding.SQUARED;
+        assertEquals(255, LabPBRConverter.smoothnessToRoughness(0, squared));
+        assertEquals(64, LabPBRConverter.smoothnessToRoughness(127, squared));
+        assertEquals(0, LabPBRConverter.smoothnessToRoughness(255, squared));
+        assertTrue(LabPBRConverter.smoothnessToRoughness(176, squared)
+                < LabPBRConverter.smoothnessToRoughness(176, LabPBRConverter.RoughnessEncoding.PERCEPTUAL),
+                "the squared encoding is glossier for every partly smooth texel");
     }
 
     private static void putPixel(ByteBuffer buffer, int pixelIndex, int r, int g, int b, int a) {

@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain;
 
@@ -155,7 +158,7 @@ class ChunkManagerMeshInstallTest {
         try {
             Object owner = markColumnDirty(manager, 2, 5, 1 << ChunkManager.CAT_CUTOUT);
             int[] ownerFingerprints = (int[]) field(owner, "categoryFingerprints");
-            int[] originalFingerprints = {11, 22, 33, 44};
+            int[] originalFingerprints = {11, 22, 33, 44, 55};
             System.arraycopy(originalFingerprints, 0, ownerFingerprints, 0,
                     originalFingerprints.length);
             set(owner, "dirtyMask", 0);
@@ -170,7 +173,7 @@ class ChunkManagerMeshInstallTest {
             activePages.add(newInstalledPage(replacedCutout, ChunkManager.CAT_CUTOUT, 0));
             activePages.add(newInstalledPage(translucent, ChunkManager.CAT_TRANSLUCENT, 0));
 
-            int[] resultFingerprints = {101, 202, 303, 404};
+            int[] resultFingerprints = {101, 202, 303, 404, 505};
             long accountedBytes = 4096;
             Object result = newResult(owner, intField(owner, "generation"),
                     1 << ChunkManager.CAT_CUTOUT, resultFingerprints,
@@ -185,7 +188,7 @@ class ChunkManagerMeshInstallTest {
             assertSame(solid, pageInstance(activePages.get(0)));
             assertSame(translucent, pageInstance(activePages.get(1)));
             assertSame(replacementCutout, pageInstance(activePages.get(2)));
-            assertArrayEquals(new int[]{11, 202, 33, 44}, ownerFingerprints,
+            assertArrayEquals(new int[]{11, 202, 33, 44, 55}, ownerFingerprints,
                     "Only categories present in the build result may advance fingerprints");
             assertTrue(booleanField(owner, "hasPublishedState"));
             assertFalse(booleanField(owner, "buildInFlight"));

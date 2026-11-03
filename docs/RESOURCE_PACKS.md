@@ -59,7 +59,7 @@ Sidecars sit beside the texture they describe and take its name plus a suffix:
 | `_n` | R, G | Normal X and Y. Z is reconstructed from them |
 | `_n` | B | Ambient occlusion, multiplied into the base colour |
 | `_n` | A | Height, used for parallax with a displacement of 0.25 blocks on terrain and 0.02 on particles |
-| `_s` | R | Perceptual smoothness, converted to roughness as `(1 - R/255)` squared |
+| `_s` | R | Perceptual smoothness, converted to the perceptual roughness Remix expects as `1 - R/255`. The Community Edition's Accurate Roughness setting, on by default, selects this; turned off it restores the upstream `(1 - R/255)` squared, which Remix squares again and so reads glossier |
 | `_s` | G | Reflectance. `230` and above is metal, below it is not. There is no coloured reflectance and no metal index |
 | `_s` | B | Subsurface scattering. `65` and above enables it and sets the thickness, rescaled so 65 is none and 255 is full. The porosity range below 65 is ignored |
 | `_s` | A | Emission. Below 255 the surface emits at `A/254` of its base colour. 255 means no emission |

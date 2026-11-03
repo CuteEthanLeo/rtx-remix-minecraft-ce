@@ -1,11 +1,17 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain;
 
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.MeshInfoSurfaceTriangles;
+import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
+import com.nvidia.rtxremix.minecraft.terrain.capture.DirectQuadWriter;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
 import com.nvidia.rtxremix.minecraft.asset.RemixMesh;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
@@ -382,12 +388,21 @@ public final class BlockMeshBuilder {
     }
 
     private RemixMaterial resolveMaterial(String bucketKey, BlockTextureManager tex) {
-        boolean isSss = bucketKey.endsWith("_sss");
-        String baseName = isSss ? bucketKey.substring(0, bucketKey.length() - 4) : bucketKey;
+        boolean wet = WetSurfaces.isWetKey(bucketKey);
+        String dryKey = WetSurfaces.dryKey(bucketKey);
+        boolean isSss = dryKey.endsWith("_sss");
+        String baseName = isSss ? dryKey.substring(0, dryKey.length() - 4) : dryKey;
 
-        if ("water".equals(baseName)) return tex.getWaterSurfaceMaterial();
+        if (DirectQuadWriter.SHORE_FOAM_BUCKET.equals(baseName)) return tex.getShoreFoamMaterial();
+        if (WaterLook.isWaterBucket(baseName)) {
+            return tex.getWaterSurfaceMaterial(WaterLook.indexOfBucketKey(baseName));
+        }
 
         int layerType = BlockTextureManager.layerType(baseName);
+        if (wet) {
+            return isSss ? tex.getWetAtlasMaterialSSS(layerType)
+                         : tex.getWetAtlasMaterial(layerType);
+        }
         return isSss ? tex.getAtlasMaterialSSS(layerType)
                      : tex.getAtlasMaterial(layerType);
     }

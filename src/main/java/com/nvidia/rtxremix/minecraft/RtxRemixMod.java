@@ -1,9 +1,13 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft;
 
+import com.nvidia.rtxremix.minecraft.community.CommunityEdition;
 import com.nvidia.rtxremix.minecraft.weather.RemixWeatherRenderer;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
@@ -337,6 +341,7 @@ public class RtxRemixMod implements ClientModInitializer {
         RemixWeatherRenderer.registerShaders();
         LOGGER.info("========================================");
         LOGGER.info("RTX Remix Renderer v{} initializing...", getModVersion());
+        LOGGER.info("{}", CommunityEdition.banner());
         LOGGER.info("========================================");
 
         NativeExtractor.extractIfNeeded();
@@ -491,6 +496,9 @@ public class RtxRemixMod implements ClientModInitializer {
                             .getConfigDir().resolve("rtxremix.json");
                     rtxSettingsStore = new RtxSettingsStore(cfg);
                     rtxSettingsStore.load(rtxSettings);
+                    // Remix graphics presets write the post-effect switches to
+                    // the user configuration, so state ours once at startup.
+                    renderer.getCameraEffectsSettings().reapply();
                     LOGGER.info("RTX settings loaded from {}", cfg);
                     applyLaunchPreset();
                 }

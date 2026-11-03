@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
@@ -30,6 +33,10 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMeshStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
 import com.nvidia.rtxremix.minecraft.asset.RemixTexture;
 import com.nvidia.rtxremix.minecraft.asset.RemixTextureStore;
+import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.NightLight;
+import com.nvidia.rtxremix.minecraft.community.NightSkyRenderer;
+import com.nvidia.rtxremix.minecraft.community.OvercastSky;
 import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
@@ -109,7 +116,12 @@ public class SkyRenderer {
      * draws here.
      */
     static final float[] SKYLESS_SKY_RADIANCE = {0.0f, 0.0f, 0.0f};
-    public static final float DEFAULT_NIGHT_AMBIENT_BOOST = 2.5f;
+    /**
+     * Community Edition default, down from 2.5: the ambient rect sits above the
+     * cloud layer, and at 2.5 it lit night clouds brighter than the sky behind
+     * them while flattening moonlit shadows.
+     */
+    public static final float DEFAULT_NIGHT_AMBIENT_BOOST = 1.4f;
     public static final float DEFAULT_DAY_AMBIENT_BOOST = 0.0f;
     public static final boolean DEFAULT_SKY_AMBIENT_RECT_ENABLED = true;
     public static final float DEFAULT_MINIMUM_CELESTIAL_WEATHER_VISIBILITY = 0.0f;
@@ -156,6 +168,7 @@ public class SkyRenderer {
     private RemixMesh sunMeshAsset;
     private final RemixMesh[] moonMeshAssets = new RemixMesh[8];
     private RemixMesh starMeshAsset;
+    private final NightSkyRenderer nightSky = new NightSkyRenderer();
     private long celestialBlendPNext;
     private final AtmosphericSkyGenerator atmosphericGenerator;
     private final TexturePatch atmosphericTexturePatch = new TexturePatch();
@@ -271,14 +284,15 @@ public class SkyRenderer {
             sunDirection = LightManager.computeSunDirection(skyAngle);
             float celestialIntensity =
                     lightState.weatherDomeRadiance();
+            float domeScale = OvercastSky.domeScale();
             weather = weatherDomeState(
                     weatherStrengths.rain(),
                     weatherStrengths.thunder(),
                     Math.max(
                             celestialIntensity,
-                            RAIN_DOME_MIN_INTENSITY),
+                            RAIN_DOME_MIN_INTENSITY) * domeScale,
                     celestialIntensity
-                            * LightManager.THUNDER_SKY_INTENSITY);
+                            * LightManager.THUNDER_SKY_INTENSITY * domeScale);
         }
 
         try (ProfileScope ignored = ProfileScope.begin("Sky.Atmosphere")) {
@@ -523,7 +537,9 @@ public class SkyRenderer {
             RemixAPI api,
             float sunHeight,
             WeatherDomeState weather) {
-        float multiplier = skyAmbientMultiplier(sunHeight);
+        float multiplier = skyAmbientMultiplier(sunHeight)
+                + OvercastSky.extraAmbient(
+                        weather.opacity(), LightManager.celestialVisibility(sunHeight));
         publishSkyAmbient(
                 api,
                 lerp(atmosphericMeanR, OVERCAST_MEAN_R * weather.intensity(), weather.opacity())
@@ -587,11 +603,14 @@ public class SkyRenderer {
 
         float weatherVisibility = Math.max(
                 minimumCelestialWeatherVisibility, 1.0f - clamp01(weatherOpacity));
-        float starsOpacity = starOpacity(world.getStarBrightness(tickDelta)) * weatherVisibility;
-        if (starsOpacity > 0.0f) {
-            updateStarOpacity(starsOpacity);
-            updateStarTransform(starTransform, cameraPos, skyAngle);
-            drawCelestialMesh(api, starMeshAsset, starTransform);
+        float starBrightness = world.getStarBrightness(tickDelta);
+        if (!drawStarryNight(api, world, cameraPos, skyAngle, starBrightness, weatherVisibility)) {
+            float starsOpacity = starOpacity(starBrightness) * weatherVisibility;
+            if (starsOpacity > 0.0f) {
+                updateStarOpacity(starsOpacity);
+                updateStarTransform(starTransform, cameraPos, skyAngle);
+                drawCelestialMesh(api, starMeshAsset, starTransform);
+            }
         }
 
         celestialMoonDirection[0] = -sunDirection[0];
@@ -617,6 +636,30 @@ public class SkyRenderer {
         }
     }
 
+    /**
+     * Draws the Community Edition night sky in place of vanilla's stars.
+     *
+     * @return whether it drew, so vanilla's stars stay as the fallback
+     */
+    private boolean drawStarryNight(
+            RemixAPI api,
+            ClientWorld world,
+            Vec3d cameraPos,
+            float skyAngle,
+            float starBrightness,
+            float weatherVisibility) {
+        if (!CommunityLook.isStarryNight()) {
+            return false;
+        }
+        float stars = NightSkyRenderer.starOpacity(starBrightness) * weatherVisibility;
+        if (stars <= 0.0f) {
+            return true;
+        }
+        updateStarTransform(starTransform, cameraPos, skyAngle);
+        return nightSky.draw(api, starTransform, celestialBlendPNext, stars,
+                NightSkyRenderer.bandOpacity(stars, world.getMoonSize()));
+    }
+
     private boolean ensureCelestialAssets() {
         if (starMeshAsset != null && sunMeshAsset != null
                 && moonMeshAssets[0] != null && celestialBlendPNext != 0) {
@@ -631,7 +674,8 @@ public class SkyRenderer {
             sunTextureAsset = loadCelestialTexture(SUN_TEXTURE);
             moonTextureAsset = loadCelestialTexture(MOON_PHASES_TEXTURE);
             sunMaterialAsset = createCelestialMaterial(sunTextureAsset, SUN_RADIANCE);
-            moonMaterialAsset = createCelestialMaterial(moonTextureAsset, MOON_RADIANCE);
+            moonMaterialAsset = createCelestialMaterial(
+                    moonTextureAsset, NightLight.moonDiscRadiance(MOON_RADIANCE));
             starMaterialAsset = createStarMaterial();
 
             sunMeshAsset = createCelestialMesh(sunMaterialAsset, 0.0f, 0.0f, 1.0f, 1.0f);
@@ -743,7 +787,8 @@ public class SkyRenderer {
         if (Math.abs(moonOpacity - lastMoonOpacity) > CELESTIAL_OPACITY_UPDATE_DELTA) {
             materials.update(
                     moonMaterialAsset,
-                    createCelestialMaterialInfo(moonTextureAsset, MOON_RADIANCE, moonOpacity));
+                    createCelestialMaterialInfo(
+                            moonTextureAsset, NightLight.moonDiscRadiance(MOON_RADIANCE), moonOpacity));
             lastMoonOpacity = moonOpacity;
         }
     }
@@ -942,6 +987,8 @@ public class SkyRenderer {
         }
         destroyAsset(starMeshAsset);
         starMeshAsset = null;
+        nightSky.destroy();
+        nightSky.resetFailure();
     }
 
     private static void destroyAsset(RemixAssetBase asset) {

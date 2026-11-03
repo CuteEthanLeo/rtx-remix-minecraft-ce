@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft;
 
@@ -262,14 +265,23 @@ public final class NativeExtractor {
 
     private static void extractAuthorPayload(Path nativeRoot, Path gameDir, AtomicInteger fileCount,
                                              AtomicLong totalBytes, AtomicInteger keptCount) throws IOException {
+        SupersededPayloadDefaults superseded = SupersededPayloadDefaults.bundled();
         try (var topStream = Files.list(nativeRoot)) {
             for (Path entry : (Iterable<Path>) topStream::iterator) {
                 String name = entry.getFileName().toString();
                 if (Files.isDirectory(entry) && !name.startsWith("remix-sdk-") && !TEXTURES_DIR.equals(name)) {
-                    extractTree(entry, gameDir.resolve(name), fileCount, totalBytes, keptCount);
+                    extractTree(entry, gameDir.resolve(name), fileCount, totalBytes, keptCount,
+                            target -> superseded.isSuperseded(
+                                    gameDir.relativize(target).toString(), target));
                 }
             }
         }
+    }
+
+    /** Decides whether an existing author-owned file may be replaced by its shipped copy. */
+    @FunctionalInterface
+    interface ReplaceableExisting {
+        boolean test(Path target) throws IOException;
     }
 
     /**
@@ -350,6 +362,16 @@ public final class NativeExtractor {
      */
     static void extractTree(Path src, Path dst, AtomicInteger fileCount, AtomicLong totalBytes,
                             AtomicInteger keptCount) throws IOException {
+        extractTree(src, dst, fileCount, totalBytes, keptCount, target -> false);
+    }
+
+    /**
+     * Like {@link #extractTree(Path, Path, AtomicInteger, AtomicLong, AtomicInteger)},
+     * except that an existing file {@code replaceable} accepts is overwritten
+     * rather than kept: an untouched copy of a superseded shipped default.
+     */
+    static void extractTree(Path src, Path dst, AtomicInteger fileCount, AtomicLong totalBytes,
+                            AtomicInteger keptCount, ReplaceableExisting replaceable) throws IOException {
         Files.createDirectories(dst);
         Files.walkFileTree(src, new SimpleFileVisitor<>() {
             @Override
@@ -365,7 +387,7 @@ public final class NativeExtractor {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Path rel = src.relativize(file);
                 Path target = dst.resolve(rel.toString());
-                if (keptCount != null && Files.exists(target)) {
+                if (keptCount != null && Files.exists(target) && !replaceable.test(target)) {
                     keptCount.incrementAndGet();
                     return FileVisitResult.CONTINUE;
                 }

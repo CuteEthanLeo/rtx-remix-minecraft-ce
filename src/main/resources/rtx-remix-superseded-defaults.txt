@@ -1,0 +1,11 @@
+# Untouched copies of these superseded shipped defaults are replaced by the
+# current default on extraction; an edited copy is kept. One "<sha256> <path>"
+# per line, the path relative to the game directory, the hash taken over the
+# content with CR bytes removed. See SupersededPayloadDefaults.
+#
+# Upstream RTX Remix for Minecraft 0.1.0 (a518eff).
+0760e6291bbee483b8eec2a74c6fb16ece0c3613957db8d98612abe18075cb7d rtx-remix/mods/minecraft-logic/confs/weather/rain.conf
+c4a32e583a03db01fe3e651242bcdd3958276514f0658ea536105bbe3151c0d1 rtx-remix/mods/minecraft-logic/confs/weather/thunder.conf
+4086401d0c87061e590ff7632ff4830661491f2f1605a02ce34de4e0fdd51f4d rtx-remix/mods/minecraft-logic/confs/time/night.conf
+ce4cd0c036ecade4a24efb71aa86bd20359c23c7264940349144b7d0cb274368 rtx-remix/mods/minecraft-logic/confs/time/dusk.conf
+4a7a90b1f2191ec267f1475d3c925c641854b0bf45d1f938b88f6141b37c621a rtx-remix/mods/minecraft-logic/confs/time/dawn.conf

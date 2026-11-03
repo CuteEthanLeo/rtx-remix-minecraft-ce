@@ -1,10 +1,15 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import com.nvidia.rtxremix.RemixAPI;
+import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.light.BlockLightRuleManager;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.light.LightEntry;
@@ -411,7 +416,7 @@ public final class BlockQuadEmitter {
             }
         }
 
-        writer.flushBlock(texManager);
+        flushBlock(world);
     }
 
     private void stageBakedQuad(BakedQuad bq, String layerName,
@@ -536,10 +541,79 @@ public final class BlockQuadEmitter {
                     layerName);
         }
 
+        flushBlock(world);
+    }
+
+    /**
+     * Flushes the staged block, first marking it rain-exposed when it has an
+     * upward face and nothing within reach above it keeps the rain off. This
+     * happens whether or not wet ground is switched on, so the switch needs no
+     * terrain rebuild. The
+     * scan stays inside the render region; anything above that counts as open
+     * sky, which is the vanilla rain test's answer for most of the world.
+     */
+    private void flushBlock(BlockRenderView world) {
+        if (writer.hasStagedRainFacingQuad()) {
+            writer.setRainExposed(isOpenToRain(world, mutablePos.getX(), mutablePos.getY(), mutablePos.getZ()));
+        }
         writer.flushBlock(texManager);
     }
 
+    private boolean isOpenToRain(BlockRenderView world, int x, int y, int z) {
+        int top = Math.min(y + WetSurfaces.MAX_SHELTER_SCAN, baseY + 31);
+        for (int scanY = y + 1; scanY <= top; scanY++) {
+            BlockState above = getCachedBlockState(world, x, scanY, z);
+            if (above.blocksMovement() || !above.getFluidState().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // --- Fluid geometry ---
+
+    /** Strip corners per shore side, as x, z fractions of the block in top-face winding order. */
+    private static final float[][] FOAM_X = {
+            {0, 1, 1, 0}, {0, 1, 1, 0},
+            {0, ShoreFoam.WIDTH, ShoreFoam.WIDTH, 0}, {1 - ShoreFoam.WIDTH, 1, 1, 1 - ShoreFoam.WIDTH}};
+    private static final float[][] FOAM_Z = {
+            {0, 0, ShoreFoam.WIDTH, ShoreFoam.WIDTH}, {1 - ShoreFoam.WIDTH, 1 - ShoreFoam.WIDTH, 1, 1},
+            {0, 0, 1, 1}, {0, 0, 1, 1}};
+    /** Fraction across the strip per corner: 0 at the shore. */
+    private static final float[][] FOAM_ACROSS = {{0, 0, 1, 1}, {1, 1, 0, 0}, {0, 1, 1, 0}, {1, 0, 0, 1}};
+    /** Shore sides in the order the tables above use: north, south, west, east. */
+    private static final Direction[] FOAM_SIDES = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
+
+    /**
+     * Lays a foam strip on the water surface along every side that meets a
+     * solid shore block. Heights follow the surface's corner heights.
+     */
+    private void emitShoreFoam(BlockRenderView world, int lx, int ly, int lz, int wx, int wy, int wz,
+                               float h00, float h10, float h01, float h11) {
+        for (int side = 0; side < FOAM_SIDES.length; side++) {
+            Direction dir = FOAM_SIDES[side];
+            int sx = wx + dir.getOffsetX();
+            int sz = wz + dir.getOffsetZ();
+            if (getCachedFluidState(world, sx, wy, sz).isIn(FluidTags.WATER)) continue;
+            BlockState shore = getCachedBlockState(world, sx, wy, sz);
+            if (shore.isAir() || !shore.isSolid()) continue;
+
+            boolean alongX = side < 2;
+            for (int corner = 0; corner < 4; corner++) {
+                float fx = FOAM_X[side][corner];
+                float fz = FOAM_Z[side][corner];
+                float height = (1 - fx) * (1 - fz) * h00 + fx * (1 - fz) * h10
+                        + (1 - fx) * fz * h01 + fx * fz * h11;
+                tempPositions[corner * 3] = lx + fx;
+                tempPositions[corner * 3 + 1] = ly + height + ShoreFoam.LIFT;
+                tempPositions[corner * 3 + 2] = lz + fz;
+                float along = alongX ? wx + fx : wz + fz;
+                tempUvs[corner * 2] = along / ShoreFoam.TILE_BLOCKS;
+                tempUvs[corner * 2 + 1] = ShoreFoam.v(FOAM_ACROSS[side][corner]);
+            }
+            writer.writeShoreFoamQuad(tempPositions, tempUvs);
+        }
+    }
 
     private void emitFluidQuads(BlockRenderView world, FluidState fluidState,
                                  int lx, int ly, int lz) {
@@ -608,6 +682,9 @@ public final class BlockQuadEmitter {
                         lx + 1, ly + h10, lz, lx, ly + h00, lz);
                 writer.writeFluidQuad(tempPositions, tempUvs, 0, -1, 0, color,
                         null, 0, 0, 1, 1, layer, texManager);
+                if (ShoreFoam.isEnabled()) {
+                    emitShoreFoam(world, lx, ly, lz, wx, wy, wz, h00, h10, h01, h11);
+                }
             } else {
                 // Vanilla FluidRenderer: a still surface shows the still sprite in
                 // full; a moving one shows the centre quarter of the flowing sprite

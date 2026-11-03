@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft;
 
@@ -25,6 +28,7 @@ import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ViewDistanceFade;
 import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
+import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
 import com.nvidia.rtxremix.minecraft.settings.PostProcessingSettings;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
@@ -51,6 +55,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.enums.CameraSubmersionType;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.world.biome.Biome;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.entity.EntityRenderDispatcher;
@@ -126,6 +131,7 @@ public class RemixRenderer {
     private CloudRenderer cloudRenderer;
     private BlockTextureManager textureManager;
     private PostProcessingSettings postProcessingSettings;
+    private CameraEffectsSettings cameraEffectsSettings;
     
     // Entity rendering pipeline: vanilla capture + skinned submission
     private RemixEntityPass entityPass;
@@ -305,6 +311,7 @@ public class RemixRenderer {
             }
 
             postProcessingSettings = new PostProcessingSettings(remixApi::setConfigVariable);
+            cameraEffectsSettings = new CameraEffectsSettings(remixApi::setConfigVariable);
             
             // NOTE: Submit() allocates the image, but semaphores are always ready
             InteropInfo interopInfo = remixApi.dxvkGetInteropInfo();
@@ -888,6 +895,12 @@ public class RemixRenderer {
                     LOGGER.error("Error rendering sky", e);
                 } finally {
                     perfTimer.end(perfSky);
+                }
+            }
+
+            if (RtxRemixMod.isWorldActive() && textureManager != null) {
+                try (ProfileScope ignored = ProfileScope.begin("WetSurfaces")) {
+                    textureManager.updateWetness(rainAtCamera(world, cameraPos, tickDelta));
                 }
             }
 
@@ -1669,6 +1682,23 @@ public class RemixRenderer {
 
     public PostProcessingSettings getPostProcessingSettings() {
         return postProcessingSettings;
+    }
+
+    public CameraEffectsSettings getCameraEffectsSettings() {
+        return cameraEffectsSettings;
+    }
+
+    /**
+     * How hard it rains where the camera is, for ground wetness: the rain
+     * gradient, or nothing where the biome snows or never rains.
+     */
+    private static float rainAtCamera(ClientWorld world, Vec3d cameraPos, float tickDelta) {
+        if (!world.getDimension().hasSkyLight()) {
+            return 0.0f;
+        }
+        BlockPos pos = BlockPos.ofFloored(cameraPos);
+        Biome.Precipitation precipitation = world.getBiome(pos).value().getPrecipitation(pos);
+        return precipitation == Biome.Precipitation.RAIN ? world.getRainGradient(tickDelta) : 0.0f;
     }
 
     public RemixEntityPass getEntityPass() {

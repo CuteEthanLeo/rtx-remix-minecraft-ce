@@ -1,5 +1,15 @@
 # RTX Remix for Minecraft
 
+> **RTX Remix for Minecraft Community Edition (Unofficial).** An unofficial derivative of
+> [NVIDIAGameWorks/rtx-remix-minecraft](https://github.com/NVIDIAGameWorks/rtx-remix-minecraft)
+> at commit `a518eff`, with lighting, weather, water, night sky, and motion blur improvements.
+> Not affiliated with or endorsed by NVIDIA. See [COMMUNITY.md](COMMUNITY.md) for what changed
+> and how it is maintained. The rest of this README is upstream's.
+>
+> **RTX Remix for Minecraft 社区版（非官方）**，基于上方官方仓库的衍生版本，与 NVIDIA 无关联。
+> 改动与维护方式见 [COMMUNITY.md](COMMUNITY.md)。
+
+
 Play Minecraft Java Edition 1.21.1 with real-time path tracing on a GeForce RTX
 GPU, powered by NVIDIA RTX Remix.
 

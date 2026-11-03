@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.cloud;
 
@@ -12,6 +15,8 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMesh;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterialStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
+import com.nvidia.rtxremix.minecraft.community.CloudTint;
+import com.nvidia.rtxremix.minecraft.community.CommunityLook;
 import java.nio.ByteBuffer;
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.InstanceCategoryBit;
@@ -136,7 +141,7 @@ public final class CloudRenderer {
         if (!shouldSuppressVanillaClouds()) {
             return;
         }
-        updateCloudColor(world.getCloudsColor(tickDelta));
+        updateCloudColor(world.getCloudsColor(tickDelta), world.getRainGradient(tickDelta));
 
         if (!proceduralClouds) {
             completedPaletteMeshes.clear();
@@ -516,8 +521,10 @@ public final class CloudRenderer {
         materialColor = cloudColor;
     }
 
-    private void updateCloudColor(Vec3d color) {
-        int packedColor = packCloudColor(color.x, color.y, color.z);
+    private void updateCloudColor(Vec3d color, float rain) {
+        int packedColor = CommunityLook.isCloudTint()
+                ? CloudTint.pack(color.x, color.y, color.z, rain)
+                : packCloudColor(color.x, color.y, color.z);
         cloudColor = packedColor;
         if (material == null || material.isDeleted() || materialColor == packedColor) {
             return;
@@ -542,10 +549,11 @@ public final class CloudRenderer {
         float red = CLOUD_ALBEDO * ((packedColor >>> 16) & 0xff) / 255.0f;
         float green = CLOUD_ALBEDO * ((packedColor >>> 8) & 0xff) / 255.0f;
         float blue = CLOUD_ALBEDO * (packedColor & 0xff) / 255.0f;
+        float transmittance = CloudTint.sssTransmittance(packedColor);
         MaterialInfoOpaqueSubsurfaceEXT subsurface =
                 MaterialInfoOpaqueSubsurfaceEXT.builder()
                         .diffusionProfile(true)
-                        .transmittanceColor(0.999f, 0.999f, 0.999f)
+                        .transmittanceColor(transmittance, transmittance, transmittance)
                         .volumetricAnisotropy(0.0f)
                         .radius(0.98f, 0.98f, 0.98f)
                         .radiusScale(SSS_RADIUS_SCALE)

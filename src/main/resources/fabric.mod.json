@@ -2,10 +2,13 @@
     "schemaVersion": 1,
     "id": "rtx-remix-renderer",
     "version": "${version}",
-    "name": "RTX Remix for Minecraft",
-    "description": "Renders Minecraft through NVIDIA RTX Remix path tracing. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
+    "name": "RTX Remix for Minecraft Community Edition (Unofficial)",
+    "description": "Unofficial community edition of NVIDIA's RTX Remix for Minecraft (github.com/NVIDIAGameWorks/rtx-remix-minecraft), with lighting, weather, water, night sky, and motion blur improvements. Not affiliated with or endorsed by NVIDIA. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
     "authors": [
         "NVIDIA"
+    ],
+    "contributors": [
+        "RTX Remix for Minecraft Community Edition contributors"
     ],
     "contact": {
         "homepage": "https://github.com/NVIDIAGameWorks/rtx-remix-minecraft",

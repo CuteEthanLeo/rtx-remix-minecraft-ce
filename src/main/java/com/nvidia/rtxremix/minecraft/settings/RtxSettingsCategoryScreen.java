@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -145,9 +148,9 @@ final class RtxSettingsCategoryScreen extends GameOptionsScreen {
 
     private boolean commitTerrainEmission() {
         BlockTextureManager textures = BlockTextureManager.get();
-        return category == SettingCategory.MATERIALS
+        return (category == SettingCategory.MATERIALS || category == SettingCategory.COMMUNITY)
                 && textures != null
-                && textures.commitTerrainEmissionMultiplier();
+                && textures.commitMaterialSettings();
     }
 
     @Override

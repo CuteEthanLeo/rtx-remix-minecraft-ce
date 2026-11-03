@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -15,6 +18,9 @@ import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
 import com.nvidia.rtxremix.minecraft.entity.RemixEntityPass;
+import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.WaterLook;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -208,10 +214,33 @@ public final class RtxSettingsFactory {
                 BlockTextureManager.DEFAULT_TERRAIN_EMISSION_MULTIPLIER,
                 () -> (double) textures.getTerrainEmissionMultiplier(),
                 value -> textures.setTerrainEmissionMultiplier(value.floatValue())));
+        list.add(RtxSetting.ofBool("materials.perceptualRoughness", SettingGroup.MATERIALS,
+                "rtxremix.setting.materials.perceptualRoughness",
+                "rtxremix.setting.materials.perceptualRoughness.tip",
+                true, textures::isPerceptualRoughness, textures::setPerceptualRoughness));
         RemixAPI remix = renderer.getRemixApi();
         remixBool("materials.smoothReliefMaps", SettingGroup.MATERIALS,
                 "rtxremix.setting.materials.smoothReliefMaps",
                 "rtx.materials.smoothReliefMapFiltering",
+                remix::getConfigVariableResolved, remix::setConfigVariable)
+                .ifPresent(list::add);
+
+        // --- Community Edition water ---
+        list.add(RtxSetting.ofBool("community.realisticWater", SettingGroup.COMMUNITY_WATER,
+                "rtxremix.setting.community.realisticWater",
+                "rtxremix.setting.community.realisticWater.tip",
+                true, WaterLook::isRealisticWater,
+                v -> {
+                    WaterLook.setRealisticWater(v);
+                    textures.refreshWaterOptics();
+                }));
+        list.add(RtxSetting.ofBool("community.shoreFoam", SettingGroup.COMMUNITY_WATER,
+                "rtxremix.setting.community.shoreFoam",
+                "rtxremix.setting.community.shoreFoam.tip",
+                true, textures::isShoreFoam, textures::setShoreFoam));
+        remixBool("community.animatedWater", SettingGroup.COMMUNITY_WATER,
+                "rtxremix.setting.community.animatedWater",
+                "rtx.translucentMaterial.animatedWaterEnable",
                 remix::getConfigVariableResolved, remix::setConfigVariable)
                 .ifPresent(list::add);
 
@@ -225,6 +254,34 @@ public final class RtxSettingsFactory {
         list.add(floatSetting("post.highlights", SettingGroup.TONEMAPPING,
                 "rtxremix.setting.post.highlights", -5.0, 10.0,
                 postProcessing::getHighlightsLevel, postProcessing::setHighlightsLevel));
+
+        // --- Camera effects (Community Edition) ---
+        CameraEffectsSettings cameraEffects = renderer.getCameraEffectsSettings();
+        list.add(RtxSetting.ofInt(RtxOptionFactory.MOTION_BLUR_ID, SettingGroup.CAMERA_EFFECTS,
+                "rtxremix.setting.post.motionBlur", "rtxremix.setting.post.motionBlur.tip",
+                CameraEffectsSettings.OFF, CameraEffectsSettings.CINEMATIC,
+                CameraEffectsSettings.DEFAULT_QUALITY,
+                cameraEffects::getQuality, cameraEffects::setQuality));
+        list.add(floatSetting("post.motionBlurShutter", SettingGroup.CAMERA_EFFECTS,
+                "rtxremix.setting.post.motionBlurShutter", 0.1, 1.0,
+                cameraEffects::getShutter, cameraEffects::setShutter));
+        list.add(floatSetting("post.motionBlurMaxSize", SettingGroup.CAMERA_EFFECTS,
+                "rtxremix.setting.post.motionBlurMaxSize", 0.01, 0.1,
+                cameraEffects::getMaxBlur, cameraEffects::setMaxBlur));
+
+        // --- Community Edition looks ---
+        list.add(communityLook(renderer, "community.overcastWeather", SettingGroup.COMMUNITY_WEATHER,
+                CommunityLook.DEFAULT_OVERCAST_WEATHER,
+                CommunityLook::isOvercastWeather, CommunityLook::setOvercastWeather));
+        list.add(RtxSetting.ofBool("community.wetGround", SettingGroup.COMMUNITY_WEATHER,
+                "rtxremix.setting.community.wetGround", "rtxremix.setting.community.wetGround.tip",
+                true, WetSurfaces::isEnabled, WetSurfaces::setEnabled));
+        list.add(communityLook(renderer, "community.cloudTint", SettingGroup.COMMUNITY_WEATHER,
+                CommunityLook.DEFAULT_CLOUD_TINT,
+                CommunityLook::isCloudTint, CommunityLook::setCloudTint));
+        list.add(communityLook(renderer, "community.starryNight", SettingGroup.COMMUNITY_NIGHT,
+                CommunityLook.DEFAULT_STARRY_NIGHT,
+                CommunityLook::isStarryNight, CommunityLook::setStarryNight));
 
         // --- Eye adaptation ---
         list.add(floatSetting("post.lowLightAdaptation", SettingGroup.EYE_ADAPTATION,
@@ -284,6 +341,19 @@ public final class RtxSettingsFactory {
                 () -> (double) getter.get(),
                 v -> {
                     setter.accept(v.floatValue());
+                    if (renderer.getSkyRenderer() != null) {
+                        renderer.getSkyRenderer().forceRefresh();
+                    }
+                });
+    }
+
+    /** A Community Edition look switch; the sky is refreshed so the change shows at once. */
+    private static RtxSetting<Boolean> communityLook(RemixRenderer renderer, String id, SettingGroup group,
+            boolean defaultValue, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+        String labelKey = "rtxremix.setting." + id;
+        return RtxSetting.ofBool(id, group, labelKey, labelKey + ".tip", defaultValue, getter,
+                v -> {
+                    setter.accept(v);
                     if (renderer.getSkyRenderer() != null) {
                         renderer.getSkyRenderer().forceRefresh();
                     }
