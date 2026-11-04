@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -161,5 +164,50 @@ class RtxSettingsStoreTest {
         assertEquals(1.0, f[0]);  // unsupported version -> nothing applied
         assertEquals(5, i[0]);
         assertTrue(b[0]);
+    }
+
+    @Test
+    void aSavedProceduralStyleKeepsTheVolumetricCloudsOff() {
+        com.google.gson.JsonObject procedural = new com.google.gson.JsonObject();
+        procedural.addProperty("clouds.procedural", true);
+        RtxSettingsStore.keepChosenCloudStyle(procedural);
+        assertFalse(procedural.get("clouds.volumetric").getAsBoolean());
+
+        com.google.gson.JsonObject chosen = new com.google.gson.JsonObject();
+        chosen.addProperty("clouds.procedural", true);
+        chosen.addProperty("clouds.volumetric", true);
+        RtxSettingsStore.keepChosenCloudStyle(chosen);
+        assertTrue(chosen.get("clouds.volumetric").getAsBoolean());
+
+        com.google.gson.JsonObject untouched = new com.google.gson.JsonObject();
+        RtxSettingsStore.keepChosenCloudStyle(untouched);
+        assertFalse(untouched.has("clouds.volumetric"));
+    }
+
+    @Test
+    void volumetricCloudsSwitchedOnBesideAProceduralStyleStayOnAcrossLaunches(@TempDir Path dir) {
+        Path file = dir.resolve("rtxremix.json");
+        RtxSettingsStore store = new RtxSettingsStore(file);
+        boolean[] procedural = {true};
+        boolean[] volumetric = {true};
+        store.save(cloudRegistry(procedural, volumetric));
+
+        for (int launch = 0; launch < 3; launch++) {
+            boolean[] loadedProcedural = {false};
+            boolean[] loadedVolumetric = {true};
+            RtxSettings loaded = cloudRegistry(loadedProcedural, loadedVolumetric);
+            store.load(loaded);
+            assertTrue(loadedProcedural[0]);
+            assertTrue(loadedVolumetric[0], "launch " + launch);
+            store.save(loaded);
+        }
+    }
+
+    private static RtxSettings cloudRegistry(boolean[] procedural, boolean[] volumetric) {
+        return new RtxSettings(List.of(
+                RtxSetting.ofBool("clouds.procedural", SettingGroup.CLOUDS, "l", "t", false,
+                        () -> procedural[0], v -> procedural[0] = v),
+                RtxSetting.ofBool("clouds.volumetric", SettingGroup.CLOUDS, "l", "t", true,
+                        () -> volumetric[0], v -> volumetric[0] = v)));
     }
 }

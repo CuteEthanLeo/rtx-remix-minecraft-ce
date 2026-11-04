@@ -17,6 +17,10 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.community.CloudTint;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.clouds.CloudField;
+import com.nvidia.rtxremix.minecraft.community.clouds.CloudNoise;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
+import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import java.nio.ByteBuffer;
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.InstanceCategoryBit;
@@ -67,10 +71,23 @@ public final class CloudRenderer {
     private static final float DEFAULT_CLOUD_SIZE = 1.0f;
     private static final float DEFAULT_CLOUDS_HEIGHT = 0.0f;
     private static final int INSTANCE_CATEGORIES = InstanceCategoryBit.IGNORE_BAKED_LIGHTING;
+    /**
+     * Community Edition: the volumetric clouds' near meshes are hard iso-surfaces, which read as
+     * smooth plastic up close. The dome draws every cloud as a volume, so the meshes stay out of
+     * the camera's view and only shadow the ground, like the first-person player's body.
+     */
+    private static final int VOLUMETRIC_TILE_CATEGORIES =
+            InstanceCategoryBit.IGNORE_BAKED_LIGHTING | InstanceCategoryBit.THIRD_PERSON_PLAYER_MODEL;
     private static final float CLOUD_ALBEDO = 0.99f;
     private static final double VANILLA_COLOR_INFLUENCE = 0.2;
     private static final float SSS_RADIUS_SCALE = 5000.0f;
     private static final float SSS_MAX_SAMPLE_RADIUS = 1.0f;
+    /**
+     * Community Edition: the volumetric clouds' near meshes are lit by the path tracer alone, so
+     * their albedo stays a constant, faintly cool white rather than following vanilla's cloud
+     * colour, which would darken them a second time at night and in rain.
+     */
+    private static final int VOLUMETRIC_CLOUD_COLOR = 0x00f2_f4f7;
 
     private final RemixRenderer renderer;
     private final MeshCreator meshCreator;
@@ -85,6 +102,23 @@ public final class CloudRenderer {
     private final ConcurrentLinkedQueue<VanillaChunkResult> completedVanillaChunks =
             new ConcurrentLinkedQueue<>();
     private final Transform vanillaTransform = new Transform();
+    private final Transform tileTransform = new Transform();
+    private final VolumetricCloudTiles<RemixMesh> volumetricTiles =
+            new VolumetricCloudTiles<>(new VolumetricCloudTiles.MeshSink<>() {
+                @Override
+                public RemixMesh create(float[] vertices, int[] indices) {
+                    return createVolumetricMesh(vertices, indices);
+                }
+
+                @Override
+                public void destroy(RemixMesh mesh) {
+                    if (!mesh.isDeleted()) {
+                        mesh.destroy();
+                    }
+                }
+            });
+    private RemixMaterial volumetricMaterial;
+    private RuntimeException volumetricFailure;
 
     private ClientWorld currentWorld;
     private RemixMaterial material;
@@ -138,6 +172,11 @@ public final class CloudRenderer {
             releaseResources();
             return;
         }
+        if (isVolumetricMode()) {
+            renderVolumetric(world, cameraPos, cloudHeight, tickDelta);
+            return;
+        }
+        deactivateVolumetric();
         if (!shouldSuppressVanillaClouds()) {
             return;
         }
@@ -174,6 +213,167 @@ public final class CloudRenderer {
 
         drawClouds(cameraPos, cloudHeight, worldTime);
         lastCloudCount = clouds.size();
+    }
+
+    /** Whether the Community Edition volumetric clouds replace the chosen classic style. */
+    boolean isVolumetricMode() {
+        return VolumetricClouds.isUsable() && volumetricFailure == null;
+    }
+
+    /**
+     * Draws the near layer of the volumetric clouds and publishes what the far layer, which the
+     * sky renderer composites into the dome, needs to continue it seamlessly.
+     */
+    private void renderVolumetric(ClientWorld world, Vec3d cameraPos, float cloudHeight, float tickDelta) {
+        // The classic styles' assets are not drawn while the volumetric clouds are.
+        if (!clouds.isEmpty() || isAnyPaletteMeshLive() || !vanillaChunks.isEmpty()) {
+            releaseClassicResources();
+        }
+        CloudNoise noise = CloudNoise.sharedIfReady();
+        if (noise == null) {
+            if (CloudNoise.shared().isCompletedExceptionally()) {
+                throw failVolumetric("Failed to generate the volumetric cloud noise",
+                        CloudNoise.shared().handle((value, failure) -> failure).join());
+            }
+            VolumetricClouds.deactivate();
+            return;
+        }
+        double worldTime = world.getTime() + (double) tickDelta;
+        ConfLayerDriver confLayers = renderer.getConfLayerDriver();
+        float rain;
+        float thunder;
+        if (confLayers != null && confLayers.isActive()) {
+            ConfLayerDriver.WeatherStrengths strengths = confLayers.weatherStrengths();
+            rain = strengths.rain();
+            thunder = strengths.thunder();
+        } else {
+            rain = world.getRainGradient(tickDelta);
+            thunder = world.getThunderGradient(tickDelta);
+        }
+        float base = cloudHeight + cloudsHeight + CloudField.BASE_ABOVE_VANILLA;
+        CloudField.Params params = CloudField.Params.of(
+                base, VolumetricClouds.getCoverage(), rain, thunder).quantized();
+        VolumetricClouds.publishFrame(params, worldTime);
+
+        double windX = worldTime * CloudField.WIND_X_PER_TICK;
+        double windZ = worldTime * CloudField.WIND_Z_PER_TICK;
+        double fieldX = cameraPos.x - windX;
+        double fieldZ = cameraPos.z - windZ;
+        Throwable failure;
+        try (ProfileScope ignored = ProfileScope.begin("Cloud.Tiles")) {
+            failure = volumetricTiles.update(noise, fieldX, fieldZ, params, VolumetricClouds.currentQuality());
+        } catch (RuntimeException e) {
+            throw failVolumetric("Failed to update the volumetric cloud tiles", e);
+        }
+        if (failure != null) {
+            throw failVolumetric("Failed to mesh a volumetric cloud tile", failure);
+        }
+        lastGenerationNanos += volumetricTiles.lastGenerationNanos();
+        VolumetricClouds.publishOccupancy(
+                volumetricTiles.cameraTileX(),
+                volumetricTiles.cameraTileZ(),
+                volumetricTiles::isCovered);
+
+        RemixAPI api = renderer.getRemixApi();
+        float[] matrix = tileTransform.matrix;
+        for (VolumetricCloudTiles.Tile<RemixMesh> tile : volumetricTiles.tiles()) {
+            if (tile.mesh == null || tile.mesh.isDeleted() || tile.params == null) {
+                continue;
+            }
+            matrix[0] = 1.0f;
+            matrix[1] = 0.0f;
+            matrix[2] = 0.0f;
+            matrix[3] = (float) (tile.key.x() * (double) VolumetricClouds.TILE_SIZE + windX);
+            matrix[4] = 0.0f;
+            matrix[5] = 1.0f;
+            matrix[6] = 0.0f;
+            matrix[7] = tile.params.base();
+            matrix[8] = 0.0f;
+            matrix[9] = 0.0f;
+            matrix[10] = 1.0f;
+            matrix[11] = (float) (tile.key.z() * (double) VolumetricClouds.TILE_SIZE + windZ);
+            api.drawInstance(tile.mesh.getHandle(), matrix, VOLUMETRIC_TILE_CATEGORIES, 0, 0L);
+            lastDrawCount++;
+            lastInstanceCount++;
+            lastVertexCount += tile.vertexCount;
+            lastTriangleCount += tile.triangleCount;
+        }
+        lastCloudCount = lastInstanceCount;
+    }
+
+    private RemixMesh createVolumetricMesh(float[] vertices, int[] indices) {
+        if (meshCreator != null) {
+            return meshCreator.create(vertices, indices);
+        }
+        if (volumetricMaterial == null || volumetricMaterial.isDeleted()) {
+            RemixMaterial created = new RemixMaterial(createMaterialInfo(VOLUMETRIC_CLOUD_COLOR));
+            RemixMaterialStore.get().create(created);
+            volumetricMaterial = created;
+        }
+        return createMesh(vertices, indices, volumetricMaterial);
+    }
+
+    private RuntimeException failVolumetric(String message, Throwable cause) {
+        RuntimeException failure = new IllegalStateException(
+                message + "; falling back to the chosen cloud style", cause);
+        try {
+            releaseVolumetricResources();
+        } catch (RuntimeException cleanupError) {
+            failure.addSuppressed(cleanupError);
+        }
+        volumetricFailure = failure;
+        return failure;
+    }
+
+    private void deactivateVolumetric() {
+        if (VolumetricClouds.isActive() || volumetricTiles.tiles().iterator().hasNext()
+                || volumetricMaterial != null) {
+            releaseVolumetricResources();
+        }
+    }
+
+    private void releaseVolumetricResources() {
+        VolumetricClouds.deactivate();
+        VolumetricClouds.clearOccupancy();
+        RuntimeException failure = null;
+        try {
+            volumetricTiles.clear();
+        } catch (RuntimeException e) {
+            failure = e;
+        }
+        try {
+            if (volumetricMaterial != null && !volumetricMaterial.isDeleted()) {
+                volumetricMaterial.destroy();
+            }
+        } catch (RuntimeException e) {
+            failure = accumulateFailure(failure, e);
+        } finally {
+            volumetricMaterial = null;
+        }
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private boolean isAnyPaletteMeshLive() {
+        for (PaletteEntry entry : palette) {
+            if (entry != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Frees the Classic and Procedural styles' meshes, leaving the volumetric layer alone. */
+    private void releaseClassicResources() {
+        clearScene();
+        paletteGenerationEpoch++;
+        paletteGenerationScheduled = false;
+        completedPaletteMeshes.clear();
+        destroyPalette(palette);
+        invalidateVanillaChunks();
+        completedVanillaChunks.clear();
+        destroyMaterial();
     }
 
     static boolean needsVisibilityRefresh(
@@ -491,6 +691,10 @@ public final class CloudRenderer {
             return meshCreator.create(packed, indices);
         }
         ensureMaterial();
+        return createMesh(packed, indices, material);
+    }
+
+    private static RemixMesh createMesh(float[] packed, int[] indices, RemixMaterial surfaceMaterial) {
         int vertexCount = packed.length / 6;
         ByteBuffer vertices = DirectBufferPool.acquire(vertexCount * HardcodedVertex.STRIDE);
         for (int i = 0; i < vertexCount; i++) {
@@ -502,7 +706,7 @@ public final class CloudRenderer {
                     0xffff_ffff, 0, 0);
         }
         vertices.flip();
-        RemixMeshSurface surface = new RemixMeshSurface(material)
+        RemixMeshSurface surface = new RemixMeshSurface(surfaceMaterial)
                 .setVertexData(vertices, vertexCount)
                 .setIndexDataFrom(indices, indices.length);
         RemixMesh mesh = new RemixMesh(new RemixMeshSurface[]{surface});
@@ -706,6 +910,12 @@ public final class CloudRenderer {
     }
 
     private void releaseResources() {
+        RuntimeException volumetricCleanup = null;
+        try {
+            releaseVolumetricResources();
+        } catch (RuntimeException e) {
+            volumetricCleanup = e;
+        }
         clearScene();
         CloudMeshGenerator.releaseWorkspace();
         paletteGenerationEpoch++;
@@ -733,6 +943,9 @@ public final class CloudRenderer {
             destroyMaterial();
         } catch (RuntimeException e) {
             failure = accumulateFailure(failure, e);
+        }
+        if (volumetricCleanup != null) {
+            failure = accumulateFailure(failure, volumetricCleanup);
         }
         if (failure != null) {
             throw failure;
@@ -774,7 +987,24 @@ public final class CloudRenderer {
 
     /** Whether the active cloud mode is healthy enough to replace Minecraft's draw. */
     public boolean shouldSuppressVanillaClouds() {
+        if (isVolumetricMode()) {
+            return true;
+        }
         return proceduralClouds ? paletteFailure == null : vanillaFailure == null;
+    }
+
+    public boolean isVolumetricClouds() {
+        return VolumetricClouds.isEnabled();
+    }
+
+    /** Community Edition: switches the volumetric clouds, which replace the chosen style while on. */
+    public void setVolumetricClouds(boolean enabled) {
+        if (VolumetricClouds.isEnabled() == enabled) {
+            return;
+        }
+        VolumetricClouds.setEnabled(enabled);
+        volumetricFailure = null;
+        releaseResources();
     }
 
     long paletteGenerationEpoch() {

@@ -9,6 +9,26 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.5 - Unreleased
+
+### Added
+
+- Volumetric clouds, on by default: real-scale cumulus fields to the horizon,
+  storm towers with anvils in thunder, overcast in rain, and thin, fibrous
+  cirrus high above in fair weather. Lightning lights the storm clouds from inside. Every
+  cloud is ray-marched into the sky as a volume with the same sun, moon, and atmosphere as
+  the sky and fades into the horizon haze; near clouds are also meshed, out of
+  sight, so they cast shadows and light shafts. Distant clouds in front of the sun dim the daylight, and
+  clouds hide the stars and the Milky Way behind them. Clouds → Volumetric
+  Clouds, Volumetric Cloud Detail, and Cloud Cover; a saved Procedural cloud
+  style is kept.
+
+### Fixed
+
+- A single frame of the raw raster sky now and then flashed over the whole
+  screen: the sky's compute passes restored vanilla's shader through its
+  bind cache, which could leave their own program bound for the next draw.
+
 ## Community Edition 0.1.0-ce.4 - Unreleased
 
 ### Added

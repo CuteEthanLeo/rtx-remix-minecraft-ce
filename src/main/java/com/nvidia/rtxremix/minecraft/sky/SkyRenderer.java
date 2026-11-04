@@ -41,6 +41,8 @@ import com.nvidia.rtxremix.minecraft.community.NightSkyRenderer;
 import com.nvidia.rtxremix.minecraft.community.OvercastSky;
 import com.nvidia.rtxremix.minecraft.community.RoundSun;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
+import com.nvidia.rtxremix.minecraft.community.clouds.CloudSkyCompositor;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
@@ -83,6 +85,10 @@ public class SkyRenderer {
     private static final float OVERCAST_MEAN_G = 0.26890025f;
     private static final float OVERCAST_MEAN_B = 0.31064802f;
     private static final float WEATHER_UPDATE_DELTA = 1.0e-4f;
+    /** Share of the storm dome's opacity kept while the volumetric clouds draw the overcast. */
+    private static final float VOLUMETRIC_WEATHER_DOME_SHARE = 0.35f;
+    /** Share of the previous cloud-dome mean kept per readback (about 10 a second). */
+    private static final float CLOUD_MEAN_KEEP = 0.8f;
     private static final Identifier SUN_TEXTURE =
             Identifier.ofVanilla("textures/environment/sun.png");
     private static final Identifier MOON_PHASES_TEXTURE =
@@ -197,6 +203,19 @@ public class SkyRenderer {
     private final TextureBatchEntry atmosphericTextureEntry = new TextureBatchEntry();
     private final TexturePatchInfo atmosphericTextureUpdate = new TexturePatchInfo();
     private final float[] atmosphericMean = new float[3];
+    /** Community Edition: the far layer of the volumetric clouds, composited into the dome. */
+    private CloudSkyCompositor cloudCompositor;
+    private final float[] cloudSunIlluminance = new float[3];
+    private final float[] cloudMoonIlluminance = new float[3];
+    private final float[] cloudSunDirection = new float[3];
+    private final float[] cloudMoonDirection = new float[3];
+    /** Whether the published dome texture holds the clouds, so turning them off republishes the bare sky. */
+    private boolean domeShowsClouds;
+    /** This frame's storm-dome opacity before the volumetric clouds thin it. */
+    private float stormOpacity;
+    private int skyTextureWidth;
+    private int skyTextureHeight;
+    private long publishedDomeTextureHandle;
     private final Transform sunTransform = new Transform();
     private final Transform moonTransform = new Transform();
     private final Transform starTransform = new Transform();
@@ -321,10 +340,17 @@ public class SkyRenderer {
                             RAIN_DOME_MIN_INTENSITY) * domeScale,
                     celestialIntensity
                             * LightManager.THUNDER_SKY_INTENSITY * domeScale);
+            stormOpacity = weather.opacity();
+            if (VolumetricClouds.isActive()) {
+                // Community Edition: the volumetric clouds are the overcast now; the static
+                // storm dome only deepens it a little.
+                weather = new WeatherDomeState(
+                        weather.opacity() * VOLUMETRIC_WEATHER_DOME_SHARE, weather.intensity());
+            }
         }
 
         try (ProfileScope ignored = ProfileScope.begin("Sky.Atmosphere")) {
-            updateAtmosphericDomeLight(api, lightState);
+            updateAtmosphericDomeLight(api, lightState, cameraPos);
         }
         try (ProfileScope ignored = ProfileScope.begin("Sky.Celestial")) {
             renderCelestialMeshes(
@@ -346,7 +372,8 @@ public class SkyRenderer {
                     sunDirection[1],
                     weatherRendered
                             ? weather
-                            : WeatherDomeState.CLEAR);
+                            : WeatherDomeState.CLEAR,
+                    weatherRendered ? stormOpacity : 0.0f);
         }
     }
 
@@ -360,7 +387,10 @@ public class SkyRenderer {
             destroyAsset(skyTextureAsset);
             ByteBuffer pixels = DirectBufferPool.acquire(AtmosphericSkyGenerator.OUTPUT_BYTES);
             fillFixedDome(pixels, radiance);
-            skyTextureAsset = createSkyTexture(pixels);
+            skyTextureAsset = createSkyTexture(pixels, SKY_W, SKY_H);
+            skyTextureWidth = SKY_W;
+            skyTextureHeight = SKY_H;
+            domeShowsClouds = false;
         }
         publishSkyDome(api);
         publishSkyAmbient(api, radiance[0], radiance[1], radiance[2], 1.0f);
@@ -396,8 +426,9 @@ public class SkyRenderer {
 
     private void updateAtmosphericDomeLight(
             RemixAPI api,
-            LightManager.SkyLightState lightState) {
-        regenerateSkyTexture(api, lightState);
+            LightManager.SkyLightState lightState,
+            Vec3d cameraPos) {
+        regenerateSkyTexture(api, lightState, cameraPos);
         publishSkyDome(api);
     }
 
@@ -410,7 +441,8 @@ public class SkyRenderer {
             return;
         }
         boolean domeAlive = skyDomeLightAsset != null && skyDomeLightAsset.isAlive();
-        if (!domeAlive || Float.compare(lastSkyDomeMultiplier, skyDomeMultiplier) != 0) {
+        if (!domeAlive || Float.compare(lastSkyDomeMultiplier, skyDomeMultiplier) != 0
+                || publishedDomeTextureHandle != skyTextureAsset.getHandle()) {
             LightInfoDomeEXT domeExt = new LightInfoDomeEXT();
             domeExt.setColorTexture(skyTextureAsset.getHandle());
             LightInfo lightInfo = LightInfo.builder()
@@ -425,6 +457,7 @@ public class SkyRenderer {
                 RemixLightStore.get().create(skyDomeLightAsset);
             }
             lastSkyDomeMultiplier = skyDomeMultiplier;
+            publishedDomeTextureHandle = skyTextureAsset.getHandle();
         }
         if (skyDomeLightAsset.isAlive()) {
             try (ProfileScope ignored =
@@ -506,49 +539,147 @@ public class SkyRenderer {
 
     private void regenerateSkyTexture(
             RemixAPI api,
-            LightManager.SkyLightState lightState) {
+            LightManager.SkyLightState lightState,
+            Vec3d cameraPos) {
+        boolean clouds = VolumetricClouds.isActive() && VolumetricClouds.isUsable();
         // Both assets must be live for a skip to be safe. They are released whenever the world
         // changes, and a world whose time never advances keeps the parameters constant forever,
         // so gating on the parameters alone would never rebuild them and the dome would stay black.
+        // A dome that still shows clouds after they were switched off is not valid either.
         boolean publishedOutputValid = skyTextureAsset != null
                 && skyTextureAsset.isAlive()
                 && skyDomeLightAsset != null
-                && skyDomeLightAsset.isAlive();
+                && skyDomeLightAsset.isAlive()
+                && (clouds || !domeShowsClouds);
         ByteBuffer pixelBuf = atmosphericGenerator.generate(
                 lightState,
                 atmosphericMean,
                 mieScatteringAnisotropy,
                 publishedOutputValid);
-        if (pixelBuf == null) {
+        if (clouds && atmosphericGenerator.hasOutput()) {
+            if (compositeClouds(api, lightState, cameraPos)) {
+                return;
+            }
+        } else if (cloudCompositor != null && !clouds) {
+            destroyCloudCompositor();
+        }
+        if (pixelBuf == null || clouds && domeShowsClouds) {
             return;
         }
         atmosphericMeanR = atmosphericMean[0];
         atmosphericMeanG = atmosphericMean[1];
         atmosphericMeanB = atmosphericMean[2];
+        uploadDome(api, pixelBuf, SKY_W, SKY_H, AtmosphericSkyGenerator.OUTPUT_BYTES);
+        domeShowsClouds = false;
+    }
 
+    /**
+     * Runs the far layer of the volumetric clouds over the atmosphere the generator holds and
+     * publishes the result as the dome when a readback is ready.
+     *
+     * @return whether the clouds own the dome this frame, so the bare sky must not be uploaded
+     */
+    private boolean compositeClouds(RemixAPI api, LightManager.SkyLightState lightState, Vec3d cameraPos) {
+        try {
+            VolumetricClouds.Quality quality = VolumetricClouds.currentQuality();
+            if (cloudCompositor != null && cloudCompositor.quality().domeWidth() != quality.domeWidth()) {
+                destroyCloudCompositor();
+            }
+            if (cloudCompositor == null) {
+                CloudSkyCompositor.AtmosphereDefines.set(AtmosphereModel.shaderDefines());
+                cloudCompositor = new CloudSkyCompositor(quality, SKY_W, SKY_H);
+            }
+            float scale = AtmosphericSkyGenerator.atmosphereScatteringScale(lightState.sunPosition()[1]);
+            copyNormalized(lightState.sunPosition(), cloudSunDirection);
+            copyNormalized(lightState.moonPosition(), cloudMoonDirection);
+            for (int i = 0; i < 3; i++) {
+                cloudSunIlluminance[i] = lightState.sunSourceRadiance()[i] * scale;
+                cloudMoonIlluminance[i] = lightState.moonSourceRadiance()[i] * scale;
+            }
+            ByteBuffer pixels;
+            try (ProfileScope ignored = ProfileScope.begin("Cloud.Dome")) {
+                pixels = cloudCompositor.update(
+                        atmosphericGenerator.finalSkyTexture(),
+                        atmosphericGenerator.transmittanceLutTexture(),
+                        new CloudSkyCompositor.Inputs(
+                                cloudSunDirection, cloudMoonDirection,
+                                cloudSunIlluminance, cloudMoonIlluminance,
+                                lightState.sunAngularRadius(), lightState.moonAngularRadius(),
+                                cameraPos.x, cameraPos.y, cameraPos.z),
+                        atmosphericMean);
+            }
+            if (pixels != null) {
+                // Each readback refreshes a quarter of the sky with fresh jitter, so its mean wobbles
+                // a little; the whole world's sky ambient follows it, so ease it in rather than step
+                // it, which would read as flicker under a dense storm.
+                float keep = domeShowsClouds ? CLOUD_MEAN_KEEP : 0.0f;
+                atmosphericMeanR = lerp(atmosphericMean[0], atmosphericMeanR, keep);
+                atmosphericMeanG = lerp(atmosphericMean[1], atmosphericMeanG, keep);
+                atmosphericMeanB = lerp(atmosphericMean[2], atmosphericMeanB, keep);
+                uploadDome(api, pixels, cloudCompositor.width(), cloudCompositor.height(),
+                        cloudCompositor.outputBytes());
+                domeShowsClouds = true;
+            }
+            // Until the first cloud readback lands, the bare sky keeps the dome.
+            return domeShowsClouds;
+        } catch (RuntimeException e) {
+            LOGGER.error("Volumetric clouds failed; falling back to the chosen cloud style", e);
+            VolumetricClouds.reportFailure(e);
+            destroyCloudCompositor();
+            return false;
+        }
+    }
+
+    private void destroyCloudCompositor() {
+        if (cloudCompositor != null) {
+            try {
+                cloudCompositor.destroy();
+            } catch (RuntimeException e) {
+                LOGGER.warn("Failed to release the volumetric cloud compositor", e);
+            }
+            cloudCompositor = null;
+        }
+    }
+
+    private static void copyNormalized(float[] source, float[] target) {
+        float length = (float) Math.sqrt(
+                source[0] * source[0] + source[1] * source[1] + source[2] * source[2]);
+        float inverse = length > 0.0f ? 1.0f / length : 0.0f;
+        target[0] = source[0] * inverse;
+        target[1] = source[1] * inverse;
+        target[2] = source[2] * inverse;
+    }
+
+    /** Uploads an RGBA16F equirect into the dome texture, replacing the texture when its size changed. */
+    private void uploadDome(RemixAPI api, ByteBuffer pixelBuf, int width, int height, int bytes) {
         try (ProfileScope ignored =
-                ProfileScope.begin("Sky.Atmosphere.Upload")
-                        .bytes(AtmosphericSkyGenerator.OUTPUT_BYTES)) {
-            if (skyTextureAsset == null || !skyTextureAsset.isAlive()) {
+                ProfileScope.begin("Sky.Atmosphere.Upload").bytes(bytes)) {
+            if (skyTextureAsset == null || !skyTextureAsset.isAlive()
+                    || skyTextureWidth != width || skyTextureHeight != height) {
                 destroyAsset(skyTextureAsset);
-                ByteBuffer ownedPixels =
-                        DirectBufferPool.acquire(
-                                AtmosphericSkyGenerator.OUTPUT_BYTES);
+                ByteBuffer ownedPixels = DirectBufferPool.acquire(bytes);
+                pixelBuf.position(0);
+                pixelBuf.limit(bytes);
                 ownedPixels.put(pixelBuf);
                 ownedPixels.flip();
                 pixelBuf.position(0);
-                skyTextureAsset = createSkyTexture(ownedPixels);
+                skyTextureAsset = createSkyTexture(ownedPixels, width, height);
+                skyTextureWidth = width;
+                skyTextureHeight = height;
             } else {
+                atmosphericTexturePatch.width = width;
+                atmosphericTexturePatch.height = height;
+                atmosphericTexturePatch.rowPitch = width * 4 * Short.BYTES;
                 updateAtmosphericTexture(api, pixelBuf);
             }
         }
     }
 
     /** Creates the dome's equirect texture over a pool buffer the texture then owns. */
-    private static RemixTexture createSkyTexture(ByteBuffer ownedPixels) {
+    private static RemixTexture createSkyTexture(ByteBuffer ownedPixels, int width, int height) {
         RemixTexture texture = new RemixTexture(
-                SKY_W,
-                SKY_H,
+                width,
+                height,
                 TextureFormat.RGBA16_SFLOAT,
                 0,
                 ownedPixels);
@@ -564,11 +695,14 @@ public class SkyRenderer {
     private void publishCombinedSkyAmbient(
             RemixAPI api,
             float sunHeight,
-            WeatherDomeState weather) {
+            WeatherDomeState weather,
+            float stormOpacity) {
+        // The lightning flash follows the full storm: with volumetric clouds the static dome is
+        // thinned, but the clouds the flash lights are there all the same.
         float multiplier = skyAmbientMultiplier(sunHeight)
                 + OvercastSky.extraAmbient(
                         weather.opacity(), LightManager.celestialVisibility(sunHeight))
-                + LightningFlash.skyAmbientBoost(weather.opacity());
+                + LightningFlash.skyAmbientBoost(stormOpacity);
         publishSkyAmbient(
                 api,
                 lerp(atmosphericMeanR, OVERCAST_MEAN_R * weather.intensity(), weather.opacity())
@@ -647,8 +781,12 @@ public class SkyRenderer {
         celestialMoonDirection[0] = -sunDirection[0];
         celestialMoonDirection[1] = -sunDirection[1];
         celestialMoonDirection[2] = -sunDirection[2];
-        float sunOpacity = celestialBodyOpacity(sunDirection[1]) * weatherVisibility;
-        float moonOpacity = celestialBodyOpacity(celestialMoonDirection[1]) * weatherVisibility;
+        // Community Edition: far volumetric clouds hide the discs (near clouds are meshes that
+        // hide them by themselves).
+        float sunOpacity = celestialBodyOpacity(sunDirection[1]) * weatherVisibility
+                * VolumetricClouds.sunTransmittance();
+        float moonOpacity = celestialBodyOpacity(celestialMoonDirection[1]) * weatherVisibility
+                * VolumetricClouds.moonTransmittance();
         boolean roundSun = DaylightSky.isRoundSun();
         updateCelestialOpacity(roundSun ? 0.0f : sunOpacity, moonOpacity);
 
@@ -1188,6 +1326,13 @@ public class SkyRenderer {
         skyDomeLightAsset = null;
         destroyAsset(skyTextureAsset);
         skyTextureAsset = null;
+        skyTextureWidth = 0;
+        skyTextureHeight = 0;
+        publishedDomeTextureHandle = 0L;
+        domeShowsClouds = false;
+        if (cloudCompositor != null) {
+            cloudCompositor.invalidate();
+        }
         atmosphericTexturePatch.pixelData = null;
         destroyAsset(overcastDomeLightAsset);
         overcastDomeLightAsset = null;
@@ -1206,6 +1351,7 @@ public class SkyRenderer {
         try {
             cleanup();
         } finally {
+            destroyCloudCompositor();
             atmosphericGenerator.destroy();
         }
     }

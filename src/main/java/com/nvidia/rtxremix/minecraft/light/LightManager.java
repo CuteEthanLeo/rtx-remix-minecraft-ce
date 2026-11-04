@@ -20,6 +20,7 @@ import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.asset.RemixLight;
 import com.nvidia.rtxremix.minecraft.asset.RemixLightStore;
@@ -304,6 +305,22 @@ public class LightManager {
                     radiance[0], radiance[1], radiance[2],
                     LightningFlash.BOLT_VOLUMETRIC_SCALE,
                     null), 1.0f);
+        }
+        // Community Edition: the bolt comes out of the volumetric clouds, so a broad light just
+        // under their base lights the storm from inside for the length of the flash.
+        if (VolumetricClouds.isActive()) {
+            double cloudBase = VolumetricClouds.params().base();
+            if (cloudBase > strike.y + LightningFlash.boltLightHeight(LightningFlash.boltLightCount() - 1)) {
+                float scale = LightningFlash.CLOUD_LIGHT_RADIANCE_SCALE;
+                submitEntityLight(new PendingAnalyticLight(
+                        EntityLightKey.lightning(bolt.getId(), LightningFlash.boltLightCount()),
+                        new Vec3d(strike.x, cloudBase - LightningFlash.CLOUD_LIGHT_BELOW_BASE, strike.z),
+                        LightningFlash.CLOUD_LIGHT_RADIUS,
+                        0.0,
+                        radiance[0] * scale, radiance[1] * scale, radiance[2] * scale,
+                        LightningFlash.BOLT_VOLUMETRIC_SCALE,
+                        null), 1.0f);
+            }
         }
     }
 
@@ -1069,10 +1086,11 @@ public class LightManager {
         BLOCK_DISPLAY,
         LIGHTNING_LOW,
         LIGHTNING_MID,
-        LIGHTNING_HIGH;
+        LIGHTNING_HIGH,
+        LIGHTNING_CLOUD;
 
-        /** One kind per light along a bolt, in {@link LightningFlash} order. */
-        private static final Kind[] LIGHTNING = {LIGHTNING_LOW, LIGHTNING_MID, LIGHTNING_HIGH};
+        /** One kind per light along a bolt, in {@link LightningFlash} order, then the cloud-base light. */
+        private static final Kind[] LIGHTNING = {LIGHTNING_LOW, LIGHTNING_MID, LIGHTNING_HIGH, LIGHTNING_CLOUD};
     }
 
     // ================================================================
@@ -1094,10 +1112,16 @@ public class LightManager {
         float sunVolumetricScale = SunShafts.sunVolumetricScale(
                 skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));
 
+        // Community Edition: a far volumetric cloud in front of the sun or moon shades the whole
+        // view, as a passing cloud does; near clouds are meshes and shadow the ground themselves.
+        float sunCloud = farCloudLightScale(VolumetricClouds.sunTransmittance(), rain);
+        float moonCloud = farCloudLightScale(VolumetricClouds.moonTransmittance(), rain);
         try {
-            sunLight = updateDistantLight(sunLight, skyLightState.sunPosition(), skyLightState.sunDirectRadiance(),
+            sunLight = updateDistantLight(sunLight, skyLightState.sunPosition(),
+                    scaleRadiance(skyLightState.sunDirectRadiance(), sunCloud),
                     SUN_ANGULAR_DIAMETER_DEGREES, sunVolumetricScale);
-            moonLight = updateDistantLight(moonLight, skyLightState.moonPosition(), skyLightState.moonDirectRadiance(),
+            moonLight = updateDistantLight(moonLight, skyLightState.moonPosition(),
+                    scaleRadiance(skyLightState.moonDirectRadiance(), moonCloud),
                     MOON_ANGULAR_DIAMETER_DEGREES, 1.0f);
         } catch (RemixException e) {
             LOGGER.error("Failed to update sky light: {}", e.getMessage());
@@ -1162,6 +1186,16 @@ public class LightManager {
                 sunSource, moonSource,
                 thresholdDirectRadiance(sunDirect), thresholdDirectRadiance(moonDirect),
                 SUN_ANGULAR_RADIUS, MOON_ANGULAR_RADIUS);
+    }
+
+    /**
+     * Scale on a distant light for the far volumetric clouds' transmittance toward it. Rain
+     * already dims the lights through the weather scales, so the clouds' share fades out as it
+     * rains instead of darkening the storm twice; a little light always gets through.
+     */
+    static float farCloudLightScale(float cloudTransmittance, float rainGradient) {
+        float scale = Math.max(0.03f, cloudTransmittance);
+        return lerp(scale, 1.0f, rainGradient);
     }
 
     static float weatherSunDirectScale(float rainGradient, float thunderGradient) {

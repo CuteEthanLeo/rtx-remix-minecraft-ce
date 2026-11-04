@@ -24,6 +24,7 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 | 草地、泥土油亮 | 官方把 LabPBR 光滑度换算成 `(1-s)²`，而 Remix 读取的是感知粗糙度并会再平方一次。改为规范的 `1-s` | 材质 → 精确粗糙度（默认开） | `texture/LabPBRConverter.java` |
 | 雨天没氛围、像晴天 | 雨/雷暴 conf：更浓的散射雾和飘动的非均匀雨幕，曝光不再把阴天提亮；阴天天空减光，雨中白天加入柔和环境光 | 社区版 → 阴天天气 | `confs/weather/*.conf`、`community/OvercastSky.java`、`sky/SkyRenderer.java` |
 | 地面不湿 | 露天朝上的方块面在雨中按 LabPBR 孔隙度变暗并泛水光，雨停后约 90 秒变干；有遮挡处保持干燥 | 社区版 → 湿润地面 | `community/WetSurfaces.java`、`texture/WetAtlas.java`、地形捕获 |
+| （新功能）体积云 | 写实尺度的体积云（云底约 y=400）：晴天是铺到地平线、底平顶亮的积云，7 km 高空有成片、纤细的丝状卷云，闪电从云里把雷暴云照亮，雷暴时长出 1500 格高、带砧状云顶的积雨云塔，下雨转为阴天。所有云都在天空穹顶里按体积光线步进，与大气共用同一个太阳、月亮和透射 LUT，并按空气透视融进地平线；相机周围几百格内另用同一个云场生成看不见的网格，只负责真实阴影和光柱；远处云挡住太阳时整片地面变暗，星星、银河、流星被云遮住。默认开启；之前手动选过「程序化」云的存档保持原样 | 云 → 体积云 / 体积云精度 / 云量 | `community/clouds/*`、`cloud/VolumetricCloudTiles.java`、`shaders/cloud_sky.comp` |
 | 雨天云发棕、夜晚云发白 | 云的反照率与次表面散射随时间和天气变化：雨中风暴灰，夜里暗蓝 | 社区版 → 云层明暗 | `community/CloudTint.java`、`cloud/CloudRenderer.java` |
 | 湖水发黑、水面单调 | 水体透射距离 1 m → 3.5 m，按生物群系分 9 种水色；水面单独成页并标记为动态水（双层流动波浪，雨中更粗糙）；岸边泡沫 | 社区版 → 真实水体 / 流动波浪 / 岸边浪花 | `community/WaterLook.java`、`community/ShoreFoam.java`、`terrain/*` |
 | 夜晚单薄 | 4000 颗亮度、色温各异的星星，沿银河聚集；程序化银河带（满月时变淡）；月光更强更冷；夜间薄雾让灯光有光晕；夜间环境光默认 2.5 → 1.4 | 社区版 → 星空 | `community/StarField.java`、`community/NightSky*.java`、`confs/time/*.conf` |
@@ -100,6 +101,14 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
   daytime sky ambient while it rains.
 - **Wet Ground**: upward faces open to the sky darken and gain a water sheen in rain by LabPBR porosity, then dry over
   about 90 seconds.
+- **Volumetric Clouds** (Clouds, on by default): real-scale cloudscapes with a base near y 400: cumulus fields to
+  the horizon in fair weather, 1500-block cumulonimbus towers with anvils in thunder, overcast in rain. Distant clouds
+  are ray-marched into the sky dome as volumes with the atmosphere's own sun, moon, and transmittance LUT and fade
+  into the horizon by aerial perspective; within a few hundred blocks the same cloud field is also meshed, hidden from
+  the camera, so near clouds shadow the ground and form light shafts. Thin, fibrous cirrus sheets lie 7 km up, and
+  lightning lights the storm clouds from inside. A distant cloud over the sun dims the whole view, and clouds
+  hide the stars, the Milky Way, and meteors behind them. Detail (Low/High/Ultra) and Cloud Cover are adjustable; a
+  settings file that chose the Procedural style keeps it.
 - **Cloud Shading**: clouds turn storm grey in rain and dim blue at night instead of staying white.
 - **Realistic Water, Moving Waves, Shore Foam**: longer transmittance with nine biome water colours; water pages
   classified as Remix animated water with two drifting wave layers that roughen in rain; foam strips along shores.

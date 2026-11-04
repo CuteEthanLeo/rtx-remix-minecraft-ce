@@ -1,9 +1,15 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.cloud;
 
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,6 +18,44 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CloudRendererTest {
+    private boolean volumetricBefore;
+
+    @BeforeEach
+    void classicStyles() {
+        // These cases cover the Classic and Procedural styles, which the volumetric clouds
+        // (on by default) would otherwise replace.
+        volumetricBefore = VolumetricClouds.isEnabled();
+        VolumetricClouds.setEnabled(false);
+    }
+
+    @AfterEach
+    void restoreVolumetric() {
+        VolumetricClouds.setEnabled(volumetricBefore);
+    }
+
+    @Test
+    void volumetricCloudsReplaceTheChosenStyleUntilSwitchedOff() {
+        CloudRenderer renderer = new CloudRenderer(null);
+        renderer.setVolumetricClouds(true);
+        assertTrue(renderer.isVolumetricMode());
+        assertTrue(renderer.shouldSuppressVanillaClouds());
+
+        renderer.setVolumetricClouds(false);
+        assertFalse(renderer.isVolumetricMode());
+        assertFalse(VolumetricClouds.isActive());
+    }
+
+    @Test
+    void aFarLayerFailureFallsBackToTheChosenStyle() {
+        CloudRenderer renderer = new CloudRenderer(null);
+        renderer.setVolumetricClouds(true);
+        VolumetricClouds.reportFailure(new IllegalStateException("compositor failed"));
+        assertFalse(renderer.isVolumetricMode());
+
+        renderer.setVolumetricClouds(false);
+        renderer.setVolumetricClouds(true);
+        assertTrue(renderer.isVolumetricMode());
+    }
     @Test
     void defaultsToVanillaClouds() {
         assertFalse(new CloudRenderer(null).isProceduralClouds());

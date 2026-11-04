@@ -20,6 +20,7 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMeshStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
 import com.nvidia.rtxremix.minecraft.asset.RemixTexture;
 import com.nvidia.rtxremix.minecraft.asset.RemixTextureStore;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 
 import org.slf4j.Logger;
@@ -73,6 +74,21 @@ public final class NightSkyRenderer {
     private final Transform meteorTransform = new Transform();
 
     /**
+     * Volumetric clouds hide the stars and the Milky Way behind them. The sky's additive
+     * billboards cannot be depth-tested against the dome, so each star's vertex colour carries
+     * how much of the sky shows through at its direction, and the meshes are rebuilt when that
+     * changes; clouds drift slowly enough that every couple of seconds is plenty.
+     */
+    private static final long OCCLUSION_INTERVAL_NANOS = 1_000_000_000L;
+    private static final float OCCLUSION_REBUILD_DELTA = 0.08f;
+    private final List<List<StarField.Star>> starBuckets = new ArrayList<>();
+    private final List<RemixMaterial> starBucketMaterials = new ArrayList<>();
+    private float[] starVisibility = new float[0];
+    private float[] bandVisibility = new float[0];
+    private long lastOcclusionNanos = Long.MIN_VALUE;
+    private boolean occluded;
+
+    /**
      * The opacity the stars take from vanilla's star brightness. Vanilla tops
      * out at 0.5 on a clear night; the field is authored for full night at 1.
      */
@@ -96,6 +112,7 @@ public final class NightSkyRenderer {
         if (!ensureAssets()) {
             return false;
         }
+        updateCloudOcclusion(skyTransform);
         updateOpacity(starOpacity, bandOpacity);
         if (bandOpacity > 0.0f) {
             api.drawInstance(bandMesh.getHandle(), skyTransform.matrix, InstanceCategoryBit.SKY, 1, blendPNext);
@@ -118,14 +135,17 @@ public final class NightSkyRenderer {
         if (meteorMesh == null || !meteors.update(ExportClock.get().nanos(), visibility, day)) {
             return;
         }
-        float brightness = meteors.brightness();
+        meteors.writeTransform(cameraX, cameraY, cameraZ, meteorTransform.matrix);
+        float brightness = meteors.brightness() * VolumetricClouds.skyVisibility(
+                (float) (meteorTransform.matrix[3] - cameraX),
+                (float) (meteorTransform.matrix[7] - cameraY),
+                (float) (meteorTransform.matrix[11] - cameraZ));
         if (Math.abs(brightness - lastMeteorBrightness) > OPACITY_UPDATE_DELTA) {
             RemixMaterialStore.get().update(meteorMaterial,
                     materialInfo(meteorTexture, METEOR_RADIANCE, Math.min(1.0f, brightness),
                             MaterialInfo.WRAP_MODE_CLAMP));
             lastMeteorBrightness = brightness;
         }
-        meteors.writeTransform(cameraX, cameraY, cameraZ, meteorTransform.matrix);
         api.drawInstance(meteorMesh.getHandle(), meteorTransform.matrix, InstanceCategoryBit.SKY, 1, blendPNext);
     }
 
@@ -156,6 +176,12 @@ public final class NightSkyRenderer {
         bandTexture = null;
         lastStarOpacity = -1.0f;
         lastBandOpacity = -1.0f;
+        starBuckets.clear();
+        starBucketMaterials.clear();
+        starVisibility = new float[0];
+        bandVisibility = new float[0];
+        lastOcclusionNanos = Long.MIN_VALUE;
+        occluded = false;
     }
 
     /** Lets a later frame retry after the renderer's resources were rebuilt. */
@@ -196,7 +222,9 @@ public final class NightSkyRenderer {
             buckets.get(star.colorClass() * tiers + star.tier()).add(star);
         }
 
-        List<RemixMeshSurface> surfaces = new ArrayList<>();
+        starBuckets.clear();
+        starBucketMaterials.clear();
+        int starTotal = 0;
         for (int colorClass = 0; colorClass < classes; colorClass++) {
             RemixTexture sprite = createTexture(
                     NightSkyTextures.star(StarField.CLASS_COLORS[colorClass]),
@@ -209,14 +237,108 @@ public final class NightSkyRenderer {
                         materialInfo(sprite, StarField.TIER_RADIANCE[tier], 1.0f,
                                 MaterialInfo.WRAP_MODE_CLAMP), List.of(sprite), null));
                 starMaterials[colorClass][tier] = material;
-                surfaces.add(starSurface(material, bucket));
+                starBuckets.add(bucket);
+                starBucketMaterials.add(material);
+                starTotal += bucket.size();
             }
         }
-        starMesh = RemixMeshStore.get().create(new RemixMesh(surfaces.toArray(new RemixMeshSurface[0])));
+        starVisibility = new float[starTotal];
+        Arrays.fill(starVisibility, 1.0f);
+        starMesh = buildStarMesh();
         lastStarOpacity = 1.0f;
     }
 
-    private static RemixMeshSurface starSurface(RemixMaterial material, List<StarField.Star> stars) {
+    private RemixMesh buildStarMesh() {
+        List<RemixMeshSurface> surfaces = new ArrayList<>();
+        int offset = 0;
+        for (int i = 0; i < starBuckets.size(); i++) {
+            List<StarField.Star> bucket = starBuckets.get(i);
+            surfaces.add(starSurface(starBucketMaterials.get(i), bucket, starVisibility, offset));
+            offset += bucket.size();
+        }
+        return RemixMeshStore.get().create(new RemixMesh(surfaces.toArray(new RemixMeshSurface[0])));
+    }
+
+    /**
+     * Rebuilds the star and Milky Way meshes with each vertex dimmed by how much of the sky the
+     * volumetric clouds leave visible in its direction, when that moved enough to notice.
+     */
+    private void updateCloudOcclusion(Transform skyTransform) {
+        boolean clouds = VolumetricClouds.isActive();
+        if (!clouds && !occluded) {
+            return;
+        }
+        long now = ExportClock.get().nanos();
+        if (clouds && lastOcclusionNanos != Long.MIN_VALUE
+                && now - lastOcclusionNanos < OCCLUSION_INTERVAL_NANOS && now >= lastOcclusionNanos) {
+            return;
+        }
+        lastOcclusionNanos = now;
+        float[] m = skyTransform.matrix;
+        float changed = 0.0f;
+        int index = 0;
+        for (List<StarField.Star> bucket : starBuckets) {
+            for (StarField.Star star : bucket) {
+                float visibility = clouds ? visibility(m, star.x(), star.y(), star.z()) : 1.0f;
+                changed = Math.max(changed, Math.abs(visibility - starVisibility[index]));
+                starVisibility[index++] = visibility;
+            }
+        }
+        int segments = StarField.BAND_SEGMENTS;
+        if (bandVisibility.length != (segments + 1) * 2) {
+            bandVisibility = new float[(segments + 1) * 2];
+            Arrays.fill(bandVisibility, 1.0f);
+        }
+        float[] point = new float[3];
+        for (int i = 0; i <= segments; i++) {
+            for (int side = 0; side < 2; side++) {
+                StarField.bandPoint(i / (float) segments, side == 0 ? -1.0f : 1.0f, point);
+                float visibility = clouds ? visibility(m, point[0], point[1], point[2]) : 1.0f;
+                int v = i * 2 + side;
+                changed = Math.max(changed, Math.abs(visibility - bandVisibility[v]));
+                bandVisibility[v] = visibility;
+            }
+        }
+        occluded = clouds;
+        if (changed < OCCLUSION_REBUILD_DELTA) {
+            return;
+        }
+        RemixMesh previousStars = starMesh;
+        RemixMesh previousBand = bandMesh;
+        starMesh = buildStarMesh();
+        bandMesh = buildBandMesh();
+        destroy(previousStars);
+        destroy(previousBand);
+    }
+
+    /** Sky visibility at a sky-local direction, rotated into the world by the sky transform. */
+    private static float visibility(float[] m, float x, float y, float z) {
+        float wx = m[0] * x + m[1] * y + m[2] * z;
+        float wy = m[4] * x + m[5] * y + m[6] * z;
+        float wz = m[8] * x + m[9] * y + m[10] * z;
+        return VolumetricClouds.skyVisibility(wx, wy, wz);
+    }
+
+    private static void shrinkQuad(float[] corners, float scale) {
+        if (scale >= 1.0f) {
+            return;
+        }
+        for (int axis = 0; axis < 3; axis++) {
+            float centre = 0.25f * (corners[axis] + corners[3 + axis] + corners[6 + axis] + corners[9 + axis]);
+            for (int corner = 0; corner < 4; corner++) {
+                int index = corner * 3 + axis;
+                corners[index] = centre + (corners[index] - centre) * scale;
+            }
+        }
+    }
+
+    private static int grey(float visibility) {
+        int level = Math.round(Math.max(0.0f, Math.min(1.0f, visibility)) * 255.0f);
+        return 0xFF000000 | level << 16 | level << 8 | level;
+    }
+
+    private static RemixMeshSurface starSurface(RemixMaterial material, List<StarField.Star> stars,
+                                                float[] visibility, int offset) {
         HardcodedVertex[] vertices = new HardcodedVertex[stars.size() * 4];
         int[] indices = new int[stars.size() * 6];
         float[] corners = new float[12];
@@ -224,11 +346,16 @@ public final class NightSkyRenderer {
         for (int s = 0; s < stars.size(); s++) {
             StarField.Star star = stars.get(s);
             StarField.quadCorners(star, corners, 0);
+            // A star's light is emissive, which the vertex colour does not dim; its sprite is
+            // far smaller than a pixel, so its brightness follows its area instead. Shrinking
+            // the quad toward its centre by the square root of the visibility hides it behind
+            // a cloud in proportion.
+            shrinkQuad(corners, (float) Math.sqrt(Math.max(0.0f, Math.min(1.0f, visibility[offset + s]))));
             for (int corner = 0; corner < 4; corner++) {
                 vertices[s * 4 + corner] = HardcodedVertex.create(
                         corners[corner * 3], corners[corner * 3 + 1], corners[corner * 3 + 2],
                         -star.x(), -star.y(), -star.z(),
-                        uv[corner][0], uv[corner][1], 0xFFFFFFFF);
+                        uv[corner][0], uv[corner][1], grey(visibility[offset + s]));
             }
             quadIndices(indices, s * 6, s * 4);
         }
@@ -242,6 +369,11 @@ public final class NightSkyRenderer {
                 materialInfo(bandTexture, MILKY_WAY_RADIANCE, 1.0f, MaterialInfo.WRAP_MODE_REPEAT),
                 List.of(bandTexture), null));
 
+        bandMesh = buildBandMesh();
+        lastBandOpacity = 1.0f;
+    }
+
+    private RemixMesh buildBandMesh() {
         int segments = StarField.BAND_SEGMENTS;
         HardcodedVertex[] vertices = new HardcodedVertex[(segments + 1) * 2];
         float[] point = new float[3];
@@ -252,7 +384,8 @@ public final class NightSkyRenderer {
                 float length = (float) Math.sqrt(point[0] * point[0] + point[1] * point[1] + point[2] * point[2]);
                 vertices[i * 2 + side] = HardcodedVertex.create(point[0], point[1], point[2],
                         -point[0] / length, -point[1] / length, -point[2] / length,
-                        along, side, 0xFFFFFFFF);
+                        along, side, grey(bandVisibility.length == vertices.length
+                                ? bandVisibility[i * 2 + side] : 1.0f));
             }
         }
         int[] indices = new int[segments * 6];
@@ -266,8 +399,7 @@ public final class NightSkyRenderer {
             indices[i * 6 + 5] = a + 1;
         }
         RemixMeshSurface surface = new RemixMeshSurface(bandMaterial).setVertices(vertices).setIndices(indices);
-        bandMesh = RemixMeshStore.get().create(new RemixMesh(new RemixMeshSurface[]{surface}));
-        lastBandOpacity = 1.0f;
+        return RemixMeshStore.get().create(new RemixMesh(new RemixMeshSurface[]{surface}));
     }
 
     private void createMeteor() {

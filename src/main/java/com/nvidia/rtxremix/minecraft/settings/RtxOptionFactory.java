@@ -9,6 +9,7 @@ package com.nvidia.rtxremix.minecraft.settings;
 
 import com.mojang.serialization.Codec;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.option.SimpleOption;
 import net.minecraft.screen.ScreenTexts;
@@ -48,6 +49,8 @@ final class RtxOptionFactory {
     static final String MOTION_BLUR_ID = "post.motionBlur";
     static final String MOTION_BLUR_SHUTTER_ID = "post.motionBlurShutterTime";
     static final String VOLUMETRIC_QUALITY_ID = "community.volumetricQuality";
+    static final String VOLUMETRIC_CLOUDS_ID = "clouds.volumetric";
+    static final String CLOUD_QUALITY_ID = "clouds.volumetricQuality";
 
     private RtxOptionFactory() {}
 
@@ -279,6 +282,13 @@ final class RtxOptionFactory {
                 case CameraEffectsSettings.CINEMATIC -> "rtxremix.settings.value.motionBlur.cinematic";
                 case CameraEffectsSettings.ULTRA -> "rtxremix.settings.value.motionBlur.ultra";
                 default -> "rtxremix.settings.value.off";
+            });
+        }
+        if (CLOUD_QUALITY_ID.equals(settingId)) {
+            return Text.translatable(switch (value) {
+                case VolumetricClouds.QUALITY_LOW -> "rtxremix.settings.value.cloudQuality.low";
+                case VolumetricClouds.QUALITY_ULTRA -> "rtxremix.settings.value.volumetricQuality.ultra";
+                default -> "rtxremix.settings.value.volumetricQuality.high";
             });
         }
         if (VOLUMETRIC_QUALITY_ID.equals(settingId)) {

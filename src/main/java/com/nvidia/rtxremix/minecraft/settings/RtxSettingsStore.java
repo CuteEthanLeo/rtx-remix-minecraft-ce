@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -52,6 +55,7 @@ public final class RtxSettingsStore {
                 case FLOAT -> values.addProperty(s.id(), (Double) s.get());
             }
         }
+        recordVolumetricChoice(settings, values);
         root.add("settings", values);
         try {
             if (values.size() == 0) {
@@ -91,6 +95,7 @@ public final class RtxSettingsStore {
             LOGGER.warn("Failed to read RTX settings from {}, ignoring", file, e);
             return;
         }
+        keepChosenCloudStyle(values);
         for (Map.Entry<String, JsonElement> entry : values.entrySet()) {
             RtxSetting<?> setting = settings.byId(entry.getKey());
             if (setting == null) {
@@ -100,6 +105,42 @@ public final class RtxSettingsStore {
             applyEntry(setting, entry.getValue());
         }
     }
+
+    /**
+     * Community Edition: the volumetric clouds are on by default and replace the chosen style.
+     * Only changed settings are saved, so a saved Procedural style is a player's own choice;
+     * a file from before the volumetric clouds that holds one keeps it by saving them off.
+     */
+    static void keepChosenCloudStyle(JsonObject values) {
+        if (values.has(VOLUMETRIC_CLOUDS_ID) || !values.has(PROCEDURAL_CLOUDS_ID)) {
+            return;
+        }
+        try {
+            if (values.get(PROCEDURAL_CLOUDS_ID).getAsBoolean()) {
+                values.addProperty(VOLUMETRIC_CLOUDS_ID, false);
+            }
+        } catch (RuntimeException e) {
+            LOGGER.warn("Ignoring a malformed saved cloud style", e);
+        }
+    }
+
+    /**
+     * Writes the volumetric clouds' switch even at its default whenever a Procedural style is
+     * saved beside it. Otherwise "on" is never saved, and {@link #keepChosenCloudStyle} would
+     * switch the clouds off again on every launch.
+     */
+    static void recordVolumetricChoice(RtxSettings settings, JsonObject values) {
+        if (!values.has(PROCEDURAL_CLOUDS_ID) || values.has(VOLUMETRIC_CLOUDS_ID)) {
+            return;
+        }
+        RtxSetting<?> volumetric = settings.byId(VOLUMETRIC_CLOUDS_ID);
+        if (volumetric != null && volumetric.get() instanceof Boolean value) {
+            values.addProperty(VOLUMETRIC_CLOUDS_ID, value);
+        }
+    }
+
+    private static final String VOLUMETRIC_CLOUDS_ID = "clouds.volumetric";
+    private static final String PROCEDURAL_CLOUDS_ID = "clouds.procedural";
 
     @SuppressWarnings("unchecked")
     private void applyEntry(RtxSetting<?> setting, JsonElement value) {

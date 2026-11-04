@@ -19,6 +19,7 @@ import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
 import com.nvidia.rtxremix.minecraft.entity.RemixEntityPass;
+import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
 import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
@@ -148,6 +149,28 @@ public final class RtxSettingsFactory {
                 SkyRenderer::getMinimumCelestialWeatherVisibility,
                 SkyRenderer::setMinimumCelestialWeatherVisibility));
 
+        // Community Edition volumetric clouds; while on they replace the style below.
+        list.add(RtxSetting.ofBool(RtxOptionFactory.VOLUMETRIC_CLOUDS_ID, SettingGroup.CLOUDS,
+                "rtxremix.setting.clouds.volumetric",
+                "rtxremix.setting.clouds.volumetric.tip",
+                VolumetricClouds.DEFAULT_ENABLED,
+                renderer.getCloudRenderer()::isVolumetricClouds,
+                renderer.getCloudRenderer()::setVolumetricClouds));
+        list.add(RtxSetting.ofInt(RtxOptionFactory.CLOUD_QUALITY_ID, SettingGroup.CLOUDS,
+                "rtxremix.setting.clouds.volumetricQuality",
+                "rtxremix.setting.clouds.volumetricQuality.tip",
+                VolumetricClouds.QUALITY_LOW, VolumetricClouds.QUALITY_ULTRA,
+                VolumetricClouds.DEFAULT_QUALITY,
+                VolumetricClouds::getQuality, VolumetricClouds::setQuality));
+        list.add(floatSetting(
+                "clouds.coverage",
+                SettingGroup.CLOUDS,
+                "rtxremix.setting.clouds.coverage",
+                VolumetricClouds.MIN_COVERAGE,
+                VolumetricClouds.MAX_COVERAGE,
+                VolumetricClouds::getCoverage,
+                VolumetricClouds::setCoverage)
+                .deferSliderApply());
         list.add(RtxSetting.ofBool("clouds.procedural", SettingGroup.CLOUDS,
                 "rtxremix.setting.clouds.procedural",
                 "rtxremix.setting.clouds.procedural.tip",

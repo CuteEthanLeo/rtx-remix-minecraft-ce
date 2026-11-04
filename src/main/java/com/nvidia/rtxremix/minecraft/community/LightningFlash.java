@@ -29,6 +29,10 @@ public final class LightningFlash {
     public static final float BOLT_LIGHT_RADIUS = 1.5f;
     /** Bolt lights scatter this much more into the haze than into surfaces. */
     public static final float BOLT_VOLUMETRIC_SCALE = 4.0f;
+    /** The light that flashes the volumetric clouds from under their base: broad and a little dimmer. */
+    public static final float CLOUD_LIGHT_RADIUS = 12.0f;
+    public static final float CLOUD_LIGHT_RADIANCE_SCALE = 0.35f;
+    public static final float CLOUD_LIGHT_BELOW_BASE = 16.0f;
     /** Cold, slightly blue white. */
     static final float[] BOLT_TINT = {0.85f, 0.9f, 1.0f};
     /** Extra sky-ambient multiplier at full flash, for strikes too far away to light directly. */

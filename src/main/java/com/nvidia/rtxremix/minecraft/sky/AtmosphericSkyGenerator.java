@@ -7,7 +7,6 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import com.nvidia.rtxremix.minecraft.light.LightManager.SkyLightState;
 import java.io.IOException;
@@ -15,7 +14,6 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
-import net.minecraft.client.gl.ShaderProgram;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -226,12 +224,13 @@ final class AtmosphericSkyGenerator {
             }
         }
 
-        ShaderProgram previousProgram;
+        // The exact GL program is restored afterwards: ShaderProgram.bind() skips glUseProgram
+        // when vanilla's cache already names that program, which would leave this compute
+        // program bound under vanilla's next uniform uploads and draws.
+        int previousProgram;
         try (ProfileScope ignored =
                 ProfileScope.begin("Sky.ProceduralGeneration.StateSave")) {
-            previousProgram = RenderSystem.isOnRenderThread()
-                    ? RenderSystem.getShader()
-                    : null;
+            previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         }
         try {
             try (ProfileScope ignored =
@@ -286,11 +285,7 @@ final class AtmosphericSkyGenerator {
                     GL21.GL_PIXEL_PACK_BUFFER,
                     0);
             GL13.glActiveTexture(GL13.GL_TEXTURE0);
-            if (previousProgram != null) {
-                previousProgram.bind();
-            } else {
-                GL20.glUseProgram(0);
-            }
+            GL20.glUseProgram(previousProgram);
         }
     }
 
@@ -725,6 +720,21 @@ final class AtmosphericSkyGenerator {
 
     int outputBytes() {
         return outputBytes;
+    }
+
+    /** Community Edition: the GL panorama (with its mean row) the volumetric clouds composite over. */
+    int finalSkyTexture() {
+        return finalSkyTexture;
+    }
+
+    /** Community Edition: the GL transmittance LUT, which also lights the volumetric clouds. */
+    int transmittanceLutTexture() {
+        return transmittanceLut;
+    }
+
+    /** Whether the panorama and LUT have been computed at least once since creation. */
+    boolean hasOutput() {
+        return hasPublishedSkyParameters && lutModel >= 0;
     }
 
     private static String loadShaderSource(int width, int height) {
