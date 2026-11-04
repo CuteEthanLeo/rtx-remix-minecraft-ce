@@ -18,7 +18,7 @@ import java.util.function.BiConsumer;
  * <p>The shutter is a time, not a share of a frame. Remix stretches each pixel
  * along its motion over one frame times {@code exposureFraction}, with no frame
  * time in the formula, so a fixed fraction blurs half as far at 120 fps as at
- * 60. {@link #onFrame(long)} divides the shutter time by a smoothed frame time
+ * 60. {@link #onFrame(long, float)} divides the shutter time by a smoothed frame time
  * every frame instead, so a streak is as long at any frame rate as a real
  * camera with that shutter would draw it.
  */
@@ -118,9 +118,14 @@ public final class CameraEffectsSettings {
     /**
      * Folds this frame's time into the smoothed frame time and, while blur is on, updates
      * Remix's exposure fraction when it moved enough to matter. Call once per rendered frame.
+     *
+     * @param fixedFrameSeconds a frame time to use as is instead of the measured one, such as
+     *     the frame time of a video export that renders far slower than it plays; 0 to measure
      */
-    public void onFrame(long nowNanos) {
-        if (hasLastFrame) {
+    public void onFrame(long nowNanos, float fixedFrameSeconds) {
+        if (fixedFrameSeconds > 0.0f) {
+            smoothedFrameSeconds = fixedFrameSeconds;
+        } else if (hasLastFrame) {
             float seconds = (nowNanos - lastFrameNanos) * 1.0e-9f;
             if (seconds >= MIN_FRAME_SECONDS && seconds <= MAX_FRAME_SECONDS) {
                 smoothedFrameSeconds += (seconds - smoothedFrameSeconds) * FRAME_TIME_SMOOTHING;

@@ -10,6 +10,7 @@ package com.nvidia.rtxremix.minecraft.logic;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.minecraft.community.DaylightSky;
+import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.BlockPos;
@@ -1099,7 +1100,7 @@ public final class ConfLayerDriver {
     }
 
     private float frameDtSeconds() {
-        long now = System.nanoTime();
+        long now = ExportClock.get().nanos();
         long previous = lastFrameNanos;
         lastFrameNanos = now;
         if (previous == 0) {

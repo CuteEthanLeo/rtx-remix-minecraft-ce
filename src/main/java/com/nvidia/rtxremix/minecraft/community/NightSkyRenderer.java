@@ -109,7 +109,7 @@ public final class NightSkyRenderer {
      */
     public void drawMeteors(RemixAPI api, double cameraX, double cameraY, double cameraZ,
                             long blendPNext, float visibility, long day) {
-        if (meteorMesh == null || !meteors.update(System.nanoTime(), visibility, day)) {
+        if (meteorMesh == null || !meteors.update(ExportClock.get().nanos(), visibility, day)) {
             return;
         }
         float brightness = meteors.brightness();

@@ -106,7 +106,7 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
 - **Starry Night**: 6000 stars of varied brightness and colour that crowd toward a procedural Milky Way (domain-warped
   star clouds, a great rift and ridged dust filaments, a warm bulge and bluish arms, faint nebulae, and a grain of
   unresolved stars, in a 40-degree meandering band), which a full moon washes out; shooting stars that flare and fade
-  along a falling great circle in real time, about every seven seconds and every 1.6 seconds on a shower night (one
+  along a falling great circle in real time (export time in a Flashback export), about every seven seconds and every 1.6 seconds on a shower night (one
   night in five); cooler moonlight three times upstream's that follows the moon phase (new moon 30%); thin night
   haze; the night sky ambient rect defaults to 0 instead of 2.5, since the dome already lights the night and the rect
   counted that sky twice in its cyan mean colour (which is what turned moonlit grass green); night auto exposure may
@@ -116,6 +116,11 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
   screen. The shutter is a time: Remix's `exposureFraction` is per-frame motion times a share of a frame, so it is
   recomputed every frame from the smoothed frame time and a streak is equally long at any frame rate. Noise sampling
   is on at every step, so streaks are two-sided. The hand and block outline stay sharp.
+- **Flashback Exports**: while Flashback exports a replay, which renders far slower than real time, shooting stars,
+  the motion-blur frame time, the lightning flash, ground wetness and conf-layer blends follow the export's timeline
+  instead of the wall clock, and Remix's own frame time (`rtx.timeDeltaBetweenFrames`, water animation and eye
+  adaptation) is pinned to the export frame time, so the video moves as it would in play. Flashback is read by
+  reflection and is not required.
 - **Glowing Block Lights**: glowstone, sea lanterns, froglights, shroomlights, jack o'lanterns, lit redstone lamps
   and copper bulbs get a rect light on each exposed face (only the carved face for a jack o'lantern); lanterns, soul
   lanterns, and end rods get a sphere or cylinder. Before, they lit the scene only through emissive texels, which

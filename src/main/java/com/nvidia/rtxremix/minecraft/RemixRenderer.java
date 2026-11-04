@@ -30,6 +30,7 @@ import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
 import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
+import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.settings.PostProcessingSettings;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
@@ -82,6 +83,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 /**
  * Render-thread bridge between Minecraft's world and the RTX Remix runtime.
@@ -112,6 +114,8 @@ public class RemixRenderer {
 
     // Remix API instance
     private RemixAPI remixApi;
+    /** {@link RemixAPI#setConfigVariable}, bound once so per-frame callers allocate nothing. */
+    private BiConsumer<String, String> configWriter;
     private boolean initialized = false;
     private long windowHandle;
     
@@ -314,7 +318,8 @@ public class RemixRenderer {
             }
 
             postProcessingSettings = new PostProcessingSettings(remixApi::setConfigVariable);
-            cameraEffectsSettings = new CameraEffectsSettings(remixApi::setConfigVariable);
+            configWriter = remixApi::setConfigVariable;
+            cameraEffectsSettings = new CameraEffectsSettings(configWriter);
             volumetricQualitySettings = new VolumetricQualitySettings(remixApi::setConfigVariable);
             
             // NOTE: Submit() allocates the image, but semaphores are always ready
@@ -745,6 +750,7 @@ public class RemixRenderer {
         }
 
         joinBurstHold.onFrame(System.nanoTime());
+        ExportClock.get().onFrame(configWriter);
 
         if (!renderThreadNamed) {
             RemixAPI.tracyThreadName("Render");
@@ -796,7 +802,8 @@ public class RemixRenderer {
             submitPendingParticleFrame();
 
             if (cameraEffectsSettings != null) {
-                cameraEffectsSettings.onFrame(System.nanoTime());
+                ExportClock clock = ExportClock.get();
+                cameraEffectsSettings.onFrame(clock.nanos(), clock.frameSeconds());
             }
 
             Camera camera = client.gameRenderer.getCamera();

@@ -16,6 +16,7 @@ import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.TextureFormat;
 import com.nvidia.rtxremix.TexturePurpose;
+import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.Puddles;
 import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
@@ -1232,7 +1233,7 @@ public class BlockTextureManager {
      * @param rain rain strength where the camera is, 0 where it snows or never rains
      */
     public void updateWetness(float rain) {
-        long now = System.nanoTime();
+        long now = ExportClock.get().nanos();
         float seconds = lastWetnessNanos == 0 ? 0.0f : Math.min(1.0f, (now - lastWetnessNanos) * 1.0e-9f);
         lastWetnessNanos = now;
         int level = wetSurfaces.advance(rain, seconds);

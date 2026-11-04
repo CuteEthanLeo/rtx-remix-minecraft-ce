@@ -16,6 +16,7 @@ import com.nvidia.rtxremix.LightInfoSphereEXT;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.minecraft.community.DaylightSky;
+import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
@@ -911,7 +912,7 @@ public class LightManager {
     }
 
     private float entityLightFrameDtSeconds() {
-        long now = System.nanoTime();
+        long now = ExportClock.get().nanos();
         long previous = lastEntityLightUpdateNanos;
         lastEntityLightUpdateNanos = now;
         return previous == 0L ? 0.0f : (now - previous) / 1.0e9f;

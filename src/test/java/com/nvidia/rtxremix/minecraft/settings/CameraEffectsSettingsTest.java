@@ -87,7 +87,7 @@ class CameraEffectsSettingsTest {
 
         long now = 0L;
         for (int frame = 0; frame < 200; frame++) {
-            settings.onFrame(now);
+            settings.onFrame(now, 0.0f);
             now += NANOS_PER_SECOND / 120;
         }
         float settled = Float.parseFloat(fractions.get(fractions.size() - 1));
@@ -96,14 +96,14 @@ class CameraEffectsSettingsTest {
 
         int writesBeforeSteadyFrames = fractions.size();
         for (int frame = 0; frame < 100; frame++) {
-            settings.onFrame(now);
+            settings.onFrame(now, 0.0f);
             now += NANOS_PER_SECOND / 120;
         }
         assertEquals(writesBeforeSteadyFrames, fractions.size(), "a steady frame rate writes nothing");
 
         // A loading hitch is not averaged in.
         now += 2 * NANOS_PER_SECOND;
-        settings.onFrame(now);
+        settings.onFrame(now, 0.0f);
         assertEquals(writesBeforeSteadyFrames, fractions.size());
     }
 
@@ -112,7 +112,7 @@ class CameraEffectsSettingsTest {
         Map<String, String> written = new LinkedHashMap<>();
         CameraEffectsSettings settings = new CameraEffectsSettings(written::put);
         settings.setShutterMs(20.0f);
-        settings.onFrame(0L);
+        settings.onFrame(0L, 0.0f);
         assertFalse(written.containsKey(CameraEffectsSettings.SHUTTER_KEY));
 
         settings.setQuality(CameraEffectsSettings.HIGH);
@@ -124,5 +124,21 @@ class CameraEffectsSettingsTest {
 
         settings.setShutterMs(1000.0f);
         assertEquals(CameraEffectsSettings.MAX_SHUTTER_MS, settings.getShutterMs(), 0.0f);
+    }
+
+    @Test
+    void aFixedFrameTimeIsUsedAsIsWithoutSmoothing() {
+        Map<String, String> written = new LinkedHashMap<>();
+        CameraEffectsSettings settings = new CameraEffectsSettings(written::put);
+        settings.setQuality(CameraEffectsSettings.CINEMATIC);
+        settings.setShutterMs(1000.0f / 48.0f);
+
+        // An offline export takes seconds per frame on the wall clock but plays at 60 fps.
+        long now = 0L;
+        for (int frame = 0; frame < 3; frame++) {
+            settings.onFrame(now, 1.0f / 60.0f);
+            now += 3 * NANOS_PER_SECOND;
+        }
+        assertEquals(60.0f / 48.0f, Float.parseFloat(written.get(CameraEffectsSettings.SHUTTER_KEY)), 1.0e-4f);
     }
 }
