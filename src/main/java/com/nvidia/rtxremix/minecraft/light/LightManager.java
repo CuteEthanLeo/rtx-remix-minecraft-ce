@@ -1114,8 +1114,8 @@ public class LightManager {
 
         // Community Edition: a far volumetric cloud in front of the sun or moon shades the whole
         // view, as a passing cloud does; near clouds are meshes and shadow the ground themselves.
-        float sunCloud = farCloudLightScale(VolumetricClouds.sunTransmittance(), rain);
-        float moonCloud = farCloudLightScale(VolumetricClouds.moonTransmittance(), rain);
+        float sunCloud = farCloudLightScale(VolumetricClouds.sunTransmittance(), rain, SUN_CLOUD_FLOOR);
+        float moonCloud = farCloudLightScale(VolumetricClouds.moonTransmittance(), rain, MOON_CLOUD_FLOOR);
         try {
             sunLight = updateDistantLight(sunLight, skyLightState.sunPosition(),
                     scaleRadiance(skyLightState.sunDirectRadiance(), sunCloud),
@@ -1193,8 +1193,15 @@ public class LightManager {
      * already dims the lights through the weather scales, so the clouds' share fades out as it
      * rains instead of darkening the storm twice; a little light always gets through.
      */
-    static float farCloudLightScale(float cloudTransmittance, float rainGradient) {
-        float scale = Math.max(0.03f, cloudTransmittance);
+    /**
+     * Least share of the sun (moon) light a far cloud in front of it leaves: a passing cloud
+     * dims the scene, it must not black it out. Rain has its own, darker light.
+     */
+    static final float SUN_CLOUD_FLOOR = 0.55f;
+    static final float MOON_CLOUD_FLOOR = 0.8f;
+
+    static float farCloudLightScale(float cloudTransmittance, float rainGradient, float floor) {
+        float scale = floor + (1.0f - floor) * Math.max(0.0f, Math.min(1.0f, cloudTransmittance));
         return lerp(scale, 1.0f, rainGradient);
     }
 

@@ -251,8 +251,11 @@ public final class CloudRenderer {
             thunder = world.getThunderGradient(tickDelta);
         }
         float base = cloudHeight + cloudsHeight + CloudField.BASE_ABOVE_VANILLA;
+        // Sun height: 1 at noon, -1 at midnight. Night fades in from dusk to full dark.
+        float sunHeight = (float) Math.cos(world.getSkyAngle(tickDelta) * 2.0 * Math.PI);
+        float night = Math.max(0.0f, Math.min(1.0f, (0.1f - sunHeight) / 0.3f));
         CloudField.Params params = CloudField.Params.of(
-                base, VolumetricClouds.getCoverage(), rain, thunder).quantized();
+                base, VolumetricClouds.getCoverage(), rain, thunder, night).quantized();
         VolumetricClouds.publishFrame(params, worldTime);
 
         double windX = worldTime * CloudField.WIND_X_PER_TICK;

@@ -139,14 +139,14 @@ public final class CloudNoise {
                 double amplitude = 1.0;
                 double total = 0.0;
                 for (int octave = 0; octave < 4; octave++) {
-                    int period = 6 << octave;
+                    int period = 12 << octave;
                     coverageNoise += amplitude * perlin(u * period, v * period, 0.37, period, SEED + 211 + octave);
                     total += amplitude;
                     amplitude *= 0.5;
                 }
                 coverageNoise = clamp01(coverageNoise / total * 0.8 + 0.5);
-                // Inverted Worley groups the cover into separate cloud fields 1–2 km across.
-                double clumps = worley(u, v, 0.5, 12, SEED + 223, true);
+                // Inverted Worley breaks the cover into separate patches about 500 blocks across.
+                double clumps = worley(u, v, 0.5, 32, SEED + 223, true);
                 double coverage = clamp01((0.55 * coverageNoise + 0.45 * clumps) * 1.4 - 0.28);
 
                 double typeNoise = 0.6 * perlin(u * 2, v * 2, 0.71, 2, SEED + 241)

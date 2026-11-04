@@ -46,6 +46,15 @@ class CloudFieldTest {
     }
 
     @Test
+    void clearNightsKeepOnlyScatteredClouds() {
+        float day = coveredFraction(CloudField.Params.of(260.0f, CloudField.DEFAULT_COVERAGE, 0.0f, 0.0f, 0.0f));
+        float night = coveredFraction(CloudField.Params.of(260.0f, CloudField.DEFAULT_COVERAGE, 0.0f, 0.0f, 1.0f));
+        assertTrue(night < day * 0.6f, night + " < 0.6 * " + day);
+        float rainyNight = coveredFraction(CloudField.Params.of(260.0f, CloudField.DEFAULT_COVERAGE, 1.0f, 0.0f, 1.0f));
+        assertTrue(rainyNight > 0.9f, "rainy night cover " + rainyNight);
+    }
+
+    @Test
     void moreCoverRainAndThunderCoverMoreSky() {
         float few = coveredFraction(CloudField.Params.of(260.0f, VolumetricClouds.MIN_COVERAGE, 0.0f, 0.0f));
         float normal = coveredFraction(CloudField.Params.of(260.0f, CloudField.DEFAULT_COVERAGE, 0.0f, 0.0f));

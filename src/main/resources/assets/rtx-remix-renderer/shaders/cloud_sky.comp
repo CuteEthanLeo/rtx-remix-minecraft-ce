@@ -72,7 +72,7 @@ const int UPPER_HEIGHT = SKY_HEIGHT / 2;
 const int LUT_WIDTH = 1024;
 const int LUT_HEIGHT = 256;
 
-const float BASE_PERIOD = 2048.0;
+const float BASE_PERIOD = 1024.0;
 const float DETAIL_PERIOD = 256.0;
 const float WEATHER_PERIOD = 16384.0;
 const float MAX_THICKNESS = 1500.0;

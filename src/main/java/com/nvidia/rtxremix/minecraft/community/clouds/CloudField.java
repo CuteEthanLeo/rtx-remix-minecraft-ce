@@ -15,8 +15,8 @@ package com.nvidia.rtxremix.minecraft.community.clouds;
  */
 public final class CloudField {
 
-    /** Period of the base shape volume, 16 blocks per texel: puffs 150–500 blocks across. */
-    public static final double BASE_PERIOD = 2048.0;
+    /** Period of the base shape volume, 8 blocks per texel: puffs 75–250 blocks across. */
+    public static final double BASE_PERIOD = 1024.0;
     /** Period of the erosion detail volume, 8 blocks per texel. */
     public static final double DETAIL_PERIOD = 256.0;
     /** Period of the weather map, 32 blocks per texel. */
@@ -60,11 +60,20 @@ public final class CloudField {
         }
 
         public static Params of(float base, float coverageSetting, float rain, float thunder) {
+            return of(base, coverageSetting, rain, thunder, 0.0f);
+        }
+
+        /**
+         * @param night 0 by day, 1 at night: a clear night keeps only a few scattered clouds, so
+         *              they do not hide the moon and stars and darken the whole scene
+         */
+        public static Params of(float base, float coverageSetting, float rain, float thunder, float night) {
             float r = clamp01(rain);
             float t = clamp01(thunder);
-            // The default setting covers about 40% of the sky with distinct cumulus fields;
-            // 0.15 leaves a few scattered clouds and 0.85 is nearly overcast.
-            float bias = (coverageSetting - DEFAULT_COVERAGE) * 0.9f - 0.09f + 0.42f * r + 0.15f * t;
+            // The default setting scatters separate cumulus patches over about a third of the
+            // sky; 0.15 leaves a few small clouds and 0.85 is nearly overcast.
+            float bias = (coverageSetting - DEFAULT_COVERAGE) * 0.9f - 0.18f + 0.51f * r + 0.15f * t
+                    - 0.17f * clamp01(night) * (1.0f - r);
             return new Params(base, bias, 0.85f * t, r);
         }
 
