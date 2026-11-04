@@ -15,6 +15,7 @@ import com.nvidia.rtxremix.LightInfoLightShaping;
 import com.nvidia.rtxremix.LightInfoSphereEXT;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
@@ -27,6 +28,7 @@ import com.nvidia.rtxremix.minecraft.block.CopperBeaconPose;
 import com.nvidia.rtxremix.minecraft.block.SpotLightBlock;
 import com.nvidia.rtxremix.minecraft.entity.CopperBeaconAnimationClock;
 import com.nvidia.rtxremix.minecraft.entity.RemixFirstPersonPass;
+import com.nvidia.rtxremix.minecraft.sky.AtmosphereModel;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.minecraft.block.Block;
@@ -1085,7 +1087,8 @@ public class LightManager {
                 ? evaluateSkyLightState(
                         world.getSkyAngle(0f),
                         rain,
-                        thunder)
+                        thunder,
+                        NightLight.moonPhaseScale(world.getMoonSize()))
                 : SkyLightState.empty();
         float sunVolumetricScale = SunShafts.sunVolumetricScale(
                 skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));
@@ -1131,21 +1134,25 @@ public class LightManager {
         return created;
     }
 
-    private static SkyLightState evaluateSkyLightState(
+    static SkyLightState evaluateSkyLightState(
             float skyAngle,
             float rainGradient,
-            float thunderGradient) {
+            float thunderGradient,
+            float moonPhaseScale) {
         float[] sunPosition = computeSunDirection(skyAngle);
         float[] moonPosition = {-sunPosition[0], -sunPosition[1], -sunPosition[2]};
 
         float sunLuminance = BASE_SUN_LUMINANCE * sunIntensity;
-        float moonLuminance = BASE_MOON_LUMINANCE * moonIntensity * NightLight.moonLuminanceScale();
+        float moonLuminance = BASE_MOON_LUMINANCE * moonIntensity * NightLight.moonLuminanceScale()
+                * moonPhaseScale;
         float[] moonTint = NightLight.moonTint();
         float[] sunSource = {sunLuminance, sunLuminance, sunLuminance};
         float[] moonSource = {
                 moonLuminance * moonTint[0], moonLuminance * moonTint[1], moonLuminance * moonTint[2]};
-        float[] sunDirect = applyTransmittance(sunSource, directAtmosphereTransmittance(sunPosition[1]));
-        float[] moonDirect = applyTransmittance(moonSource, directAtmosphereTransmittance(moonPosition[1]));
+        float[] sunDirect = applyTransmittance(
+                sunSource, lightTransmittance(sunPosition[1], SUN_ANGULAR_RADIUS));
+        float[] moonDirect = applyTransmittance(
+                moonSource, lightTransmittance(moonPosition[1], MOON_ANGULAR_RADIUS));
         sunDirect = scaleRadiance(sunDirect, weatherSunDirectScale(rainGradient, thunderGradient));
         moonDirect = scaleRadiance(moonDirect, weatherMoonDirectScale(rainGradient, thunderGradient));
 
@@ -1202,6 +1209,20 @@ public class LightManager {
     public static float celestialVisibility(float height) {
         float t = Math.max(0.0f, Math.min(1.0f, (height + 0.15f) / 0.20f));
         return t * t * (3.0f - 2.0f * t);
+    }
+
+    /**
+     * Transmittance from the sun or moon to the ground. With the physical atmosphere it is the
+     * same air the sky shader scatters in ({@link AtmosphereModel}), so the light and the sky it
+     * comes with agree; otherwise it is upstream's airmass approximation.
+     */
+    static float[] lightTransmittance(float height, float angularRadius) {
+        if (!DaylightSky.isPhysicalAtmosphere()) {
+            return directAtmosphereTransmittance(height);
+        }
+        float[] transmittance = new float[3];
+        AtmosphereModel.discTransmittance(height, angularRadius, transmittance);
+        return transmittance;
     }
 
     private static float[] directAtmosphereTransmittance(float height) {

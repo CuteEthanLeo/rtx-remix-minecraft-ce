@@ -11,6 +11,7 @@ import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.minecraft.light.BlockLightIntensityControls;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
+import com.nvidia.rtxremix.minecraft.texture.AutoPbr;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
 import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
@@ -223,6 +224,10 @@ public final class RtxSettingsFactory {
                 "rtxremix.setting.materials.perceptualRoughness",
                 "rtxremix.setting.materials.perceptualRoughness.tip",
                 true, textures::isPerceptualRoughness, textures::setPerceptualRoughness));
+        list.add(RtxSetting.ofBool("materials.autoPbr", SettingGroup.MATERIALS,
+                "rtxremix.setting.materials.autoPbr",
+                "rtxremix.setting.materials.autoPbr.tip",
+                AutoPbr.DEFAULT_ENABLED, textures::isAutoPbr, textures::setAutoPbr));
         RemixAPI remix = renderer.getRemixApi();
         remixBool("materials.smoothReliefMaps", SettingGroup.MATERIALS,
                 "rtxremix.setting.materials.smoothReliefMaps",
@@ -264,14 +269,17 @@ public final class RtxSettingsFactory {
         CameraEffectsSettings cameraEffects = renderer.getCameraEffectsSettings();
         list.add(RtxSetting.ofInt(RtxOptionFactory.MOTION_BLUR_ID, SettingGroup.CAMERA_EFFECTS,
                 "rtxremix.setting.post.motionBlur", "rtxremix.setting.post.motionBlur.tip",
-                CameraEffectsSettings.OFF, CameraEffectsSettings.CINEMATIC,
+                CameraEffectsSettings.OFF, CameraEffectsSettings.ULTRA,
                 CameraEffectsSettings.DEFAULT_QUALITY,
                 cameraEffects::getQuality, cameraEffects::setQuality));
-        list.add(floatSetting("post.motionBlurShutter", SettingGroup.CAMERA_EFFECTS,
-                "rtxremix.setting.post.motionBlurShutter", 0.1, 1.0,
-                cameraEffects::getShutter, cameraEffects::setShutter));
+        // A new id: the old "post.motionBlurShutter" was a share of a frame, not a time.
+        list.add(floatSetting(RtxOptionFactory.MOTION_BLUR_SHUTTER_ID, SettingGroup.CAMERA_EFFECTS,
+                "rtxremix.setting.post.motionBlurShutterTime",
+                CameraEffectsSettings.MIN_SHUTTER_MS, CameraEffectsSettings.MAX_SHUTTER_MS,
+                cameraEffects::getShutterMs, cameraEffects::setShutterMs));
         list.add(floatSetting("post.motionBlurMaxSize", SettingGroup.CAMERA_EFFECTS,
-                "rtxremix.setting.post.motionBlurMaxSize", 0.01, 0.1,
+                "rtxremix.setting.post.motionBlurMaxSize",
+                CameraEffectsSettings.MIN_MAX_BLUR, CameraEffectsSettings.MAX_MAX_BLUR,
                 cameraEffects::getMaxBlur, cameraEffects::setMaxBlur));
 
         // --- Community Edition light and haze ---

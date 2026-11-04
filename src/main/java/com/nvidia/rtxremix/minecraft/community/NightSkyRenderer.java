@@ -42,10 +42,12 @@ public final class NightSkyRenderer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NightSkyRenderer.class);
     /** Milky Way radiance at full opacity, for a texel of full intensity. */
-    static final float MILKY_WAY_RADIANCE = 0.35f;
+    static final float MILKY_WAY_RADIANCE = 0.45f;
     /** Share of the Milky Way a full moon washes out. */
     static final float FULL_MOON_WASHOUT = 0.6f;
     private static final float OPACITY_UPDATE_DELTA = 1.0f / 255.0f;
+    /** Meteor streak radiance at full brightness, above the night bloom threshold so heads glow. */
+    static final float METEOR_RADIANCE = 12.0f;
 
     private final List<RemixTexture> textures = new ArrayList<>();
     private final RemixMaterial[][] starMaterials =
@@ -57,6 +59,12 @@ public final class NightSkyRenderer {
     private float lastStarOpacity = -1.0f;
     private float lastBandOpacity = -1.0f;
     private boolean failed;
+    private final Meteors meteors = new Meteors();
+    private RemixTexture meteorTexture;
+    private RemixMaterial meteorMaterial;
+    private RemixMesh meteorMesh;
+    private float lastMeteorBrightness = -1.0f;
+    private final Transform meteorTransform = new Transform();
 
     /**
      * The opacity the stars take from vanilla's star brightness. Vanilla tops
@@ -92,7 +100,36 @@ public final class NightSkyRenderer {
         return true;
     }
 
+    /**
+     * Advances the shooting stars and draws the one in flight, if any. Meteors move in real
+     * time around the camera rather than with the rotating sky.
+     *
+     * @param visibility how visible the stars are, 0 to 1
+     * @param day the world's day number, which picks the meteor-shower nights
+     */
+    public void drawMeteors(RemixAPI api, double cameraX, double cameraY, double cameraZ,
+                            long blendPNext, float visibility, long day) {
+        if (meteorMesh == null || !meteors.update(System.nanoTime(), visibility, day)) {
+            return;
+        }
+        float brightness = meteors.brightness();
+        if (Math.abs(brightness - lastMeteorBrightness) > OPACITY_UPDATE_DELTA) {
+            RemixMaterialStore.get().update(meteorMaterial,
+                    materialInfo(meteorTexture, METEOR_RADIANCE, Math.min(1.0f, brightness),
+                            MaterialInfo.WRAP_MODE_CLAMP));
+            lastMeteorBrightness = brightness;
+        }
+        meteors.writeTransform(cameraX, cameraY, cameraZ, meteorTransform.matrix);
+        api.drawInstance(meteorMesh.getHandle(), meteorTransform.matrix, InstanceCategoryBit.SKY, 1, blendPNext);
+    }
+
     public void destroy() {
+        destroy(meteorMesh);
+        destroy(meteorMaterial);
+        meteorMesh = null;
+        meteorMaterial = null;
+        meteorTexture = null;
+        lastMeteorBrightness = -1.0f;
         destroy(starMesh);
         destroy(bandMesh);
         starMesh = null;
@@ -120,7 +157,7 @@ public final class NightSkyRenderer {
     }
 
     private boolean ensureAssets() {
-        if (starMesh != null && bandMesh != null) {
+        if (starMesh != null && bandMesh != null && meteorMesh != null) {
             return true;
         }
         if (failed) {
@@ -130,6 +167,7 @@ public final class NightSkyRenderer {
         try {
             createStars();
             createBand();
+            createMeteor();
             return true;
         } catch (RuntimeException e) {
             LOGGER.error("Failed to create the night sky; falling back to vanilla stars", e);
@@ -222,6 +260,25 @@ public final class NightSkyRenderer {
         RemixMeshSurface surface = new RemixMeshSurface(bandMaterial).setVertices(vertices).setIndices(indices);
         bandMesh = RemixMeshStore.get().create(new RemixMesh(new RemixMeshSurface[]{surface}));
         lastBandOpacity = 1.0f;
+    }
+
+    private void createMeteor() {
+        meteorTexture = createTexture(NightSkyTextures.meteor(),
+                NightSkyTextures.METEOR_WIDTH, NightSkyTextures.METEOR_HEIGHT);
+        meteorMaterial = RemixMaterialStore.get().create(new RemixMaterial(
+                materialInfo(meteorTexture, METEOR_RADIANCE, 0.0f, MaterialInfo.WRAP_MODE_CLAMP),
+                List.of(meteorTexture), null));
+        HardcodedVertex[] vertices = {
+                HardcodedVertex.create(0, -0.5f, 0, 0, 0, -1, 0, 0, 0xFFFFFFFF),
+                HardcodedVertex.create(1, -0.5f, 0, 0, 0, -1, 1, 0, 0xFFFFFFFF),
+                HardcodedVertex.create(1, 0.5f, 0, 0, 0, -1, 1, 1, 0xFFFFFFFF),
+                HardcodedVertex.create(0, 0.5f, 0, 0, 0, -1, 0, 1, 0xFFFFFFFF)
+        };
+        RemixMeshSurface surface = new RemixMeshSurface(meteorMaterial)
+                .setVertices(vertices)
+                .setIndices(new int[]{0, 1, 2, 0, 2, 3});
+        meteorMesh = RemixMeshStore.get().create(new RemixMesh(new RemixMeshSurface[]{surface}));
+        lastMeteorBrightness = 0.0f;
     }
 
     private void updateOpacity(float starOpacity, float bandOpacity) {

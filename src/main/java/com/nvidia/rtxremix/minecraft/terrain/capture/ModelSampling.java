@@ -9,6 +9,8 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.LocalRandom;
 
@@ -41,6 +43,9 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
     private BlockRenderManager blockRenderManager;
     private BlockState state;
     private long seed;
+    private BlockView world;
+    private final BlockPos.Mutable origin = new BlockPos.Mutable();
+    private final BlockPos.Mutable neighbor = new BlockPos.Mutable();
 
     private BakedModel model;
     private boolean modelResolved;
@@ -54,6 +59,16 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
 
     /** Rebinds this sampler to a new block and drops everything memoised. */
     public void begin(BlockRenderManager blockRenderManager, BlockState state, long seed) {
+        begin(blockRenderManager, state, seed, null, null);
+    }
+
+    /** Rebinds to a block in a world, so rules can ask which faces are exposed. */
+    public void begin(BlockRenderManager blockRenderManager, BlockState state, long seed,
+                      BlockView world, BlockPos pos) {
+        this.world = world;
+        if (pos != null) {
+            this.origin.set(pos);
+        }
         this.blockRenderManager = blockRenderManager;
         this.state = state;
         this.seed = seed;
@@ -62,6 +77,16 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         this.vertexCount = 0;
         this.verticesCollected = false;
         this.centroidComputed = false;
+    }
+
+    @Override
+    public boolean isFaceExposed(Direction face) {
+        if (world == null) {
+            return true;
+        }
+        neighbor.set(origin, face);
+        BlockState other = world.getBlockState(neighbor);
+        return !other.isOpaqueFullCube(world, neighbor);
     }
 
     @Override

@@ -46,6 +46,7 @@ final class RtxOptionFactory {
     static final int SENTINEL_SLIDER_VALUE = 33;
     static final String UNFOCUSED_FRAMERATE_ID = "framerate.unfocused";
     static final String MOTION_BLUR_ID = "post.motionBlur";
+    static final String MOTION_BLUR_SHUTTER_ID = "post.motionBlurShutterTime";
     static final String VOLUMETRIC_QUALITY_ID = "community.volumetricQuality";
 
     private RtxOptionFactory() {}
@@ -246,6 +247,11 @@ final class RtxOptionFactory {
     }
 
     private static Text floatValueText(String settingId, double value) {
+        if (MOTION_BLUR_SHUTTER_ID.equals(settingId)) {
+            // Shown as a camera shutter speed: 20.83 ms reads as 1/48 s.
+            long denominator = Math.round(1000.0 / Math.max(value, 1.0e-3));
+            return Text.translatable("rtxremix.settings.value.shutter", Long.toString(denominator));
+        }
         String formatted = String.format(Locale.ROOT, "%.2f", value);
         if (!TERRAIN_EMISSION_MULTIPLIER_ID.equals(settingId)) {
             return Text.literal(formatted);
@@ -271,6 +277,7 @@ final class RtxOptionFactory {
                 case CameraEffectsSettings.STANDARD -> "rtxremix.settings.value.motionBlur.standard";
                 case CameraEffectsSettings.HIGH -> "rtxremix.settings.value.motionBlur.high";
                 case CameraEffectsSettings.CINEMATIC -> "rtxremix.settings.value.motionBlur.cinematic";
+                case CameraEffectsSettings.ULTRA -> "rtxremix.settings.value.motionBlur.ultra";
                 default -> "rtxremix.settings.value.off";
             });
         }

@@ -137,6 +137,9 @@ public class BlockTextureManager {
     private float terrainEmissionMultiplier = DEFAULT_TERRAIN_EMISSION_MULTIPLIER;
     private float appliedTerrainEmissionMultiplier = DEFAULT_TERRAIN_EMISSION_MULTIPLIER;
     private boolean perceptualRoughness = true;
+    /** Staged and applied auto PBR switch; the atlas is built with the applied one. */
+    private boolean autoPbr = AutoPbr.DEFAULT_ENABLED;
+    private boolean appliedAutoPbr = AutoPbr.DEFAULT_ENABLED;
     private boolean shoreFoam = true;
     private boolean terrainEmissionMaterialsInitialized;
 
@@ -474,7 +477,7 @@ public class BlockTextureManager {
                     LabPBRConverter.blitNormal(normalAtlas, atlasW, nI, se.pixX, se.pixY, se.pixW, se.pixH);
                     LabPBRConverter.blitHeight(heightAtlas, atlasW, nI, se.pixX, se.pixY, se.pixW, se.pixH);
                     LabPBRConverter.applyAO(albedoRGBA, atlasW, nI, se.pixX, se.pixY, se.pixW, se.pixH);
-                    LabPBRConverter.applyAO(sssAlbedoAtlas, atlasW, nI, se.pixX, se.pixY, se.pixW, se.pixH);
+                    LabPBRConverter.applyAOToData(sssAlbedoAtlas, atlasW, nI, se.pixX, se.pixY, se.pixW, se.pixH);
                     hasAnyNormal = true;
                     hasAnyHeight = true;
                 }
@@ -486,6 +489,20 @@ public class BlockTextureManager {
                         LabPBRConverter.blitSSS(sssThicknessAtlas, atlasW, sI, se.pixX, se.pixY, se.pixW, se.pixH);
                         se.hasSSS = true;
                         hasAnySSS = true;
+                    }
+                }
+                if (appliedAutoPbr && (nI == null || sI == null)) {
+                    AutoPbr.Surface surface = AutoPbr.surface(se.id);
+                    if (surface != null) {
+                        if (nI == null) {
+                            AutoPbr.writeNormal(albedoRGBA, normalAtlas, atlasW,
+                                    se.pixX, se.pixY, se.pixW, se.pixH, surface.normalStrength());
+                            hasAnyNormal = true;
+                        }
+                        if (sI == null) {
+                            AutoPbr.writeMaterial(albedoRGBA, roughnessAtlas, metallicAtlas, atlasW,
+                                    se.pixX, se.pixY, se.pixW, se.pixH, surface);
+                        }
                     }
                 }
                 if (sssI != null) {
@@ -1052,7 +1069,16 @@ public class BlockTextureManager {
         LabPBRConverter.setRoughnessEncoding(encoding);
         boolean foamChanged = ShoreFoam.isEnabled() != shoreFoam;
         ShoreFoam.setEnabled(shoreFoam);
-        return emissionChanged || roughnessChanged || foamChanged;
+        boolean autoPbrChanged = appliedAutoPbr != autoPbr;
+        appliedAutoPbr = autoPbr;
+        return emissionChanged || roughnessChanged || foamChanged || autoPbrChanged;
+    }
+
+    public boolean isAutoPbr() { return autoPbr; }
+
+    /** Stages auto PBR; it is baked into the atlas, so it applies through {@link #commitMaterialSettings()}. */
+    public void setAutoPbr(boolean enabled) {
+        autoPbr = enabled;
     }
 
     public boolean isShoreFoam() { return shoreFoam; }

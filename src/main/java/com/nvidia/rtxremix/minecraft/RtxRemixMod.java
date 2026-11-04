@@ -1630,7 +1630,7 @@ public class RtxRemixMod implements ClientModInitializer {
                         "Community Edition tuning (this session only): "
                                 + "shafts " + SunShafts.getGoldenPeak()
                                 + ", rainshafts " + SunShafts.getRainShare()
-                                + ", skyfill " + DaylightSky.getDayScatteringTuning()
+                                + ", skyfill " + DaylightSky.getSkyFillTuning()
                                 + ", halo " + DaylightSky.getHaloBoostTuning()
                                 + ", lightning " + LightningFlash.getBoltRadiance()));
                 return 1;
@@ -1641,12 +1641,12 @@ public class RtxRemixMod implements ClientModInitializer {
             .then(communityTuning("rainshafts", 0.0f, 1.0f,
                     SunShafts::getRainShare, SunShafts::setRainShare,
                     "Cloud-gap shaft share of the clear-sky sun in rain"))
-            .then(communityTuning("skyfill", 1.0f, 32.0f,
-                    DaylightSky::getDayScatteringTuning, DaylightSky::setDayScatteringTuning,
-                    "Daytime sky scattering (upstream 16)"))
+            .then(communityTuning("skyfill", 0.1f, 8.0f,
+                    DaylightSky::getSkyFillTuning, DaylightSky::setSkyFillTuning,
+                    "Sky brightness relative to the physical sun-to-sky ratio (1 = real)"))
             .then(communityTuning("halo", 0.0f, 20.0f,
                     DaylightSky::getHaloBoostTuning, DaylightSky::setHaloBoostTuning,
-                    "Sun halo boost (upstream 10.35)"))
+                    "Sun Mie halo boost (1 = physical, upstream 10.35)"))
             .then(communityTuning("lightning", 0.0f, 10000.0f,
                     LightningFlash::getBoltRadiance, LightningFlash::setBoltRadiance,
                     "Lightning bolt light radiance"));

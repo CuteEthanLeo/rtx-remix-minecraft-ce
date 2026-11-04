@@ -23,7 +23,7 @@ public final class StarField {
 
     public static final float RADIUS = 100.0f;
     public static final long SEED = 0x5354_4152_5345_4544L;
-    public static final int STAR_COUNT = 4000;
+    public static final int STAR_COUNT = 6000;
 
     /** Approximate sRGB colours of 3000 K, 4500 K, 6000 K, 8000 K, and 12000 K stars. */
     public static final float[][] CLASS_COLORS = {
@@ -50,7 +50,7 @@ public final class StarField {
     /** Normal of the Milky Way's great circle in the sky-local frame. */
     public static final float[] GALACTIC_NORMAL = normalize(0.35f, 0.60f, 0.72f);
     /** Angular half-width of the band mesh. */
-    public static final double BAND_HALF_WIDTH_RADIANS = Math.toRadians(14.0);
+    public static final double BAND_HALF_WIDTH_RADIANS = Math.toRadians(20.0);
     public static final int BAND_SEGMENTS = 96;
 
     /** One star: a unit direction, a quad half-size, a colour class, and a brightness tier. */

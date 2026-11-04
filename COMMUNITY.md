@@ -103,10 +103,35 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
 - **Cloud Shading**: clouds turn storm grey in rain and dim blue at night instead of staying white.
 - **Realistic Water, Moving Waves, Shore Foam**: longer transmittance with nine biome water colours; water pages
   classified as Remix animated water with two drifting wave layers that roughen in rain; foam strips along shores.
-- **Starry Night**: 4000 stars of varied brightness and colour that crowd toward a procedural Milky Way, which a full
-  moon washes out; stronger, cooler moonlight; thin night haze; night sky ambient defaults to 1.4 instead of 2.5.
-- **Motion Blur** (Image & Exposure → Camera Effects): off, Standard, High, or Cinematic, with shutter and maximum
-  blur size; the hand and block outline stay sharp.
+- **Starry Night**: 6000 stars of varied brightness and colour that crowd toward a procedural Milky Way (domain-warped
+  star clouds, a great rift and ridged dust filaments, a warm bulge and bluish arms, faint nebulae, and a grain of
+  unresolved stars, in a 40-degree meandering band), which a full moon washes out; shooting stars that flare and fade
+  along a falling great circle in real time, about every seven seconds and every 1.6 seconds on a shower night (one
+  night in five); cooler moonlight three times upstream's that follows the moon phase (new moon 30%); thin night
+  haze; the night sky ambient rect defaults to 0 instead of 2.5, since the dome already lights the night and the rect
+  counted that sky twice in its cyan mean colour (which is what turned moonlit grass green); night auto exposure may
+  reach EV -4.
+- **Motion Blur** (Image & Exposure → Camera Effects): off, Standard, High, Cinematic, or Ultra (8/16/32/48
+  samples), with a shutter speed from 1/250 s to 1/24 s (default 1/48 s) and a maximum blur size up to 0.25 of the
+  screen. The shutter is a time: Remix's `exposureFraction` is per-frame motion times a share of a frame, so it is
+  recomputed every frame from the smoothed frame time and a streak is equally long at any frame rate. Noise sampling
+  is on at every step, so streaks are two-sided. The hand and block outline stay sharp.
+- **Glowing Block Lights**: glowstone, sea lanterns, froglights, shroomlights, jack o'lanterns, lit redstone lamps
+  and copper bulbs get a rect light on each exposed face (only the carved face for a jack o'lantern); lanterns, soul
+  lanterns, and end rods get a sphere or cylinder. Before, they lit the scene only through emissive texels, which
+  Remix does not sample as lights. Each is calibrated to a torch's emitted power at its light level and has its own
+  intensity control.
+- **Auto PBR** (Materials, on by default): for block textures without a LabPBR sidecar, a normal map is derived from
+  the albedo's luminance (darker texels sit lower) and roughness and metalness come from the block's name
+  (`texture/AutoPbr`): gold, iron, netherite, raw-metal, copper (bare and exposed), anvils, chains, and iron bars are
+  metals; diamond, emerald, amethyst, ice, obsidian, quartz, polished stone, concrete, and glazed terracotta are
+  glossy dielectrics; wood, soil, wool, and foliage stay rough. Darker texels are slightly rougher. An installed PBR
+  pack's sidecars always win.
+- **Linear AO**: LabPBR ambient occlusion multiplies the decoded albedo, not its sRGB bytes, which had applied AO
+  raised to about 2.2.
+- **Foliage energy**: the baseline leaves and grass `_sss` single-scattering albedo is halved on load. At its authored
+  green 0.94, light bounced between blades and through leaves almost without loss, so foliage near a torch glowed
+  fluorescent green.
 - **Light & Haze** (Community Edition):
   - **Golden-Hour Shafts**: between about 2 and 20 degrees of sun elevation the sun scatters up to four times more
     into the haze and the sky ambient less, over a patchy dawn mist and a warm dusk haze, so trees and hills cast
@@ -115,11 +140,19 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
     it shines through cloud gaps; rain curtains drift with clearer gaps between them.
   - **Lightning Glow**: bolts light the rain haze around them and throw brief, cold shadows; distant flashes lift
     the sky ambient.
-  - **Natural Daylight**: daytime sky scattering 16 → 11, so sun and shade differ and shade stays blue while auto
-    exposure keeps the overall brightness; a blue, forward-scattering aerial perspective (`confs/community/daylight.conf`)
-    instead of Remix's neutral default medium; a tighter sun halo and a half-size sun.
+  - **Natural Daylight**: one physical atmosphere (`sky/AtmosphereModel`, the Earth parameters of Hillaire 2020 with
+    ozone, Mie absorption, and a multiple-scattering LUT built once) for both the sky dome and the sun and moon
+    lights. Upstream lit the sky with empirical multipliers (16 by day, 70 by night) and dimmed the sun with a
+    separate airmass formula three times stronger than the shader's air, so the sky gave half the sun's light at noon
+    and over four times it at a low sun, and the noon sun was orange. Now the sky is lit by the distant light's own
+    irradiance (pi times its radiance), the sky-to-sun ratio is the real one at every hour, the zenith is deep blue
+    instead of cyan, the noon sun is near white, and the dome no longer paints a sun disc that was sampled as light a
+    second time. The sun is a small round limb-darkened disc with a tight glow, tinted by the same transmittance; a
+    blue, forward-scattering aerial perspective (`confs/community/daylight.conf`) replaces Remix's neutral default
+    medium. Off restores the upstream sky, sun, and airmass.
   - **Haze Detail**: froxel grid Standard (16 px, 48 slices), High (12 px, 64), or Ultra (8 px, 64, the default).
-  - `/rtx ce` tunes the shaft, sky-fill, halo, and lightning values for the session.
+  - `/rtx ce` tunes the shaft, sky-fill (1 = the physical sky brightness), halo (1 = physical), and lightning values
+    for the session.
 - **Simplified Chinese** translation of every setting.
 - Shipped confs that an install still has in their untouched upstream form are upgraded on extraction; edited ones
   are kept (`SupersededPayloadDefaults`).

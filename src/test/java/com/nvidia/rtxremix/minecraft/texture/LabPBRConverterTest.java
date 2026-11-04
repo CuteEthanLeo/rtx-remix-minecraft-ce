@@ -134,4 +134,19 @@ class LabPBRConverterTest {
     private static int unsigned(byte value) {
         return value & 0xFF;
     }
+
+    @Test
+    void ambientOcclusionDarkensTheDecodedAlbedoNotTheEncodedBytes() {
+        // Half the light of white is sRGB byte 188, not 128.
+        assertEquals(188, LabPBRConverter.occludeSrgb(255, 0.5f));
+        assertEquals(255, LabPBRConverter.occludeSrgb(255, 1.0f));
+        assertEquals(0, LabPBRConverter.occludeSrgb(200, 0.0f));
+    }
+
+    @Test
+    void foliageSingleScatteringAlbedoLosesEnergyPerBounce() {
+        // The baseline leaves' green 240 (0.94) would bounce green almost without loss.
+        assertEquals(120, LabPBRConverter.scaleSingleScatteringAlbedo(240));
+        assertEquals(0, LabPBRConverter.scaleSingleScatteringAlbedo(0));
+    }
 }

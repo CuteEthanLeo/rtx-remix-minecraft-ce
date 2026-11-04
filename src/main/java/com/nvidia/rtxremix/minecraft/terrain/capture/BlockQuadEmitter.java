@@ -309,7 +309,7 @@ public final class BlockQuadEmitter {
         // frames agree for every vanilla block; a modded or resource-pack rule
         // on an offset block would need the same offset passed into begin() and
         // into the LightEntry positions.
-        modelSampling.begin(blockRenderManager, state, state.getRenderingSeed(pos));
+        modelSampling.begin(blockRenderManager, state, state.getRenderingSeed(pos), world, pos);
         List<LightEntry> resolvedLights = BlockLightRuleManager.resolve(state, pos, modelSampling);
         lights.addAll(resolvedLights);
     }

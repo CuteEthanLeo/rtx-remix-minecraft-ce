@@ -39,6 +39,7 @@ import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.community.NightSkyRenderer;
 import com.nvidia.rtxremix.minecraft.community.OvercastSky;
+import com.nvidia.rtxremix.minecraft.community.RoundSun;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
@@ -97,6 +98,10 @@ public class SkyRenderer {
     private static final float CELESTIAL_HORIZON_FADE_MIN_HEIGHT =
             -(float) Math.sin(Math.toRadians(CELESTIAL_HORIZON_FADE_DEGREES));
     private static final float CELESTIAL_OPACITY_UPDATE_DELTA = 1.0f / 255.0f;
+    private static final int FILTER_NEAREST = 0;
+    private static final int FILTER_LINEAR = 1;
+    /** Angular radius of the real sun, which the round sun's colour is evaluated over. */
+    private static final float ROUND_SUN_TRANSMITTANCE_RADIUS = (float) Math.toRadians(0.265);
     private static final InstanceInfoBlendEXT CELESTIAL_BLEND =
             createCelestialBlend();
 
@@ -120,11 +125,14 @@ public class SkyRenderer {
      */
     static final float[] SKYLESS_SKY_RADIANCE = {0.0f, 0.0f, 0.0f};
     /**
-     * Community Edition default, down from 2.5: the ambient rect sits above the
-     * cloud layer, and at 2.5 it lit night clouds brighter than the sky behind
-     * them while flattening moonlit shadows.
+     * Community Edition default, down from 2.5 (and 1.4 in 0.1.0-ce.3): the dome
+     * already lights the scene with the night sky, so the rect counted that sky
+     * a second time, from straight above, in its cyan mean colour. At 1.4 the
+     * night sky gave 4.7 times the moonlight; cyan fill on yellow-green grass is
+     * what turned moonlit grass neon green. The setting stays for players who
+     * want a brighter night.
      */
-    public static final float DEFAULT_NIGHT_AMBIENT_BOOST = 1.4f;
+    public static final float DEFAULT_NIGHT_AMBIENT_BOOST = 0.0f;
     public static final float DEFAULT_DAY_AMBIENT_BOOST = 0.0f;
     public static final boolean DEFAULT_SKY_AMBIENT_RECT_ENABLED = true;
     public static final float DEFAULT_MINIMUM_CELESTIAL_WEATHER_VISIBILITY = 0.0f;
@@ -172,6 +180,16 @@ public class SkyRenderer {
     private RemixMesh sunMeshAsset;
     private final RemixMesh[] moonMeshAssets = new RemixMesh[8];
     private RemixMesh starMeshAsset;
+    private RemixTexture roundSunTextureAsset;
+    private RemixMaterial roundSunMaterialAsset;
+    private RemixMesh roundSunMeshAsset;
+    private ByteBuffer roundSunPixels;
+    private final float[] roundSunColor = {-1.0f, -1.0f, -1.0f};
+    private final float[] roundSunTransmittance = new float[3];
+    private final TexturePatch roundSunTexturePatch = new TexturePatch();
+    private final TextureBatchEntry roundSunTextureEntry = new TextureBatchEntry();
+    private final TexturePatchInfo roundSunTextureUpdate = new TexturePatchInfo();
+    private float lastRoundSunOpacity = -1.0f;
     private final NightSkyRenderer nightSky = new NightSkyRenderer();
     private long celestialBlendPNext;
     private final AtmosphericSkyGenerator atmosphericGenerator;
@@ -208,6 +226,12 @@ public class SkyRenderer {
         atmosphericTexturePatch.format = TextureFormat.RGBA16_SFLOAT;
         atmosphericTextureEntry.patches = new TexturePatch[]{atmosphericTexturePatch};
         atmosphericTextureUpdate.entries = new TextureBatchEntry[]{atmosphericTextureEntry};
+        roundSunTexturePatch.width = RoundSun.TEXTURE_SIZE;
+        roundSunTexturePatch.height = RoundSun.TEXTURE_SIZE;
+        roundSunTexturePatch.rowPitch = RoundSun.TEXTURE_SIZE * 4;
+        roundSunTexturePatch.format = TextureFormat.RGBA8_UNORM;
+        roundSunTextureEntry.patches = new TexturePatch[]{roundSunTexturePatch};
+        roundSunTextureUpdate.entries = new TextureBatchEntry[]{roundSunTextureEntry};
         LOGGER.info("Sky renderer initialized (Rayleigh+Mie dome light)");
     }
 
@@ -625,11 +649,17 @@ public class SkyRenderer {
         celestialMoonDirection[2] = -sunDirection[2];
         float sunOpacity = celestialBodyOpacity(sunDirection[1]) * weatherVisibility;
         float moonOpacity = celestialBodyOpacity(celestialMoonDirection[1]) * weatherVisibility;
-        updateCelestialOpacity(sunOpacity, moonOpacity);
+        boolean roundSun = DaylightSky.isRoundSun();
+        updateCelestialOpacity(roundSun ? 0.0f : sunOpacity, moonOpacity);
 
-        if (sunOpacity > 0.0f) {
-            updateCelestialTransform(sunTransform, cameraPos, sunDirection,
-                    DaylightSky.sunHalfSize(SUN_HALF_SIZE));
+        if (roundSun) {
+            updateRoundSun(api, sunDirection[1], sunOpacity);
+            if (sunOpacity > 0.0f) {
+                updateCelestialTransform(sunTransform, cameraPos, sunDirection, RoundSun.HALF_SIZE);
+                drawCelestialMesh(api, roundSunMeshAsset, sunTransform);
+            }
+        } else if (sunOpacity > 0.0f) {
+            updateCelestialTransform(sunTransform, cameraPos, sunDirection, SUN_HALF_SIZE);
             drawCelestialMesh(api, sunMeshAsset, sunTransform);
         }
 
@@ -641,6 +671,34 @@ public class SkyRenderer {
                     celestialMoonDirection,
                     MOON_HALF_SIZE);
             drawCelestialMesh(api, moonMeshAssets[moonPhase], moonTransform);
+        }
+    }
+
+    /**
+     * Re-tints the round sun with the sunlight that reaches the ground when that colour moved,
+     * and fades its material with the sun's opacity. Both are cheap no-ops on most frames.
+     */
+    private void updateRoundSun(RemixAPI api, float sunHeight, float opacity) {
+        AtmosphereModel.discTransmittance(
+                sunHeight, ROUND_SUN_TRANSMITTANCE_RADIUS, roundSunTransmittance);
+        float red = roundSunTransmittance[0];
+        float green = roundSunTransmittance[1];
+        float blue = roundSunTransmittance[2];
+        if (RoundSun.colorChanged(roundSunColor, red, green, blue)) {
+            RoundSun.fillTexture(roundSunPixels, red, green, blue);
+            roundSunTexturePatch.pixelData = roundSunPixels;
+            roundSunTextureEntry.handle = roundSunTextureAsset.getHandle();
+            api.updateTextureFromMemory(roundSunTextureUpdate);
+            roundSunColor[0] = red;
+            roundSunColor[1] = green;
+            roundSunColor[2] = blue;
+        }
+        if (Math.abs(opacity - lastRoundSunOpacity) > CELESTIAL_OPACITY_UPDATE_DELTA) {
+            RemixMaterialStore.get().update(
+                    roundSunMaterialAsset,
+                    createCelestialMaterialInfo(
+                            roundSunTextureAsset, RoundSun.DISC_RADIANCE, opacity, FILTER_LINEAR));
+            lastRoundSunOpacity = opacity;
         }
     }
 
@@ -664,12 +722,17 @@ public class SkyRenderer {
             return true;
         }
         updateStarTransform(starTransform, cameraPos, skyAngle);
-        return nightSky.draw(api, starTransform, celestialBlendPNext, stars,
+        boolean drawn = nightSky.draw(api, starTransform, celestialBlendPNext, stars,
                 NightSkyRenderer.bandOpacity(stars, world.getMoonSize()));
+        if (drawn) {
+            nightSky.drawMeteors(api, cameraPos.x, cameraPos.y, cameraPos.z, celestialBlendPNext,
+                    stars, world.getTimeOfDay() / 24000L);
+        }
+        return drawn;
     }
 
     private boolean ensureCelestialAssets() {
-        if (starMeshAsset != null && sunMeshAsset != null
+        if (starMeshAsset != null && sunMeshAsset != null && roundSunMeshAsset != null
                 && moonMeshAssets[0] != null && celestialBlendPNext != 0) {
             return true;
         }
@@ -687,6 +750,27 @@ public class SkyRenderer {
             starMaterialAsset = createStarMaterial();
 
             sunMeshAsset = createCelestialMesh(sunMaterialAsset, 0.0f, 0.0f, 1.0f, 1.0f);
+
+            int roundSunBytes = RoundSun.TEXTURE_SIZE * RoundSun.TEXTURE_SIZE * 4;
+            ByteBuffer initialRoundSun = DirectBufferPool.acquire(roundSunBytes);
+            RoundSun.fillTexture(initialRoundSun, 1.0f, 1.0f, 1.0f);
+            roundSunTextureAsset = RemixTextureStore.get().create(new RemixTexture(
+                    RoundSun.TEXTURE_SIZE,
+                    RoundSun.TEXTURE_SIZE,
+                    TextureFormat.RGBA8_UNORM,
+                    TexturePurpose.COLOR,
+                    initialRoundSun));
+            roundSunPixels = ByteBuffer.allocateDirect(roundSunBytes).order(ByteOrder.nativeOrder());
+            roundSunColor[0] = 1.0f;
+            roundSunColor[1] = 1.0f;
+            roundSunColor[2] = 1.0f;
+            roundSunMaterialAsset = RemixMaterialStore.get().create(new RemixMaterial(
+                    createCelestialMaterialInfo(
+                            roundSunTextureAsset, RoundSun.DISC_RADIANCE, 1.0f, FILTER_LINEAR),
+                    List.of(roundSunTextureAsset),
+                    null));
+            roundSunMeshAsset = createCelestialMesh(roundSunMaterialAsset, 0.0f, 0.0f, 1.0f, 1.0f);
+            lastRoundSunOpacity = 1.0f;
 
             for (int phase = 0; phase < moonMeshAssets.length; phase++) {
                 int column = phase % 4;
@@ -753,7 +837,7 @@ public class SkyRenderer {
     }
 
     private static RemixMaterial createCelestialMaterial(RemixTexture texture, float radiance) {
-        MaterialInfo info = createCelestialMaterialInfo(texture, radiance, 1.0f);
+        MaterialInfo info = createCelestialMaterialInfo(texture, radiance, 1.0f, FILTER_NEAREST);
         RemixMaterial material = new RemixMaterial(info, List.of(texture), null);
         return RemixMaterialStore.get().create(material);
     }
@@ -766,7 +850,8 @@ public class SkyRenderer {
     private static MaterialInfo createCelestialMaterialInfo(
             RemixTexture texture,
             float radiance,
-            float opacity) {
+            float opacity,
+            int filterMode) {
         MaterialInfoOpaqueEXT opaque = MaterialInfoOpaqueEXT.builder()
                 .albedoConstant(opacity, opacity, opacity)
                 .opacityConstant(opacity)
@@ -778,7 +863,7 @@ public class SkyRenderer {
                 .albedoTexture(texture.getHandle())
                 .emissiveTexture(texture.getHandle())
                 .emissiveIntensity(radiance * opacity)
-                .filterMode(0)
+                .filterMode(filterMode)
                 .wrapMode(MaterialInfo.WRAP_MODE_CLAMP, MaterialInfo.WRAP_MODE_CLAMP)
                 .opaqueExt(opaque)
                 .build();
@@ -789,14 +874,15 @@ public class SkyRenderer {
         if (Math.abs(sunOpacity - lastSunOpacity) > CELESTIAL_OPACITY_UPDATE_DELTA) {
             materials.update(
                     sunMaterialAsset,
-                    createCelestialMaterialInfo(sunTextureAsset, SUN_RADIANCE, sunOpacity));
+                    createCelestialMaterialInfo(sunTextureAsset, SUN_RADIANCE, sunOpacity, FILTER_NEAREST));
             lastSunOpacity = sunOpacity;
         }
         if (Math.abs(moonOpacity - lastMoonOpacity) > CELESTIAL_OPACITY_UPDATE_DELTA) {
             materials.update(
                     moonMaterialAsset,
                     createCelestialMaterialInfo(
-                            moonTextureAsset, NightLight.moonDiscRadiance(MOON_RADIANCE), moonOpacity));
+                            moonTextureAsset, NightLight.moonDiscRadiance(MOON_RADIANCE), moonOpacity,
+                            FILTER_NEAREST));
             lastMoonOpacity = moonOpacity;
         }
     }
@@ -972,6 +1058,13 @@ public class SkyRenderer {
         celestialBlendPNext = 0;
         destroyMeshes();
         destroyAsset(sunMaterialAsset);
+        destroyAsset(roundSunMaterialAsset);
+        destroyAsset(roundSunTextureAsset);
+        roundSunMaterialAsset = null;
+        roundSunTextureAsset = null;
+        roundSunTexturePatch.pixelData = null;
+        roundSunColor[0] = -1.0f;
+        lastRoundSunOpacity = -1.0f;
         destroyAsset(moonMaterialAsset);
         destroyAsset(starMaterialAsset);
         destroyAsset(sunTextureAsset);
@@ -989,6 +1082,8 @@ public class SkyRenderer {
     private void destroyMeshes() {
         destroyAsset(sunMeshAsset);
         sunMeshAsset = null;
+        destroyAsset(roundSunMeshAsset);
+        roundSunMeshAsset = null;
         for (int i = 0; i < moonMeshAssets.length; i++) {
             destroyAsset(moonMeshAssets[i]);
             moonMeshAssets[i] = null;

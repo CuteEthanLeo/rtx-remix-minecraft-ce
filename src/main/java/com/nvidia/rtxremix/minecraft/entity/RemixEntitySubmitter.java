@@ -2330,7 +2330,7 @@ public class RemixEntitySubmitter {
                         LabPBRConverter.blitNormal(normalData, w, nImg, x, y, spriteW, spriteH);
                         LabPBRConverter.blitHeight(heightData, w, nImg, x, y, spriteW, spriteH);
                         LabPBRConverter.applyAO(pixels, w, nImg, x, y, spriteW, spriteH);
-                        LabPBRConverter.applyAO(sssAlbedoData, w, nImg, x, y, spriteW, spriteH);
+                        LabPBRConverter.applyAOToData(sssAlbedoData, w, nImg, x, y, spriteW, spriteH);
                         hasNormal = true;
                     }
                     if (sImg != null) {

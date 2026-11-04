@@ -360,7 +360,7 @@ public final class BlockLightRuleManager {
         return Identifier.of(namespace, RESOURCE_PATH + "/" + path);
     }
 
-    private static BlockLightKey key(BlockPos pos, Identifier ruleId, int index) {
+    static BlockLightKey key(BlockPos pos, Identifier ruleId, int index) {
         return new BlockLightKey(pos.toImmutable(), ruleId, index);
     }
 
@@ -390,6 +390,15 @@ public final class BlockLightRuleManager {
     public interface ModelSampler {
         /** Mean of the model's vertices, in block-local [0,1] space. */
         float[] centroid();
+
+        /**
+         * Whether light can leave the block through a face: false when the neighbour
+         * on that side is an opaque full cube. Callers with no world, such as the
+         * item-light path, see every face as exposed.
+         */
+        default boolean isFaceExposed(net.minecraft.util.math.Direction face) {
+            return true;
+        }
     }
 
     /**

@@ -54,9 +54,14 @@ final class AtmosphericSkyGenerator {
     private static final int PASS_BUILD_LUT = 0;
     private static final int PASS_SINGLE_SCATTERING = 1;
     private static final int PASS_REDUCE_AND_COMPOSE = 2;
+    private static final int PASS_BUILD_MULTISCATTERING_LUT = 3;
+    static final int MULTISCATTERING_LUT_SIZE = 32;
+    private static final int MODEL_LEGACY = 0;
+    private static final int MODEL_PHYSICAL = 1;
     private static final int READBACK_RING_SIZE = 3;
     // The render boundary owns texture unit 0 and an unbound pixel-pack buffer;
     // dedicated units avoid synchronous binding queries on every sky update.
+    private static final int MULTISCATTERING_TEXTURE_UNIT = 13;
     private static final int FINAL_SKY_TEXTURE_UNIT = 14;
     private static final int TRANSMITTANCE_TEXTURE_UNIT = 15;
     private static final String SHADER_RESOURCE =
@@ -89,9 +94,13 @@ final class AtmosphericSkyGenerator {
     private int upperSingleTexture;
     private int upperViewTexture;
     private int finalSkyTexture;
+    private int multiScatteringLut;
     private int skyParametersBuffer;
     private int passLocation;
     private int transmittanceLutLocation;
+    private int multiScatteringLutLocation;
+    /** Model the transmittance and multiple-scattering LUTs were last built for, or -1 before the first build. */
+    private int lutModel = -1;
 
     AtmosphericSkyGenerator() {
         this(WIDTH, HEIGHT);
@@ -115,6 +124,8 @@ final class AtmosphericSkyGenerator {
         passLocation = uniformLocation("Pass");
         transmittanceLutLocation =
                 uniformLocation("TransmittanceLut");
+        multiScatteringLutLocation =
+                uniformLocation("MultiScatteringLut");
 
         transmittanceLut = createTexture(
                 LUT_WIDTH,
@@ -136,26 +147,26 @@ final class AtmosphericSkyGenerator {
                 height + 1,
                 GL30.GL_RGBA16F,
                 GL11.GL_NEAREST);
+        multiScatteringLut = createTexture(
+                MULTISCATTERING_LUT_SIZE,
+                MULTISCATTERING_LUT_SIZE,
+                GL30.GL_RGBA32F,
+                GL11.GL_LINEAR);
         createSkyParametersBuffer();
         createReadbackBuffers();
 
+        // The LUTs depend on the active atmosphere model, which only the parameter block
+        // carries, so they are built on the first generate() instead of here.
         int previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         try {
             GL20.glUseProgram(program);
             GL20.glUniform1i(
                     transmittanceLutLocation,
                     TRANSMITTANCE_TEXTURE_UNIT);
-            bindImages();
-            GL20.glUniform1i(passLocation, PASS_BUILD_LUT);
-            GL43.glDispatchCompute(
-                    divideRoundUp(LUT_WIDTH, 8),
-                    divideRoundUp(LUT_HEIGHT, 8),
-                    1);
-            GL42.glMemoryBarrier(
-                    GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
-                            | GL42.GL_TEXTURE_FETCH_BARRIER_BIT);
+            GL20.glUniform1i(
+                    multiScatteringLutLocation,
+                    MULTISCATTERING_TEXTURE_UNIT);
         } finally {
-            unbindImages();
             GL20.glUseProgram(previousProgram);
         }
         checkGlError("initialize atmospheric sky generator");
@@ -233,9 +244,20 @@ final class AtmosphericSkyGenerator {
                 GL11.glBindTexture(
                         GL11.GL_TEXTURE_2D,
                         transmittanceLut);
+                GL13.glActiveTexture(
+                        GL13.GL_TEXTURE0
+                                + MULTISCATTERING_TEXTURE_UNIT);
+                GL11.glBindTexture(
+                        GL11.GL_TEXTURE_2D,
+                        multiScatteringLut);
                 GL13.glActiveTexture(GL13.GL_TEXTURE0);
                 bindImages();
                 uploadSkyParameters();
+            }
+
+            try (ProfileScope ignored =
+                    ProfileScope.begin("Sky.ProceduralGeneration.Luts")) {
+                buildLutsFor(activeModel());
             }
 
             try (ProfileScope ignored =
@@ -306,6 +328,7 @@ final class AtmosphericSkyGenerator {
         deleteTexture(upperSingleTexture);
         deleteTexture(upperViewTexture);
         deleteTexture(finalSkyTexture);
+        deleteTexture(multiScatteringLut);
         destroyReadbackBuffers();
         if (skyParametersBuffer != 0) {
             GL15.glDeleteBuffers(skyParametersBuffer);
@@ -315,6 +338,8 @@ final class AtmosphericSkyGenerator {
         upperSingleTexture = 0;
         upperViewTexture = 0;
         finalSkyTexture = 0;
+        multiScatteringLut = 0;
+        lutModel = -1;
         if (program != 0) {
             GL20.glDeleteProgram(program);
             program = 0;
@@ -484,7 +509,7 @@ final class AtmosphericSkyGenerator {
                 0.0f);
         skyParameters.putFloat(64, mieScatteringAnisotropy);
         skyParameters.putFloat(68, DaylightSky.haloBoost());
-        skyParameters.putFloat(72, 0.0f);
+        skyParameters.putFloat(72, activeModel() == MODEL_PHYSICAL ? 1.0f : 0.0f);
         skyParameters.putFloat(76, 0.0f);
 
         return !hasPublishedSkyParameters || skyParameters.mismatch(publishedSkyParameters) >= 0;
@@ -522,6 +547,36 @@ final class AtmosphericSkyGenerator {
         skyParameters.putFloat(offset + Float.BYTES, vector[1]);
         skyParameters.putFloat(offset + 2 * Float.BYTES, vector[2]);
         skyParameters.putFloat(offset + 3 * Float.BYTES, scalar);
+    }
+
+    private static int activeModel() {
+        return DaylightSky.isPhysicalAtmosphere() ? MODEL_PHYSICAL : MODEL_LEGACY;
+    }
+
+    /**
+     * Builds the transmittance LUT, and for the physical model the multiple-scattering LUT
+     * that reads it, when the active model differs from the one they hold. Both depend only
+     * on the atmosphere, so this runs once per model switch and never per frame. Expects the
+     * program, images, LUT samplers, and the parameter block (which carries the model) bound.
+     */
+    private void buildLutsFor(int model) {
+        if (model == lutModel) {
+            return;
+        }
+        dispatch(PASS_BUILD_LUT, LUT_WIDTH, LUT_HEIGHT);
+        GL42.glMemoryBarrier(
+                GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
+                        | GL42.GL_TEXTURE_FETCH_BARRIER_BIT);
+        if (model == MODEL_PHYSICAL) {
+            dispatch(
+                    PASS_BUILD_MULTISCATTERING_LUT,
+                    MULTISCATTERING_LUT_SIZE,
+                    MULTISCATTERING_LUT_SIZE);
+            GL42.glMemoryBarrier(
+                    GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT
+                            | GL42.GL_TEXTURE_FETCH_BARRIER_BIT);
+        }
+        lutModel = model;
     }
 
     private void dispatch(int pass, int width, int height) {
@@ -565,10 +620,18 @@ final class AtmosphericSkyGenerator {
                 0,
                 GL15.GL_READ_WRITE,
                 GL30.GL_RGBA16F);
+        GL42.glBindImageTexture(
+                4,
+                multiScatteringLut,
+                0,
+                false,
+                0,
+                GL15.GL_READ_WRITE,
+                GL30.GL_RGBA32F);
     }
 
     private static void unbindImages() {
-        for (int unit = 0; unit <= 3; unit++) {
+        for (int unit = 0; unit <= 4; unit++) {
             GL42.glBindImageTexture(
                     unit,
                     0,
@@ -699,6 +762,7 @@ final class AtmosphericSkyGenerator {
         return source.substring(0, versionEnd)
                 + "#define SKY_WIDTH " + width + "\n"
                 + "#define SKY_HEIGHT " + height + "\n"
+                + AtmosphereModel.shaderDefines()
                 + source.substring(versionEnd);
     }
 
@@ -722,7 +786,17 @@ final class AtmosphericSkyGenerator {
         }
     }
 
-    private static float atmosphereScatteringScale(float sunHeight) {
+    /**
+     * Factor from a light's Remix radiance to the illuminance the sky shader scatters. The
+     * physical model uses the distant light's own conversion, pi, at every hour, so the sky
+     * and the light it comes with keep their real ratio by day and by night; the look's
+     * sky-fill factor scales it. The legacy model keeps upstream's empirical day and night
+     * multipliers.
+     */
+    static float atmosphereScatteringScale(float sunHeight) {
+        if (DaylightSky.isPhysicalAtmosphere()) {
+            return AtmosphereModel.DISTANT_LIGHT_IRRADIANCE_PER_RADIANCE * DaylightSky.skyFill();
+        }
         float nightFactor =
                 1.0f - smoothstep(-0.15f, 0.05f, sunHeight);
         return DaylightSky.dayScattering() * (1.0f - nightFactor) + 70.0f * nightFactor;

@@ -43,6 +43,13 @@ final class BlockLightDefaults {
     private static final LightEntry.ColorOverride REDSTONE_COLOR = LightEntry.ColorOverride.of(1.0f, 0.15f, 0.02f);
     private static final LightEntry.ColorOverride CONDUIT_COLOR = LightEntry.ColorOverride.of(0.45f, 0.9f, 1.0f);
     private static final LightEntry.ColorOverride AMETHYST_COLOR = LightEntry.ColorOverride.of(0.65f, 0.35f, 1.0f);
+    static final LightEntry.ColorOverride LANTERN_COLOR = LightEntry.ColorOverride.of(1.0f, 0.6f, 0.3f);
+    /** Faces of a full-block emitter sit this far outside the block, so its own faces never shadow them. */
+    static final float FACE_LIGHT_OFFSET = 0.005f;
+    static final float LANTERN_RADIUS = 0.15f;
+    static final float END_ROD_RADIUS = 0.0625f;
+    static final float END_ROD_LENGTH = 0.9375f;
+    private static final Direction[] FACES = Direction.values();
 
     // Shared beacon geometry and path-specific radiance tuning live in
     // BeaconBeam; the block_display lighthouse remains independent.
@@ -97,6 +104,18 @@ final class BlockLightDefaults {
                 BlockLightDefaults::candles);
         add(rules, "candle_cakes", state -> candleCakes.contains(state.getBlock()) && state.get(Properties.LIT),
                 (id, state, pos, centroid) -> List.of(thinSphere(id, 0, state, pos, 0.5f, 1.0f, 0.5f, 0.08f, null)));
+        // Community Edition: full-block emitters had no light of their own and lit the
+        // scene only through emissive texels, which Remix does not sample as lights. Each
+        // exposed face is now a rect light, calibrated so a block with all six
+        // faces open emits what a torch of its light level would; the colour comes from its texture.
+        Set<Block> glowingBlocks = glowingBlocks();
+        add(rules, "glowing_blocks",
+                state -> glowingBlocks.contains(state.getBlock()) && state.getLuminance() > 0,
+                BlockLightDefaults::glowingBlock, 1.0f);
+        add(rules, "lanterns", state -> state.isOf(Blocks.LANTERN) || state.isOf(Blocks.SOUL_LANTERN),
+                BlockLightDefaults::lantern, 1.0f);
+        add(rules, "end_rod", exact(Blocks.END_ROD),
+                (id, state, pos, centroid) -> List.of(endRod(id, state, pos)), 1.0f);
         BlockLightIntensityControls.validateBuiltInRules(rules.keySet());
         return Collections.unmodifiableMap(new LinkedHashMap<>(rules));
     }
@@ -165,8 +184,83 @@ final class BlockLightDefaults {
     private static LightEntry endRod(Identifier id, BlockState state, BlockPos pos) {
         Direction facing = state.get(Properties.FACING);
         BlockLightRuleManager.Vec3 axis = BlockLightRuleManager.Vec3.fromAxis(facing.getAxis());
+        float area = 2.0f * (float) Math.PI * END_ROD_RADIUS * END_ROD_LENGTH;
         return BlockLightRuleManager.cylinder(id, 0, state, pos,
-                0.5f, 0.5f, 0.5f, 0.125f, axis, 1.0f, null, null);
+                0.5f, 0.5f, 0.5f, END_ROD_RADIUS, axis, END_ROD_LENGTH,
+                LightEntry.ColorOverride.of(1.0f, 0.95f, 0.9f),
+                torchMatchedIntensity(state.getLuminance(), area));
+    }
+
+    /**
+     * Radiance, for a white emitter of this surface area, whose emitted power at this
+     * light level matches the torch's power scaled by level over the torch's own level.
+     */
+    static float torchMatchedIntensity(int lightLevel, float area) {
+        float levelShare = lightLevel / (float) TORCH_LIGHT_LEVEL;
+        return LightPower.torchReference() * levelShare / (area * (float) Math.PI);
+    }
+
+    /** Vanilla torch light level, the level {@link LightPower#torchReference()} is computed at. */
+    static final int TORCH_LIGHT_LEVEL = 14;
+
+    private static List<LightEntry> glowingBlock(Identifier id, BlockState state, BlockPos pos,
+                                                 BlockLightRuleManager.ModelSampler sampler) {
+        // A carved pumpkin lights only through its face.
+        Direction only = state.contains(Properties.HORIZONTAL_FACING) && state.isOf(Blocks.JACK_O_LANTERN)
+                ? state.get(Properties.HORIZONTAL_FACING)
+                : null;
+        float intensity = torchMatchedIntensity(state.getLuminance(), 6.0f);
+        List<LightEntry> entries = new ArrayList<>(6);
+        for (Direction face : FACES) {
+            if ((only != null && face != only) || !sampler.isFaceExposed(face)) {
+                continue;
+            }
+            entries.add(faceLight(id, state, pos, face, intensity));
+        }
+        return entries;
+    }
+
+    /** A 1x1 rect light just outside one face of the block, facing out. */
+    static LightEntry faceLight(Identifier id, BlockState state, BlockPos pos, Direction face, float intensity) {
+        float nx = face.getOffsetX();
+        float ny = face.getOffsetY();
+        float nz = face.getOffsetZ();
+        float out = 0.5f + FACE_LIGHT_OFFSET;
+        // Any two axes spanning the face plane.
+        Direction.Axis axis = face.getAxis();
+        float ax = axis == Direction.Axis.X ? 0 : 1;
+        float ay = 0;
+        float az = axis == Direction.Axis.X ? 1 : 0;
+        float bx = 0;
+        float by = axis == Direction.Axis.Y ? 0 : 1;
+        float bz = axis == Direction.Axis.Y ? 1 : 0;
+        return LightEntry.rect(BlockLightRuleManager.key(pos, id, face.ordinal()),
+                state.getLuminance(), state.getBlock(),
+                pos.getX() + 0.5f + nx * out, pos.getY() + 0.5f + ny * out, pos.getZ() + 0.5f + nz * out,
+                ax, ay, az, 1.0f,
+                bx, by, bz, 1.0f,
+                nx, ny, nz,
+                null, intensity, LightEntry.defaultVolumetricRadianceScale());
+    }
+
+    private static List<LightEntry> lantern(Identifier id, BlockState state, BlockPos pos,
+                                            BlockLightRuleManager.ModelSampler sampler) {
+        boolean hanging = state.get(Properties.HANGING);
+        float area = 4.0f * (float) Math.PI * LANTERN_RADIUS * LANTERN_RADIUS;
+        LightEntry.ColorOverride color = state.isOf(Blocks.SOUL_LANTERN) ? SOUL_COLOR : LANTERN_COLOR;
+        return List.of(sphere(id, 0, state, pos, 0.5f, hanging ? 0.375f : 0.3125f, 0.5f,
+                LANTERN_RADIUS, color, torchMatchedIntensity(state.getLuminance(), area)));
+    }
+
+    private static Set<Block> glowingBlocks() {
+        return Set.of(
+                Blocks.GLOWSTONE, Blocks.SEA_LANTERN, Blocks.SHROOMLIGHT, Blocks.JACK_O_LANTERN,
+                Blocks.OCHRE_FROGLIGHT, Blocks.VERDANT_FROGLIGHT, Blocks.PEARLESCENT_FROGLIGHT,
+                Blocks.REDSTONE_LAMP,
+                Blocks.COPPER_BULB, Blocks.EXPOSED_COPPER_BULB,
+                Blocks.WEATHERED_COPPER_BULB, Blocks.OXIDIZED_COPPER_BULB,
+                Blocks.WAXED_COPPER_BULB, Blocks.WAXED_EXPOSED_COPPER_BULB,
+                Blocks.WAXED_WEATHERED_COPPER_BULB, Blocks.WAXED_OXIDIZED_COPPER_BULB);
     }
 
     private static LightEntry amethystCrystal(Identifier id, BlockState state, BlockPos pos,

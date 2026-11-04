@@ -3,6 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
+//
+// Two atmosphere models share this program:
+//  - Legacy (upstream): Rayleigh and Mie single scattering, an empirical
+//    multiple-scattering fill from the mean of the upper hemisphere, and the
+//    sun and moon discs painted into the dome.
+//  - Physical (Community Edition "Natural daylight"): the Hillaire 2020 model
+//    with ozone, Mie absorption, a multiple-scattering LUT, and energy-
+//    conserving integration. Its constants come from AtmosphereModel.java as
+//    PHYS_* defines, the same numbers the sun and moon lights use. It paints no
+//    discs: the sun is a distant light and a billboard, and a disc in the dome
+//    would be sampled as light a second time.
 
 #version 430 core
 
@@ -12,8 +23,10 @@ layout(rgba32f, binding = 0) uniform image2D TransmittanceLutImage;
 layout(rgba32f, binding = 1) uniform image2D UpperSingleImage;
 layout(rgba32f, binding = 2) uniform image2D UpperViewImage;
 layout(rgba16f, binding = 3) uniform image2D FinalSkyImage;
+layout(rgba32f, binding = 4) uniform image2D MultiScatteringLutImage;
 
 layout(binding = 0) uniform sampler2D TransmittanceLut;
+layout(binding = 1) uniform sampler2D MultiScatteringLut;
 
 uniform int Pass;
 layout(std140, binding = 0) uniform SkyParameters {
@@ -34,6 +47,8 @@ layout(std140, binding = 0) uniform SkyParameters {
 #define MieScatteringAnisotropy AtmosphereParameters.x
 // Community Edition: the sun's Mie halo boost is a parameter (upstream 10.35).
 #define SunMieHaloBoost AtmosphereParameters.y
+// Community Edition: 1 selects the physical model, 0 the legacy one.
+#define PhysicalModel (AtmosphereParameters.z > 0.5)
 
 shared vec3 Reduction[64];
 shared vec3 ReducedUpperMean;
@@ -41,6 +56,7 @@ shared vec3 ReducedUpperMean;
 const int PASS_BUILD_LUT = 0;
 const int PASS_SINGLE_SCATTERING = 1;
 const int PASS_REDUCE_AND_COMPOSE = 2;
+const int PASS_BUILD_MULTISCATTERING_LUT = 3;
 
 #ifndef SKY_WIDTH
 #define SKY_WIDTH 64
@@ -66,6 +82,264 @@ const float MOON_MIE_HALO_BOOST = 1.0;
 const float MULTIPLE_SCATTERING_SCALE = 0.65;
 const float GROUND_HORIZON_SCALE = 0.9;
 const float GROUND_NADIR_SCALE = 0.3;
+
+// ---------------------------------------------------------------------------
+//  Physical model (Community Edition)
+// ---------------------------------------------------------------------------
+
+#ifndef PHYS_PLANET_RADIUS
+#define PHYS_PLANET_RADIUS 6360000.0
+#define PHYS_TOP_RADIUS 6460000.0
+#define PHYS_VIEW_HEIGHT 100.0
+#define PHYS_RAYLEIGH_SCATTERING vec3(5.802e-6, 13.558e-6, 33.1e-6)
+#define PHYS_RAYLEIGH_SCALE_HEIGHT 8000.0
+#define PHYS_MIE_SCATTERING 3.996e-6
+#define PHYS_MIE_EXTINCTION 4.44e-6
+#define PHYS_MIE_SCALE_HEIGHT 1200.0
+#define PHYS_MIE_ANISOTROPY 0.8
+#define PHYS_OZONE_ABSORPTION vec3(0.65e-6, 1.881e-6, 0.085e-6)
+#define PHYS_OZONE_CENTER_HEIGHT 25000.0
+#define PHYS_OZONE_HALF_WIDTH 15000.0
+#define PHYS_GROUND_ALBEDO 0.3
+#define PHYS_AIRGLOW vec3(0.00022, 0.00028, 0.0004)
+#define PHYS_TRANSMITTANCE_STEPS 48
+#endif
+
+const int MS_LUT_SIZE = 32;
+const int MS_SQRT_DIRECTIONS = 8;
+const int MS_STEPS = 20;
+const int PHYS_VIEW_STEPS = 40;
+const float PHYS_ATMOSPHERE_HEIGHT = PHYS_TOP_RADIUS - PHYS_PLANET_RADIUS;
+
+struct Medium {
+    vec3 rayleighScattering;
+    float mieScattering;
+    vec3 extinction;
+};
+
+Medium physMedium(float height) {
+    float h = max(0.0, height);
+    float rayleigh = exp(-h / PHYS_RAYLEIGH_SCALE_HEIGHT);
+    float mie = exp(-h / PHYS_MIE_SCALE_HEIGHT);
+    float ozone = max(0.0, 1.0 - abs(h - PHYS_OZONE_CENTER_HEIGHT) / PHYS_OZONE_HALF_WIDTH);
+    Medium medium;
+    medium.rayleighScattering = PHYS_RAYLEIGH_SCATTERING * rayleigh;
+    medium.mieScattering = PHYS_MIE_SCATTERING * mie;
+    medium.extinction = medium.rayleighScattering
+        + vec3(PHYS_MIE_EXTINCTION * mie)
+        + PHYS_OZONE_ABSORPTION * ozone;
+    return medium;
+}
+
+bool physHitsGround(float r, float mu) {
+    return mu < 0.0 && r * r * (1.0 - mu * mu) < PHYS_PLANET_RADIUS * PHYS_PLANET_RADIUS;
+}
+
+float physDistanceToTop(float r, float mu) {
+    float discriminant = r * r * (mu * mu - 1.0) + PHYS_TOP_RADIUS * PHYS_TOP_RADIUS;
+    return max(0.0, -r * mu + sqrt(max(0.0, discriminant)));
+}
+
+float physDistanceToGround(float r, float mu) {
+    float discriminant = r * r * (mu * mu - 1.0) + PHYS_PLANET_RADIUS * PHYS_PLANET_RADIUS;
+    return max(0.0, -r * mu - sqrt(max(0.0, discriminant)));
+}
+
+// Same quadratic step layout as AtmosphereModel.transmittance, so the LUT and
+// the CPU light colour agree.
+vec3 physIntegrateTransmittance(float r, float mu) {
+    if (physHitsGround(r, mu)) {
+        return vec3(0.0);
+    }
+    float distance = physDistanceToTop(r, mu);
+    vec3 opticalDepth = vec3(0.0);
+    float previous = 0.0;
+    for (int step = 1; step <= PHYS_TRANSMITTANCE_STEPS; step++) {
+        float amount = float(step) / float(PHYS_TRANSMITTANCE_STEPS);
+        float next = distance * amount * amount;
+        float segmentLength = next - previous;
+        float t = previous + 0.5 * segmentLength;
+        float height = sqrt(r * r + t * t + 2.0 * r * t * mu) - PHYS_PLANET_RADIUS;
+        opticalDepth += physMedium(height).extinction * segmentLength;
+        previous = next;
+    }
+    return exp(-opticalDepth);
+}
+
+vec2 physTransmittanceUv(float r, float mu) {
+    float height = clamp(r - PHYS_PLANET_RADIUS, 0.0, PHYS_ATMOSPHERE_HEIGHT);
+    float heightCoordinate = sqrt(height / PHYS_ATMOSPHERE_HEIGHT) * float(LUT_HEIGHT - 1);
+    float angleCoordinate = (clamp(mu, -1.0, 1.0) + 1.0) * 0.5 * float(LUT_WIDTH - 1);
+    return (vec2(angleCoordinate, heightCoordinate) + vec2(0.5))
+        / vec2(float(LUT_WIDTH), float(LUT_HEIGHT));
+}
+
+vec3 physTransmittance(float r, float mu) {
+    if (physHitsGround(r, mu)) {
+        return vec3(0.0);
+    }
+    return texture(TransmittanceLut, physTransmittanceUv(r, mu)).rgb;
+}
+
+vec3 physMultipleScattering(float r, float muLight) {
+    vec2 uv = vec2(
+        clamp(muLight * 0.5 + 0.5, 0.0, 1.0),
+        clamp((r - PHYS_PLANET_RADIUS) / PHYS_ATMOSPHERE_HEIGHT, 0.0, 1.0));
+    // Keep the lookup inside the outer texel centres.
+    uv = (uv * float(MS_LUT_SIZE - 1) + vec2(0.5)) / float(MS_LUT_SIZE);
+    return texture(MultiScatteringLut, uv).rgb;
+}
+
+void buildPhysicalTransmittanceLut(ivec2 pixel) {
+    float normalizedHeight = float(pixel.y) / float(LUT_HEIGHT - 1);
+    float r = PHYS_PLANET_RADIUS
+        + normalizedHeight * normalizedHeight * PHYS_ATMOSPHERE_HEIGHT;
+    float mu = 2.0 * float(pixel.x) / float(LUT_WIDTH - 1) - 1.0;
+    imageStore(TransmittanceLutImage, pixel, vec4(physIntegrateTransmittance(r, mu), 1.0));
+}
+
+// Hillaire 2020, section 5.5: the second-order isotropic scattering L2 and
+// the transfer fraction fms at one point, for unit illuminance from a light at
+// muLight, give the infinite multiple-scattering series as L2 / (1 - fms).
+// It depends only on the atmosphere, so it is built once.
+void buildMultipleScatteringLut(ivec2 pixel) {
+    float r = PHYS_PLANET_RADIUS
+        + (float(pixel.y) + 0.5) / float(MS_LUT_SIZE) * PHYS_ATMOSPHERE_HEIGHT;
+    float muLight = 2.0 * (float(pixel.x) + 0.5) / float(MS_LUT_SIZE) - 1.0;
+    vec3 lightDirection = vec3(sqrt(max(0.0, 1.0 - muLight * muLight)), muLight, 0.0);
+    vec3 origin = vec3(0.0, r, 0.0);
+    const float isotropicPhase = 1.0 / (4.0 * PI);
+
+    vec3 secondOrder = vec3(0.0);
+    vec3 transfer = vec3(0.0);
+    for (int i = 0; i < MS_SQRT_DIRECTIONS; i++) {
+        for (int j = 0; j < MS_SQRT_DIRECTIONS; j++) {
+            float u = (float(i) + 0.5) / float(MS_SQRT_DIRECTIONS);
+            float v = (float(j) + 0.5) / float(MS_SQRT_DIRECTIONS);
+            float cosTheta = 1.0 - 2.0 * v;
+            float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+            float phi = 2.0 * PI * u;
+            vec3 direction = vec3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
+            bool ground = physHitsGround(r, cosTheta);
+            float distance = ground
+                ? physDistanceToGround(r, cosTheta)
+                : physDistanceToTop(r, cosTheta);
+            float stepLength = distance / float(MS_STEPS);
+            vec3 throughput = vec3(1.0);
+            vec3 luminance = vec3(0.0);
+            vec3 fraction = vec3(0.0);
+            for (int step = 0; step < MS_STEPS; step++) {
+                vec3 position = origin + direction * ((float(step) + 0.5) * stepLength);
+                float radius = length(position);
+                Medium medium = physMedium(radius - PHYS_PLANET_RADIUS);
+                vec3 scattering = medium.rayleighScattering + vec3(medium.mieScattering);
+                vec3 extinction = max(medium.extinction, vec3(1.0e-12));
+                vec3 segment = exp(-extinction * stepLength);
+                vec3 lightTransmittance = physTransmittance(
+                    radius, dot(position, lightDirection) / radius);
+                vec3 source = scattering * lightTransmittance * isotropicPhase;
+                luminance += throughput * (source - source * segment) / extinction;
+                fraction += throughput * (scattering - scattering * segment) / extinction;
+                throughput *= segment;
+            }
+            if (ground) {
+                vec3 position = origin + direction * distance;
+                float radius = length(position);
+                vec3 normal = position / radius;
+                vec3 lightTransmittance = physTransmittance(
+                    radius, dot(normal, lightDirection));
+                luminance += throughput * lightTransmittance
+                    * max(0.0, dot(normal, lightDirection)) * PHYS_GROUND_ALBEDO / PI;
+            }
+            secondOrder += luminance;
+            transfer += fraction;
+        }
+    }
+    float directions = float(MS_SQRT_DIRECTIONS * MS_SQRT_DIRECTIONS);
+    secondOrder /= directions;
+    transfer /= directions;
+    vec3 psi = secondOrder / max(vec3(1.0) - transfer, vec3(1.0e-4));
+    imageStore(MultiScatteringLutImage, pixel, vec4(psi, 1.0));
+}
+
+float rayleighPhase(float cosAngle) {
+    return 3.0 / (16.0 * PI) * (1.0 + cosAngle * cosAngle);
+}
+
+float cornetteShanksPhase(float cosAngle, float g) {
+    float g2 = g * g;
+    return 3.0 / (8.0 * PI)
+        * ((1.0 - g2) * (1.0 + cosAngle * cosAngle))
+        / ((2.0 + g2) * pow(max(1.0e-6, 1.0 + g2 - 2.0 * g * cosAngle), 1.5));
+}
+
+vec3 physLightInscatter(
+    Medium medium,
+    vec3 position,
+    float radius,
+    vec3 viewDirection,
+    vec3 lightDirection,
+    vec3 illuminance) {
+    if (dot(illuminance, illuminance) <= 0.0) {
+        return vec3(0.0);
+    }
+    float muLight = dot(position, lightDirection) / radius;
+    float cosAngle = dot(viewDirection, lightDirection);
+    vec3 lightTransmittance = physTransmittance(radius, muLight);
+    vec3 single = (medium.rayleighScattering * rayleighPhase(cosAngle)
+        + vec3(medium.mieScattering * cornetteShanksPhase(cosAngle, PHYS_MIE_ANISOTROPY)
+            * SunMieHaloBoost))
+        * lightTransmittance;
+    vec3 multiple = (medium.rayleighScattering + vec3(medium.mieScattering))
+        * physMultipleScattering(radius, muLight);
+    return (single + multiple) * illuminance;
+}
+
+void generatePhysicalSky(ivec2 pixel, vec3 viewDirection) {
+    float r = PHYS_PLANET_RADIUS + PHYS_VIEW_HEIGHT;
+    vec3 origin = vec3(0.0, r, 0.0);
+    float mu = viewDirection.y;
+    float distance = physHitsGround(r, mu)
+        ? physDistanceToGround(r, mu)
+        : physDistanceToTop(r, mu);
+    // AtmosphereScale carries pi (Remix distant-light irradiance per radiance)
+    // times the look's sky-fill factor.
+    vec3 sunIlluminance = SunRadiance * AtmosphereScale;
+    vec3 moonIlluminance = MoonRadiance * AtmosphereScale;
+
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+    float previous = 0.0;
+    for (int step = 1; step <= PHYS_VIEW_STEPS; step++) {
+        float amount = float(step) / float(PHYS_VIEW_STEPS);
+        float next = distance * amount * amount;
+        float stepLength = next - previous;
+        float t = previous + 0.5 * stepLength;
+        vec3 position = origin + viewDirection * t;
+        float radius = length(position);
+        Medium medium = physMedium(radius - PHYS_PLANET_RADIUS);
+        vec3 extinction = max(medium.extinction, vec3(1.0e-12));
+        vec3 segment = exp(-extinction * stepLength);
+        vec3 source = physLightInscatter(
+                medium, position, radius, viewDirection, SunDirection, sunIlluminance)
+            + physLightInscatter(
+                medium, position, radius, viewDirection, MoonDirection, moonIlluminance);
+        radiance += throughput * (source - source * segment) / extinction;
+        throughput *= segment;
+        previous = next;
+    }
+    // Airglow and starlight brighten toward the horizon (van Rhijn), where the
+    // line of sight crosses more of the emitting layer.
+    float horizonGain = 1.0 + 1.5 * (1.0 - clamp(mu, 0.0, 1.0));
+    radiance += PHYS_AIRGLOW * horizonGain * throughput;
+
+    imageStore(UpperSingleImage, pixel, vec4(radiance, 1.0));
+    imageStore(UpperViewImage, pixel, vec4(throughput, 1.0));
+}
+
+// ---------------------------------------------------------------------------
+//  Legacy model (upstream)
+// ---------------------------------------------------------------------------
 
 float raySphere(vec3 origin, vec3 direction, float radius) {
     float b = 2.0 * dot(origin, direction);
@@ -185,6 +459,10 @@ vec3 finishScattering(
 
 void generateSingleScattering(ivec2 pixel) {
     vec3 viewDirection = skyDirection(pixel);
+    if (PhysicalModel) {
+        generatePhysicalSky(pixel, viewDirection);
+        return;
+    }
     vec3 origin = vec3(0.0, EARTH_RADIUS, 0.0);
     float atmosphereDistance = raySphere(
         origin,
@@ -257,6 +535,22 @@ void generateSingleScattering(ivec2 pixel) {
     imageStore(UpperViewImage, pixel, vec4(viewTransmittance, 1.0));
 }
 
+// Upper-hemisphere radiance as the legacy model composes it: single
+// scattering plus the empirical mean fill. The physical model's single image
+// already holds the full radiance.
+vec3 composedUpperRadiance(ivec2 pixel) {
+    vec3 singleScattering = imageLoad(UpperSingleImage, pixel).rgb;
+    if (PhysicalModel) {
+        return max(singleScattering, vec3(0.0));
+    }
+    vec3 viewTransmittance = imageLoad(UpperViewImage, pixel).rgb;
+    return max(
+        singleScattering
+        + ReducedUpperMean * (vec3(1.0) - viewTransmittance)
+        * MULTIPLE_SCATTERING_SCALE,
+        vec3(0.0));
+}
+
 void reduceAndComposeSky() {
     uint invocation = gl_LocalInvocationIndex;
     vec3 sum = vec3(0.0);
@@ -288,15 +582,7 @@ void reduceAndComposeSky() {
         ivec2 pixel = ivec2(
             int(index) % SKY_WIDTH,
             int(index) / SKY_WIDTH);
-        vec3 singleScattering =
-            imageLoad(UpperSingleImage, pixel).rgb;
-        vec3 viewTransmittance =
-            imageLoad(UpperViewImage, pixel).rgb;
-        vec3 radiance = max(
-            singleScattering
-            + ReducedUpperMean * (vec3(1.0) - viewTransmittance)
-            * MULTIPLE_SCATTERING_SCALE,
-            vec3(0.0));
+        vec3 radiance = composedUpperRadiance(pixel);
         vec2 quantizedRg =
             unpackHalf2x16(packHalf2x16(radiance.rg));
         vec2 quantizedBa =
@@ -325,11 +611,7 @@ void reduceAndComposeSky() {
 
     for (int x = int(invocation); x < SKY_WIDTH; x += 64) {
         ivec2 horizonPixel = ivec2(x, UPPER_HEIGHT - 1);
-        vec3 horizon =
-            imageLoad(UpperSingleImage, horizonPixel).rgb
-            + ReducedUpperMean
-            * (vec3(1.0) - imageLoad(UpperViewImage, horizonPixel).rgb)
-            * MULTIPLE_SCATTERING_SCALE;
+        vec3 horizon = composedUpperRadiance(horizonPixel);
         for (int y = UPPER_HEIGHT; y < SKY_HEIGHT; y++) {
             float amount = float(y - UPPER_HEIGHT)
                 / float(SKY_HEIGHT - UPPER_HEIGHT - 1);
@@ -346,7 +628,15 @@ void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     if (Pass == PASS_BUILD_LUT) {
         if (pixel.x < LUT_WIDTH && pixel.y < LUT_HEIGHT) {
-            buildTransmittanceLut(pixel);
+            if (PhysicalModel) {
+                buildPhysicalTransmittanceLut(pixel);
+            } else {
+                buildTransmittanceLut(pixel);
+            }
+        }
+    } else if (Pass == PASS_BUILD_MULTISCATTERING_LUT) {
+        if (pixel.x < MS_LUT_SIZE && pixel.y < MS_LUT_SIZE) {
+            buildMultipleScatteringLut(pixel);
         }
     } else if (Pass == PASS_SINGLE_SCATTERING) {
         if (pixel.x < SKY_WIDTH && pixel.y < UPPER_HEIGHT) {

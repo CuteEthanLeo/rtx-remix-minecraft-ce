@@ -5,37 +5,38 @@
 package com.nvidia.rtxremix.minecraft.community;
 
 /**
- * The "Natural daylight" look: a clear day lit by a warm sun and a blue sky
- * in a believable ratio, instead of a bright, flat, white one.
+ * The "Natural daylight" look: a physical sky lit by the same sun, moon, and
+ * atmosphere as the ground, instead of a bright, flat, white one.
  *
- * <p>Upstream multiplies the daytime sky's scattering by 16, so the dome
- * lights shaded ground nearly as strongly as the sun lights open ground: sun
- * and shade differ little, and shadows read grey instead of blue. A lower
- * multiplier keeps the sky's colour but returns the sun its share; auto
- * exposure then lifts the whole frame back, so sunlit ground ends up brighter
- * and shade keeps its blue, rather than the picture getting darker. The night
- * multiplier is unchanged.
+ * <p>Upstream lit the sky with empirical multipliers (16 by day, 70 by night)
+ * and attenuated the sun with a separate airmass formula about three times
+ * stronger than the sky shader's air. The sky then gave half the sun's light
+ * at noon and over four times it at a low sun, so shadows read grey, golden
+ * hour drowned in blue-white fill, and the sun itself was tinted orange at
+ * noon. With the look on, {@code sky/AtmosphereModel} is the one atmosphere
+ * (with ozone and a multiple-scattering LUT) for both, and the sky is lit by
+ * the distant light's own irradiance, so their ratio is the real one at every
+ * hour. Auto exposure lifts the frame back.
  *
- * <p>The sun's Mie halo is boosted by about ten upstream, which with the
- * vanilla-sized sun billboard spreads into a large overexposed blot. A lower
- * boost keeps a bright but tight glow, and the billboard is drawn at half the
- * vanilla size. The haze half of the look is {@code confs/community/daylight.conf},
- * whose strength {@code ConfLayerDriver} gates with {@link #isEnabled()}.
+ * <p>The sun's Mie halo is physical (no boost), and the sun is drawn as a
+ * small round limb-darkened disc instead of the vanilla billboard, which at
+ * an 8.5 degree half angle spread into a large overexposed blot. The haze
+ * half of the look is {@code confs/community/daylight.conf}, whose strength
+ * {@code ConfLayerDriver} gates with {@link #isEnabled()}.
  */
 public final class DaylightSky {
 
     public static final boolean DEFAULT_ENABLED = true;
     /** Upstream daytime sky scattering multiplier. */
     public static final float UPSTREAM_DAY_SCATTERING = 16.0f;
-    public static final float DEFAULT_DAY_SCATTERING = 11.0f;
+    /** Factor on the physical sky's brightness; 1 is the real sun-to-sky ratio. */
+    public static final float DEFAULT_SKY_FILL = 1.0f;
     /** Upstream Mie halo boost around the sun, as {@code sky_atmosphere.comp} had it. */
     public static final float UPSTREAM_HALO_BOOST = 10.35f;
-    public static final float DEFAULT_HALO_BOOST = 4.0f;
-    /** Sun billboard size relative to vanilla. */
-    static final float SUN_SIZE_SCALE = 0.5f;
+    public static final float DEFAULT_HALO_BOOST = 1.0f;
 
     private static volatile boolean enabled = DEFAULT_ENABLED;
-    private static volatile float dayScattering = DEFAULT_DAY_SCATTERING;
+    private static volatile float skyFill = DEFAULT_SKY_FILL;
     private static volatile float haloBoost = DEFAULT_HALO_BOOST;
 
     private DaylightSky() {}
@@ -44,16 +45,26 @@ public final class DaylightSky {
     public static void setEnabled(boolean value) { enabled = value; }
 
     /** Live tuning for {@code /rtx ce skyfill}; the look switch still gates it. */
-    public static float getDayScatteringTuning() { return dayScattering; }
-    public static void setDayScatteringTuning(float value) { dayScattering = Math.max(0.0f, value); }
+    public static float getSkyFillTuning() { return skyFill; }
+    public static void setSkyFillTuning(float value) { skyFill = Math.max(0.0f, value); }
 
     /** Live tuning for {@code /rtx ce halo}; the look switch still gates it. */
     public static float getHaloBoostTuning() { return haloBoost; }
     public static void setHaloBoostTuning(float value) { haloBoost = Math.max(0.0f, value); }
 
-    /** Daytime sky scattering multiplier for the atmosphere generator. */
+    /** Whether the sky and the sun and moon lights use the physical atmosphere. */
+    public static boolean isPhysicalAtmosphere() {
+        return enabled;
+    }
+
+    /** Factor on the physical sky's brightness. */
+    public static float skyFill() {
+        return skyFill;
+    }
+
+    /** Upstream daytime sky scattering multiplier, for the legacy atmosphere. */
     public static float dayScattering() {
-        return enabled ? dayScattering : UPSTREAM_DAY_SCATTERING;
+        return UPSTREAM_DAY_SCATTERING;
     }
 
     /** Mie halo boost around the sun for the atmosphere shader. */
@@ -61,9 +72,9 @@ public final class DaylightSky {
         return enabled ? haloBoost : UPSTREAM_HALO_BOOST;
     }
 
-    /** Sun billboard half-size, given the vanilla one. */
-    public static float sunHalfSize(float vanillaHalfSize) {
-        return enabled ? vanillaHalfSize * SUN_SIZE_SCALE : vanillaHalfSize;
+    /** Whether the sun is the round physical disc rather than the vanilla billboard. */
+    public static boolean isRoundSun() {
+        return enabled;
     }
 
     /** Strength of the daylight conf layer, given the day profile's strength. */

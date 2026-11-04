@@ -8,38 +8,50 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DaylightSkyTest {
 
     @AfterEach
     void restoreDefaults() {
         DaylightSky.setEnabled(DaylightSky.DEFAULT_ENABLED);
-        DaylightSky.setDayScatteringTuning(DaylightSky.DEFAULT_DAY_SCATTERING);
+        DaylightSky.setSkyFillTuning(DaylightSky.DEFAULT_SKY_FILL);
         DaylightSky.setHaloBoostTuning(DaylightSky.DEFAULT_HALO_BOOST);
     }
 
     @Test
-    void onByDefaultWithADimmerSkyFillATighterHaloAndAHalfSizeSun() {
-        assertEquals(DaylightSky.DEFAULT_DAY_SCATTERING, DaylightSky.dayScattering(), 0.0f);
-        assertEquals(DaylightSky.DEFAULT_HALO_BOOST, DaylightSky.haloBoost(), 0.0f);
-        assertEquals(15.0f, DaylightSky.sunHalfSize(30.0f), 0.0f);
+    void onByDefaultWithAPhysicalSkyAPhysicalHaloAndARoundSun() {
+        assertTrue(DaylightSky.isPhysicalAtmosphere());
+        assertTrue(DaylightSky.isRoundSun());
+        assertEquals(1.0f, DaylightSky.skyFill(), 0.0f);
+        assertEquals(1.0f, DaylightSky.haloBoost(), 0.0f);
         assertEquals(0.75f, DaylightSky.layerStrength(0.75f), 0.0f);
     }
 
     @Test
     void offRestoresTheUpstreamSky() {
         DaylightSky.setEnabled(false);
+        assertFalse(DaylightSky.isPhysicalAtmosphere());
+        assertFalse(DaylightSky.isRoundSun());
         assertEquals(DaylightSky.UPSTREAM_DAY_SCATTERING, DaylightSky.dayScattering(), 0.0f);
         assertEquals(DaylightSky.UPSTREAM_HALO_BOOST, DaylightSky.haloBoost(), 0.0f);
-        assertEquals(30.0f, DaylightSky.sunHalfSize(30.0f), 0.0f);
         assertEquals(0.0f, DaylightSky.layerStrength(1.0f), 0.0f);
     }
 
     @Test
-    void tuningOnlyAppliesWhileTheLookIsOn() {
-        DaylightSky.setDayScatteringTuning(9.0f);
-        assertEquals(9.0f, DaylightSky.dayScattering(), 0.0f);
+    void haloTuningOnlyAppliesWhileTheLookIsOn() {
+        DaylightSky.setHaloBoostTuning(3.0f);
+        assertEquals(3.0f, DaylightSky.haloBoost(), 0.0f);
         DaylightSky.setEnabled(false);
-        assertEquals(DaylightSky.UPSTREAM_DAY_SCATTERING, DaylightSky.dayScattering(), 0.0f);
+        assertEquals(DaylightSky.UPSTREAM_HALO_BOOST, DaylightSky.haloBoost(), 0.0f);
+    }
+
+    @Test
+    void skyFillTuningIsNeverNegative() {
+        DaylightSky.setSkyFillTuning(-2.0f);
+        assertEquals(0.0f, DaylightSky.skyFill(), 0.0f);
+        DaylightSky.setSkyFillTuning(1.5f);
+        assertEquals(1.5f, DaylightSky.skyFill(), 0.0f);
     }
 }

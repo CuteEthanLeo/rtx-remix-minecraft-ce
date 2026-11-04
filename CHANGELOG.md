@@ -9,6 +9,43 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.4 - Unreleased
+
+### Added
+
+- Glowing block lights: glowstone, sea lanterns, froglights, shroomlights, jack
+  o'lanterns, lit redstone lamps and copper bulbs, lanterns, and end rods now
+  cast light, calibrated to a torch's power at their light level.
+- An Ultra motion blur step with 48 samples.
+- Auto PBR, on by default: every block without a PBR pack gets surface relief
+  from its texture and a roughness that suits it; gold, iron, netherite, and
+  copper blocks reflect as metal, and diamond blocks, ice, and polished stone
+  are glossy.
+- Shooting stars on clear nights, about one every seven seconds, and a meteor
+  shower one night in five.
+
+### Changed
+
+- Natural Daylight is a physical sky: one atmosphere with ozone and multiple
+  scattering lights both the sky and the sun and moon, in their real ratio. The
+  sky is deep blue instead of grey-cyan, shade has contrast, golden hour is
+  warm, and the noon sun and the clouds are no longer tinted orange.
+- The sun is a small round disc with a tight glow instead of a large white blot.
+- Nights are lit by the moon, three times upstream's and following its phase,
+  instead of a second cyan sky light that turned moonlit grass green. The night
+  ambient boost defaults to 0.
+- Motion blur takes a shutter speed (1/250 s to 1/24 s, default 1/48 s) and
+  draws the same streak at any frame rate; the maximum blur size goes up to
+  0.25, and streaks are two-sided at every quality step. The old shutter
+  setting is not carried over.
+- A richer Milky Way: clumpy star clouds, a great rift and thin dust lanes, a
+  warm core with bluish arms, faint nebulae, and a grain of unresolved stars,
+  in a wider, meandering band; 6000 stars instead of 4000.
+- LabPBR ambient occlusion is applied in linear space.
+- Leaves and grass absorb more light per scattering event (half the authored
+  single-scattering albedo), so torch-lit foliage no longer glows green.
+- An untouched 0.1.0-ce.3 night conf is upgraded.
+
 ## Community Edition 0.1.0-ce.3 - Unreleased
 
 ### Added

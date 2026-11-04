@@ -795,6 +795,10 @@ public class RemixRenderer {
             }
             submitPendingParticleFrame();
 
+            if (cameraEffectsSettings != null) {
+                cameraEffectsSettings.onFrame(System.nanoTime());
+            }
+
             Camera camera = client.gameRenderer.getCamera();
             float tickDelta = client.getRenderTickCounter().getTickDelta(true);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());

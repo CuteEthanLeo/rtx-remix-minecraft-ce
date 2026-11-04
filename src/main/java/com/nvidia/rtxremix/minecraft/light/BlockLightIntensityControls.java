@@ -32,7 +32,10 @@ public final class BlockLightIntensityControls {
             control("conduit", "block.minecraft.conduit"),
             control("light", "block.minecraft.light"),
             control("candles", "rtxremix.setting.blockLights.candles"),
-            control("candle_cakes", "rtxremix.setting.blockLights.candleCakes"));
+            control("candle_cakes", "rtxremix.setting.blockLights.candleCakes"),
+            control("glowing_blocks", "rtxremix.setting.blockLights.glowingBlocks"),
+            control("lanterns", "rtxremix.setting.blockLights.lanterns"),
+            control("end_rod", "block.minecraft.end_rod"));
     private static final Map<Identifier, Control> BY_RULE_ID = indexByRuleId();
 
     private BlockLightIntensityControls() {}

@@ -102,17 +102,59 @@ public final class LabPBRConverter {
         }
     }
 
-    /** Multiplies RGBA albedo in-place by the AO stored in _n blue (0 = occluded, 255 = none). */
+    /**
+     * Multiplies RGBA albedo in-place by the AO stored in _n blue (0 = occluded, 255 = none).
+     *
+     * <p>The albedo bytes are sRGB-encoded and the runtime decodes them, so the AO is applied
+     * to the decoded value and the product encoded again. Multiplying the bytes directly
+     * applied AO raised to about 2.2: a texel meant to keep 80% kept 61%.
+     */
     public static void applyAO(byte[] albedoRGBA, int atlasW, NativeImage n, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
                 int abgr = n.getColor(x % n.getWidth(), y % n.getHeight());
                 int ao = (abgr >> 16) & 0xFF;
+                if (ao == 255) continue;
+                float occlusion = ao / 255.0f;
                 int idx = ((oy + y) * atlasW + (ox + x)) * 4;
-                albedoRGBA[idx]     = (byte) ((albedoRGBA[idx]     & 0xFF) * ao / 255);
-                albedoRGBA[idx + 1] = (byte) ((albedoRGBA[idx + 1] & 0xFF) * ao / 255);
-                albedoRGBA[idx + 2] = (byte) ((albedoRGBA[idx + 2] & 0xFF) * ao / 255);
+                for (int c = 0; c < 3; c++) {
+                    albedoRGBA[idx + c] = (byte) occludeSrgb(albedoRGBA[idx + c] & 0xFF, occlusion);
+                }
             }
+    }
+
+    /**
+     * Multiplies linear data in-place by the AO in _n blue, byte for byte: for atlases the
+     * runtime does not decode, such as the single-scattering albedo.
+     */
+    public static void applyAOToData(byte[] dataRGBA, int atlasW, NativeImage n, int ox, int oy, int w, int h) {
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                int abgr = n.getColor(x % n.getWidth(), y % n.getHeight());
+                int ao = (abgr >> 16) & 0xFF;
+                int idx = ((oy + y) * atlasW + (ox + x)) * 4;
+                for (int c = 0; c < 3; c++) {
+                    dataRGBA[idx + c] = (byte) ((dataRGBA[idx + c] & 0xFF) * ao / 255);
+                }
+            }
+    }
+
+    private static final float[] SRGB_TO_LINEAR = buildSrgbToLinear();
+
+    private static float[] buildSrgbToLinear() {
+        float[] table = new float[256];
+        for (int i = 0; i < 256; i++) {
+            double c = i / 255.0;
+            table[i] = (float) (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+        }
+        return table;
+    }
+
+    /** An sRGB byte times a linear occlusion factor, encoded back to an sRGB byte. */
+    static int occludeSrgb(int srgb, float occlusion) {
+        double linear = SRGB_TO_LINEAR[srgb] * occlusion;
+        double encoded = linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.pow(linear, 1.0 / 2.4) - 0.055;
+        return clamp255((int) Math.round(encoded * 255.0));
     }
 
     /** Blits a single R8 channel from _n alpha (height). */
@@ -171,11 +213,27 @@ public final class LabPBRConverter {
             for (int x = 0; x < w; x++) {
                 int abgr = sss.getColor(x % sss.getWidth(), y % sss.getHeight());
                 int idx = ((oy + y) * atlasW + (ox + x)) * 4;
-                dst[idx]     = (byte) (abgr & 0xFF);
-                dst[idx + 1] = (byte) ((abgr >> 8) & 0xFF);
-                dst[idx + 2] = (byte) ((abgr >> 16) & 0xFF);
+                dst[idx]     = (byte) scaleSingleScatteringAlbedo(abgr & 0xFF);
+                dst[idx + 1] = (byte) scaleSingleScatteringAlbedo((abgr >> 8) & 0xFF);
+                dst[idx + 2] = (byte) scaleSingleScatteringAlbedo((abgr >> 16) & 0xFF);
                 dst[idx + 3] = (byte) 255;
             }
+    }
+
+    /**
+     * Community Edition: share of the authored foliage single-scattering albedo that is kept.
+     *
+     * <p>The baseline leaves and grass carry (163, 240, 0), a green albedo of 0.94: almost no
+     * green is absorbed per scattering event, on top of a tinted surface albedo of about 0.4.
+     * Real leaves keep about a quarter of green light per interaction. Near a strong light the
+     * path tracer bounced green between blades and through leaves nearly without loss, so
+     * torch-lit foliage glowed fluorescent green. Halving it keeps backlit leaves translucent
+     * while green energy dies out after a few bounces as it does in real foliage.
+     */
+    static final float SINGLE_SCATTERING_ALBEDO_SCALE = 0.5f;
+
+    static int scaleSingleScatteringAlbedo(int value) {
+        return Math.round(value * SINGLE_SCATTERING_ALBEDO_SCALE);
     }
 
     /** Builds the fallback single-scattering albedo atlas from the current albedo atlas. */
