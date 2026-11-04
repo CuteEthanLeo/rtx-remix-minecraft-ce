@@ -34,9 +34,12 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
 import com.nvidia.rtxremix.minecraft.asset.RemixTexture;
 import com.nvidia.rtxremix.minecraft.asset.RemixTextureStore;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
+import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
 import com.nvidia.rtxremix.minecraft.community.NightSkyRenderer;
 import com.nvidia.rtxremix.minecraft.community.OvercastSky;
+import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
@@ -336,7 +339,7 @@ public class SkyRenderer {
             skyTextureAsset = createSkyTexture(pixels);
         }
         publishSkyDome(api);
-        publishSkyAmbient(api, radiance[0], radiance[1], radiance[2]);
+        publishSkyAmbient(api, radiance[0], radiance[1], radiance[2], 1.0f);
     }
 
     /**
@@ -540,7 +543,8 @@ public class SkyRenderer {
             WeatherDomeState weather) {
         float multiplier = skyAmbientMultiplier(sunHeight)
                 + OvercastSky.extraAmbient(
-                        weather.opacity(), LightManager.celestialVisibility(sunHeight));
+                        weather.opacity(), LightManager.celestialVisibility(sunHeight))
+                + LightningFlash.skyAmbientBoost(weather.opacity());
         publishSkyAmbient(
                 api,
                 lerp(atmosphericMeanR, OVERCAST_MEAN_R * weather.intensity(), weather.opacity())
@@ -548,11 +552,13 @@ public class SkyRenderer {
                 lerp(atmosphericMeanG, OVERCAST_MEAN_G * weather.intensity(), weather.opacity())
                         * multiplier,
                 lerp(atmosphericMeanB, OVERCAST_MEAN_B * weather.intensity(), weather.opacity())
-                        * multiplier);
+                        * multiplier,
+                SunShafts.ambientVolumetricScale(sunHeight, weather.opacity()));
     }
 
     /** Updates the sky ambient rect to this radiance and draws it; a black or disabled rect stays undrawn. */
-    private void publishSkyAmbient(RemixAPI api, float radianceR, float radianceG, float radianceB) {
+    private void publishSkyAmbient(RemixAPI api, float radianceR, float radianceG, float radianceB,
+                                   float volumetricRadianceScale) {
         if (!skyAmbientRectEnabled
                 || (radianceR == 0.0f && radianceG == 0.0f && radianceB == 0.0f)) {
             return;
@@ -565,7 +571,7 @@ public class SkyRenderer {
                 .yAxis(0, 0, 1)
                 .ySize(SKY_AMBIENT_RECT_HALF_SIZE)
                 .direction(0, -1, 0)
-                .volumetricRadianceScale(1.0f)
+                .volumetricRadianceScale(volumetricRadianceScale)
                 .build();
 
         LightInfo ambientInfo = LightInfo.builder()
@@ -622,7 +628,8 @@ public class SkyRenderer {
         updateCelestialOpacity(sunOpacity, moonOpacity);
 
         if (sunOpacity > 0.0f) {
-            updateCelestialTransform(sunTransform, cameraPos, sunDirection, SUN_HALF_SIZE);
+            updateCelestialTransform(sunTransform, cameraPos, sunDirection,
+                    DaylightSky.sunHalfSize(SUN_HALF_SIZE));
             drawCelestialMesh(api, sunMeshAsset, sunTransform);
         }
 

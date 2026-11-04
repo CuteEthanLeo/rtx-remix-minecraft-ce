@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.logic;
 
@@ -310,13 +313,14 @@ class ConfLayerDriverTest {
     // --- layer table invariants ---
 
     @Test
-    void staticTableHasNineUniqueRows() {
+    void staticTableHasTenUniqueRows() {
         // 1 water + 1 view-distance controller + 1 volumetric settling
-        // controller + 2 weather + 4 time profiles. Optional biome and zone
+        // controller + 2 weather + 4 time profiles + the Community Edition
+        // daylight look. Optional biome and zone
         // rows are discovered from disk.
         assertEquals(64, ConfLayerDriver.vanillaBiomeNames().size(),
                 "vanilla 1.21.1 biome count (BiomeKeys)");
-        assertEquals(9, ConfLayerDriver.STATIC_LAYER_TABLE.size());
+        assertEquals(10, ConfLayerDriver.STATIC_LAYER_TABLE.size());
         Set<String> names = new HashSet<>();
         Set<String> paths = new HashSet<>();
         for (var spec : ConfLayerDriver.STATIC_LAYER_TABLE) {
@@ -395,6 +399,8 @@ class ConfLayerDriverTest {
                 expected = 4000f;
             } else if (spec.name().equals(LogicChannels.TIME_DAY)) {
                 expected = 4001f;
+            } else if (spec.name().equals(LogicChannels.COMMUNITY_DAYLIGHT)) {
+                expected = 4001.5f;
             } else if (spec.name().equals(LogicChannels.TIME_DUSK)) {
                 expected = 4002f;
             } else if (spec.name().equals(LogicChannels.TIME_NIGHT)) {
@@ -413,7 +419,8 @@ class ConfLayerDriverTest {
     void blendThresholdsMatchTheAuthoredLayerBehavior() {
         for (var spec : representativeLayerSpecs()) {
             float expected = spec.name().equals(LogicChannels.UNDERWATER)
-                    || spec.name().startsWith(LogicChannels.TIME_PREFIX) ? 0.5f : 0.01f;
+                    || spec.name().startsWith(LogicChannels.TIME_PREFIX)
+                    || spec.name().equals(LogicChannels.COMMUNITY_DAYLIGHT) ? 0.5f : 0.01f;
             assertEquals(expected, spec.blendThreshold(), spec.name());
         }
     }

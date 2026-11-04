@@ -1,5 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
 
 #version 430 core
 
@@ -29,6 +32,8 @@ layout(std140, binding = 0) uniform SkyParameters {
 #define AtmosphereScale SunRadianceAndAtmosphereScale.w
 #define MoonRadiance MoonRadianceValue.xyz
 #define MieScatteringAnisotropy AtmosphereParameters.x
+// Community Edition: the sun's Mie halo boost is a parameter (upstream 10.35).
+#define SunMieHaloBoost AtmosphereParameters.y
 
 shared vec3 Reduction[64];
 shared vec3 ReducedUpperMean;
@@ -57,7 +62,6 @@ const float RAYLEIGH_HEIGHT = 8000.0;
 const float MIE_HEIGHT = 1200.0;
 const vec3 BETA_R = vec3(5.5e-6, 13.0e-6, 22.4e-6);
 const float BETA_M = 21.0e-6;
-const float SUN_MIE_HALO_BOOST = 10.35;
 const float MOON_MIE_HALO_BOOST = 1.0;
 const float MULTIPLE_SCATTERING_SCALE = 0.65;
 const float GROUND_HORIZON_SCALE = 0.9;
@@ -231,7 +235,7 @@ void generateSingleScattering(ivec2 pixel) {
         SunRadiance,
         sunRayleigh,
         sunMie,
-        SUN_MIE_HALO_BOOST);
+        SunMieHaloBoost);
     singleScattering += finishScattering(
         viewDirection,
         MoonDirection,

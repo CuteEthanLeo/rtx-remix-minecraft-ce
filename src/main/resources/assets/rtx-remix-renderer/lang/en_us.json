@@ -157,5 +157,19 @@
   "rtxremix.setting.community.shoreFoam": "Shore Foam",
   "rtxremix.setting.community.shoreFoam.tip": "Draws drifting foam where water meets a solid shore. Community Edition. Applies when you leave this screen and rebuilds loaded terrain once.",
   "rtxremix.setting.community.starryNight": "Starry Night",
-  "rtxremix.setting.community.starryNight.tip": "Replaces Minecraft's stars with thousands of stars of varied brightness and colour, adds a faint Milky Way that a bright moon washes out, and gives moonlight a cool, stronger tint. Community Edition."
+  "rtxremix.setting.community.starryNight.tip": "Replaces Minecraft's stars with thousands of stars of varied brightness and colour, adds a faint Milky Way that a bright moon washes out, and gives moonlight a cool, stronger tint. Community Edition.",
+  "rtxremix.settings.group.communityLight": "Light & Haze",
+  "rtxremix.settings.value.volumetricQuality.standard": "Standard",
+  "rtxremix.settings.value.volumetricQuality.high": "High",
+  "rtxremix.settings.value.volumetricQuality.ultra": "Ultra",
+  "rtxremix.setting.community.volumetricQuality": "Haze Detail",
+  "rtxremix.setting.community.volumetricQuality.tip": "How finely fog and light shafts are resolved. Higher settings give crisper shaft edges and rain curtains at a frame-rate cost: High costs a few percent, Ultra noticeably more. Community Edition.",
+  "rtxremix.setting.community.goldenHourShafts": "Golden-Hour Shafts",
+  "rtxremix.setting.community.goldenHourShafts.tip": "At sunrise and sunset the low sun lights the morning mist and evening haze far more strongly, so trees and hills cast visible shafts of light. Community Edition.",
+  "rtxremix.setting.community.rainShafts": "Cloud-Gap Shafts",
+  "rtxremix.setting.community.rainShafts.tip": "In rain the ground stays overcast, but sunlight still lights the haze wherever it breaks through gaps in the clouds, as slanted shafts. Community Edition.",
+  "rtxremix.setting.community.lightningGlow": "Lightning Glow",
+  "rtxremix.setting.community.lightningGlow.tip": "Lightning lights the storm: each flash lights up the rain haze around the bolt and throws brief, cold shadows, and distant strikes brighten the whole sky. Community Edition.",
+  "rtxremix.setting.community.naturalDaylight": "Natural Daylight",
+  "rtxremix.setting.community.naturalDaylight.tip": "A clear day lit by a warm sun and a blue sky in a believable ratio: sunlit ground brighter, shade blue rather than grey, distance fading to pale blue instead of a white veil, and a tighter glow around a smaller sun. Overall brightness stays about the same. Community Edition."
 }

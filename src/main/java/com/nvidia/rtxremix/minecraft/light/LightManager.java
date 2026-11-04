@@ -15,7 +15,9 @@ import com.nvidia.rtxremix.LightInfoLightShaping;
 import com.nvidia.rtxremix.LightInfoSphereEXT;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
+import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.NightLight;
+import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.asset.RemixLight;
 import com.nvidia.rtxremix.minecraft.asset.RemixLightStore;
@@ -36,6 +38,7 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.LightningEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.item.BlockItem;
@@ -212,6 +215,7 @@ public class LightManager {
         lightOwnerIds.clear();
         float frameDtSeconds = entityLightFrameDtSeconds();
         boolean localFirstPersonRigUpdated = false;
+        LightningFlash.advance(world.getLightningTicksLeft(), frameDtSeconds);
 
         for (Entity entity : world.getEntities()) {
             if (entity instanceof ItemEntity itemEntity) {
@@ -233,6 +237,8 @@ public class LightManager {
                 }
             } else if (entity instanceof DisplayEntity.BlockDisplayEntity display) {
                 ensureDisplayBeaconLight(display, tickDelta);
+            } else if (entity instanceof LightningEntity bolt) {
+                submitLightningLights(bolt, tickDelta);
             }
         }
 
@@ -272,6 +278,29 @@ public class LightManager {
                 }
                 beaconIterator.remove();
             }
+        }
+    }
+
+    /**
+     * Community Edition: a column of cold lights along a flashing bolt, which
+     * scatter strongly into the rain haze; dark between flashes. See
+     * {@link LightningFlash}.
+     */
+    private void submitLightningLights(LightningEntity bolt, float tickDelta) {
+        float[] radiance = LightningFlash.boltRadianceNow();
+        if (radiance == null) {
+            return;
+        }
+        Vec3d strike = bolt.getLerpedPos(tickDelta);
+        for (int index = 0; index < LightningFlash.boltLightCount(); index++) {
+            submitEntityLight(new PendingAnalyticLight(
+                    EntityLightKey.lightning(bolt.getId(), index),
+                    strike.add(0.0, LightningFlash.boltLightHeight(index), 0.0),
+                    LightningFlash.BOLT_LIGHT_RADIUS,
+                    0.0,
+                    radiance[0], radiance[1], radiance[2],
+                    LightningFlash.BOLT_VOLUMETRIC_SCALE,
+                    null), 1.0f);
         }
     }
 
@@ -1024,13 +1053,23 @@ public class LightManager {
             return new EntityLightKey(entityId, Kind.BLOCK_DISPLAY);
         }
 
+        private static EntityLightKey lightning(int entityId, int index) {
+            return new EntityLightKey(entityId, Kind.LIGHTNING[index]);
+        }
+
     }
 
     private enum Kind {
         ITEM,
         MAIN_HAND,
         OFF_HAND,
-        BLOCK_DISPLAY
+        BLOCK_DISPLAY,
+        LIGHTNING_LOW,
+        LIGHTNING_MID,
+        LIGHTNING_HIGH;
+
+        /** One kind per light along a bolt, in {@link LightningFlash} order. */
+        private static final Kind[] LIGHTNING = {LIGHTNING_LOW, LIGHTNING_MID, LIGHTNING_HIGH};
     }
 
     // ================================================================
@@ -1040,25 +1079,30 @@ public class LightManager {
     private void updateSkyLight(ClientWorld world) {
         // Only a NORMAL sky has a sun and a moon. The End and the Nether pin their time, so
         // evaluating them would light a permanent noon or midnight that vanilla never draws.
+        float rain = world.getRainGradient(0.0f);
+        float thunder = world.getThunderGradient(0.0f);
         skyLightState = world.getDimensionEffects().getSkyType() == DimensionEffects.SkyType.NORMAL
                 ? evaluateSkyLightState(
                         world.getSkyAngle(0f),
-                        world.getRainGradient(0.0f),
-                        world.getThunderGradient(0.0f))
+                        rain,
+                        thunder)
                 : SkyLightState.empty();
+        float sunVolumetricScale = SunShafts.sunVolumetricScale(
+                skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));
 
         try {
             sunLight = updateDistantLight(sunLight, skyLightState.sunPosition(), skyLightState.sunDirectRadiance(),
-                    SUN_ANGULAR_DIAMETER_DEGREES);
+                    SUN_ANGULAR_DIAMETER_DEGREES, sunVolumetricScale);
             moonLight = updateDistantLight(moonLight, skyLightState.moonPosition(), skyLightState.moonDirectRadiance(),
-                    MOON_ANGULAR_DIAMETER_DEGREES);
+                    MOON_ANGULAR_DIAMETER_DEGREES, 1.0f);
         } catch (RemixException e) {
             LOGGER.error("Failed to update sky light: {}", e.getMessage());
         }
     }
 
     private RemixLight updateDistantLight(RemixLight light, float[] positionDirection, float[] radiance,
-                                          float angularDiameterDegrees) throws RemixException {
+                                          float angularDiameterDegrees, float volumetricRadianceScale)
+            throws RemixException {
         float[] incomingDirection = {
                 -positionDirection[0],
                 -positionDirection[1],
@@ -1070,7 +1114,7 @@ public class LightManager {
                 .distantExt(LightInfoDistantEXT.builder()
                         .direction(incomingDirection[0], incomingDirection[1], incomingDirection[2])
                         .angularDiameterDegrees(angularDiameterDegrees)
-                        .volumetricRadianceScale(1.0f)
+                        .volumetricRadianceScale(volumetricRadianceScale)
                         .build())
                 .build();
 
@@ -1230,6 +1274,7 @@ public class LightManager {
         placedBeaconLights.clear();
         seenPlacedBeacons.clear();
         lightOwnerIds.clear();
+        LightningFlash.reset();
         heldLightPlacement.clear();
         shadowModelPlacement.clear();
         firstPersonShadowModelOffset = Vec3d.ZERO;

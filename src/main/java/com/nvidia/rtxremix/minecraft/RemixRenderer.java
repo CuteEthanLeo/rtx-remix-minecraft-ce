@@ -29,6 +29,7 @@ import com.nvidia.rtxremix.minecraft.logic.ViewDistanceFade;
 import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
+import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.settings.PostProcessingSettings;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
@@ -133,6 +134,7 @@ public class RemixRenderer {
     private BlockTextureManager textureManager;
     private PostProcessingSettings postProcessingSettings;
     private CameraEffectsSettings cameraEffectsSettings;
+    private VolumetricQualitySettings volumetricQualitySettings;
     
     // Entity rendering pipeline: vanilla capture + skinned submission
     private RemixEntityPass entityPass;
@@ -313,6 +315,7 @@ public class RemixRenderer {
 
             postProcessingSettings = new PostProcessingSettings(remixApi::setConfigVariable);
             cameraEffectsSettings = new CameraEffectsSettings(remixApi::setConfigVariable);
+            volumetricQualitySettings = new VolumetricQualitySettings(remixApi::setConfigVariable);
             
             // NOTE: Submit() allocates the image, but semaphores are always ready
             InteropInfo interopInfo = remixApi.dxvkGetInteropInfo();
@@ -1691,6 +1694,10 @@ public class RemixRenderer {
 
     public CameraEffectsSettings getCameraEffectsSettings() {
         return cameraEffectsSettings;
+    }
+
+    public VolumetricQualitySettings getVolumetricQualitySettings() {
+        return volumetricQualitySettings;
     }
 
     /**

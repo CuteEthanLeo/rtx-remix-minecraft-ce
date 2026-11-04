@@ -9,6 +9,23 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.3 - Unreleased
+
+### Added
+
+- Golden-hour light shafts: a low sun lights the dawn mist and dusk haze far more
+  strongly than surfaces, and the sky ambient scatters less, so shafts read.
+- Cloud-gap shafts in rain, drifting rain curtains with clearer gaps, and
+  lightning that lights the rain haze and casts brief shadows.
+- Natural Daylight: a believable sun-to-sky ratio, blue aerial perspective, a
+  tighter sun halo, and a smaller sun.
+- Haze Detail setting for the volumetric froxel grid, Ultra by default.
+- `/rtx ce` for live tuning of the new looks.
+
+### Changed
+
+- Untouched 0.1.0-ce.2 dawn, dusk, rain, and thunder confs are upgraded.
+
 ## Community Edition 0.1.0-ce.1 - Unreleased
 
 The first Community Edition build, on upstream `a518eff`. Every change below

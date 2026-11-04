@@ -8,6 +8,9 @@
 package com.nvidia.rtxremix.minecraft;
 
 import com.nvidia.rtxremix.minecraft.community.CommunityEdition;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
+import com.nvidia.rtxremix.minecraft.community.LightningFlash;
+import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.weather.RemixWeatherRenderer;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
@@ -106,6 +109,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
 
 /**
@@ -161,6 +165,13 @@ public class RtxRemixMod implements ClientModInitializer {
             return Text.literal("Preset '" + name + "' did NOT apply: the Remix runtime is unavailable");
         }
         preset.get().writeTo(renderer.getRemixApi()::setConfigVariable);
+        // Presets also rewrite the post-effect and froxel options; restate ours.
+        if (renderer.getCameraEffectsSettings() != null) {
+            renderer.getCameraEffectsSettings().reapply();
+        }
+        if (renderer.getVolumetricQualitySettings() != null) {
+            renderer.getVolumetricQualitySettings().reapply();
+        }
         return Text.literal("Remix graphics preset '" + name + "' applied for this session");
     }
     
@@ -499,6 +510,7 @@ public class RtxRemixMod implements ClientModInitializer {
                     // Remix graphics presets write the post-effect switches to
                     // the user configuration, so state ours once at startup.
                     renderer.getCameraEffectsSettings().reapply();
+                    renderer.getVolumetricQualitySettings().reapply();
                     LOGGER.info("RTX settings loaded from {}", cfg);
                     applyLaunchPreset();
                 }
@@ -1103,6 +1115,7 @@ public class RtxRemixMod implements ClientModInitializer {
                         return 1;
                     }))
                 .then(sssCommand())
+                .then(communityTuningCommand())
                 .then(zoneCommand())
                 .then(ClientCommandManager.literal("conf")
                     .then(ClientCommandManager.literal("reload")
@@ -1602,6 +1615,60 @@ public class RtxRemixMod implements ClientModInitializer {
                     + "or <world>/rtx-remix/confs/ (ships with this map), then /rtx conf reload";
         }
         return "no conf layer for channel " + channel;
+    }
+
+    /**
+     * Community Edition live tuning: {@code /rtx ce} prints the light-and-haze
+     * values, {@code /rtx ce <name> <value>} changes one for this session, so a
+     * player can find values they like and report them as new defaults.
+     */
+    private LiteralArgumentBuilder<
+            FabricClientCommandSource> communityTuningCommand() {
+        return ClientCommandManager.literal("ce")
+            .executes(context -> {
+                context.getSource().sendFeedback(Text.literal(
+                        "Community Edition tuning (this session only): "
+                                + "shafts " + SunShafts.getGoldenPeak()
+                                + ", rainshafts " + SunShafts.getRainShare()
+                                + ", skyfill " + DaylightSky.getDayScatteringTuning()
+                                + ", halo " + DaylightSky.getHaloBoostTuning()
+                                + ", lightning " + LightningFlash.getBoltRadiance()));
+                return 1;
+            })
+            .then(communityTuning("shafts", 1.0f, 20.0f,
+                    SunShafts::getGoldenPeak, SunShafts::setGoldenPeak,
+                    "Golden-hour shaft peak (sun volumetric scale)"))
+            .then(communityTuning("rainshafts", 0.0f, 1.0f,
+                    SunShafts::getRainShare, SunShafts::setRainShare,
+                    "Cloud-gap shaft share of the clear-sky sun in rain"))
+            .then(communityTuning("skyfill", 1.0f, 32.0f,
+                    DaylightSky::getDayScatteringTuning, DaylightSky::setDayScatteringTuning,
+                    "Daytime sky scattering (upstream 16)"))
+            .then(communityTuning("halo", 0.0f, 20.0f,
+                    DaylightSky::getHaloBoostTuning, DaylightSky::setHaloBoostTuning,
+                    "Sun halo boost (upstream 10.35)"))
+            .then(communityTuning("lightning", 0.0f, 10000.0f,
+                    LightningFlash::getBoltRadiance, LightningFlash::setBoltRadiance,
+                    "Lightning bolt light radiance"));
+    }
+
+    private LiteralArgumentBuilder<FabricClientCommandSource> communityTuning(
+            String name, float min, float max, Supplier<Float> getter, Consumer<Float> setter,
+            String description) {
+        return ClientCommandManager.literal(name)
+            .executes(context -> {
+                context.getSource().sendFeedback(Text.literal(description + ": " + getter.get()));
+                return 1;
+            })
+            .then(ClientCommandManager.argument("value", FloatArgumentType.floatArg(min, max))
+                .executes(context -> {
+                    setter.accept(FloatArgumentType.getFloat(context, "value"));
+                    if (renderer != null && renderer.getSkyRenderer() != null) {
+                        renderer.getSkyRenderer().forceRefresh();
+                    }
+                    context.getSource().sendFeedback(Text.literal(description + " set to " + getter.get()));
+                    return 1;
+                }));
     }
 
     private LiteralArgumentBuilder<

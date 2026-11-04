@@ -27,12 +27,21 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 | 雨天云发棕、夜晚云发白 | 云的反照率与次表面散射随时间和天气变化：雨中风暴灰，夜里暗蓝 | 社区版 → 云层明暗 | `community/CloudTint.java`、`cloud/CloudRenderer.java` |
 | 湖水发黑、水面单调 | 水体透射距离 1 m → 3.5 m，按生物群系分 9 种水色；水面单独成页并标记为动态水（双层流动波浪，雨中更粗糙）；岸边泡沫 | 社区版 → 真实水体 / 流动波浪 / 岸边浪花 | `community/WaterLook.java`、`community/ShoreFoam.java`、`terrain/*` |
 | 夜晚单薄 | 4000 颗亮度、色温各异的星星，沿银河聚集；程序化银河带（满月时变淡）；月光更强更冷；夜间薄雾让灯光有光晕；夜间环境光默认 2.5 → 1.4 | 社区版 → 星空 | `community/StarField.java`、`community/NightSky*.java`、`confs/time/*.conf` |
+| 晨昏没有体积光 | 太阳高度 2°–20° 时太阳对雾的散射最高放大到 4 倍，天空环境光对雾的散射降到 0.35，光柱和阴影的反差拉开；清晨是贴地、成团飘动的晨雾，黄昏是偏暖的薄霾，都强烈向前散射 | 社区版 → 光照与体积光 → 晨昏光柱 | `community/SunShafts.java`、`confs/time/dawn.conf`、`dusk.conf` |
+| 雨天体积光平淡 | 地面仍是阴天光照，但太阳对雾的散射单独补偿回晴天的 20%（雷暴 8%），从云缝中照出斜光柱；雨幕噪声加到 3 个 octave，密度曲线更陡，雨幕之间有清楚的空隙 | 社区版 → 光照与体积光 → 云隙光柱 | `community/SunShafts.java`、`confs/weather/*.conf` |
+| （新功能）闪电照亮雨幕 | 每道闪电沿高度放 3 个冷白光源，对雾的散射为 4 倍，照亮周围的雨幕并投下短暂的影子；远处闪电让天空环境光闪一下 | 社区版 → 光照与体积光 → 闪电照亮雨幕 | `community/LightningFlash.java`、`light/LightManager.java` |
+| 白天「傻白」 | 白天天空散射 ×16 → ×11，阳光与阴影的明暗比更合理，阴影保持偏蓝，自动曝光把整体亮度提回；Remix 默认的中性灰、各向同性雾换成偏蓝、向前散射的空气透视（新 conf 层 `community/daylight.conf`，优先级 4001.5）；阴影提亮 1.4 → 1.2；日晕增益 10.35 → 4，太阳贴片缩小一半 | 社区版 → 光照与体积光 → 写实白天 | `community/DaylightSky.java`、`sky/AtmosphericSkyGenerator.java`、`shaders/sky_atmosphere.comp` |
+| 体积光发糊 | froxel 网格三档：标准 16 px/48 层、高 12 px/64 层、极高 8 px/64 层（默认）；画质预设切换后重新写入 | 社区版 → 光照与体积光 → 体积光精度 | `settings/VolumetricQualitySettings.java` |
 | （新功能）动态模糊 | Remix 后处理的运动模糊，四档质量（关/标准/高/电影）、快门和最大模糊长度可调；手和方块描边不模糊；色差和暗角保持关闭 | 画面与曝光 → 镜头效果 | `settings/CameraEffectsSettings.java` |
 | （新功能）简体中文 | 全部设置与提示的中文翻译 | 跟随游戏语言 | `lang/zh_cn.json` |
 
 另有一项维护性改动：官方 mod 从不覆盖已存在的 `rtx-remix/` conf，所以已安装官方版的玩家拿不到新的默认 conf。社区版在
 `rtx-remix-superseded-defaults.txt` 中记录了旧默认 conf 的哈希：**完全未改动**的旧默认会被升级，改过的保持原样
 （`SupersededPayloadDefaults.java`）。
+
+### 实时调参
+
+`/rtx ce` 列出当前值；`/rtx ce shafts|rainshafts|skyfill|halo|lightning <数值>` 只在本次运行中修改晨昏光柱峰值、云隙光柱比例、白天天空散射、日晕增益和闪电亮度，方便找到合适的数值后再改成默认值。conf 文件改动后用 `/rtx conf reload` 生效。
 
 ### 尚未完成 / 已知限制
 
@@ -98,6 +107,19 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
   moon washes out; stronger, cooler moonlight; thin night haze; night sky ambient defaults to 1.4 instead of 2.5.
 - **Motion Blur** (Image & Exposure → Camera Effects): off, Standard, High, or Cinematic, with shutter and maximum
   blur size; the hand and block outline stay sharp.
+- **Light & Haze** (Community Edition):
+  - **Golden-Hour Shafts**: between about 2 and 20 degrees of sun elevation the sun scatters up to four times more
+    into the haze and the sky ambient less, over a patchy dawn mist and a warm dusk haze, so trees and hills cast
+    shafts.
+  - **Cloud-Gap Shafts**: in rain the ground stays overcast, but the haze gets back a share of the clear-sky sun, so
+    it shines through cloud gaps; rain curtains drift with clearer gaps between them.
+  - **Lightning Glow**: bolts light the rain haze around them and throw brief, cold shadows; distant flashes lift
+    the sky ambient.
+  - **Natural Daylight**: daytime sky scattering 16 → 11, so sun and shade differ and shade stays blue while auto
+    exposure keeps the overall brightness; a blue, forward-scattering aerial perspective (`confs/community/daylight.conf`)
+    instead of Remix's neutral default medium; a tighter sun halo and a half-size sun.
+  - **Haze Detail**: froxel grid Standard (16 px, 48 slices), High (12 px, 64), or Ultra (8 px, 64, the default).
+  - `/rtx ce` tunes the shaft, sky-fill, halo, and lightning values for the session.
 - **Simplified Chinese** translation of every setting.
 - Shipped confs that an install still has in their untouched upstream form are upgraded on extraction; edited ones
   are kept (`SupersededPayloadDefaults`).

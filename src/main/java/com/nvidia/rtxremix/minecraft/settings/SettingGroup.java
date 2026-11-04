@@ -18,6 +18,7 @@ public enum SettingGroup {
     EYE_ADAPTATION(SettingCategory.IMAGE, "rtxremix.settings.group.eyeAdaptation"),
     CAMERA_EFFECTS(SettingCategory.IMAGE, "rtxremix.settings.group.cameraEffects"),
     MATERIALS(SettingCategory.MATERIALS, "rtxremix.settings.group.materials"),
+    COMMUNITY_LIGHT(SettingCategory.COMMUNITY, "rtxremix.settings.group.communityLight"),
     COMMUNITY_WEATHER(SettingCategory.COMMUNITY, "rtxremix.settings.group.communityWeather"),
     COMMUNITY_WATER(SettingCategory.COMMUNITY, "rtxremix.settings.group.communityWater"),
     COMMUNITY_NIGHT(SettingCategory.COMMUNITY, "rtxremix.settings.group.communityNight");

@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.logic;
 
@@ -25,6 +28,8 @@ public final class LogicChannels {
     public static final String TIME_DAY = TIME_PREFIX + "day";
     public static final String TIME_DUSK = TIME_PREFIX + "dusk";
     public static final String TIME_NIGHT = TIME_PREFIX + "night";
+    /** Community Edition natural-daylight look; follows the day profile while enabled. */
+    public static final String COMMUNITY_DAYLIGHT = "mc.community.daylight";
 
     private LogicChannels() {
     }

@@ -249,6 +249,7 @@ from several places with a shared channel.
 | `confs/weather/rain.conf` | Vanilla rain gradient: 0 to 1 | 5000 | 0.01 | Immediate; vanilla ramps the gradient over about five seconds |
 | `confs/time/night.conf` | Fixed Overworld schedule | 4003 | 0.50 | The clock curve below |
 | `confs/time/dusk.conf` | Fixed Overworld schedule | 4002 | 0.50 | The clock curve below |
+| `confs/community/daylight.conf` | The day strength while the Community Edition "Natural Daylight" setting is on, else 0 | 4001.5 | 0.50 | The clock curve below |
 | `confs/time/day.conf` | Fixed Overworld schedule | 4001 | 0.50 | The clock curve below |
 | `confs/time/dawn.conf` | Fixed Overworld schedule | 4000 | 0.50 | The clock curve below |
 | `confs/volumetrics/settling.conf` | A weather gradient moving, or a smoothed profile still easing: 0 or 1 | 3100 | 0.01 | Immediate, held 0.75 s after the last movement |

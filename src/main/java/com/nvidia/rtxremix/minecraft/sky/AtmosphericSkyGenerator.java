@@ -1,10 +1,14 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import com.nvidia.rtxremix.minecraft.light.LightManager.SkyLightState;
 import java.io.IOException;
 import java.io.InputStream;
@@ -479,7 +483,7 @@ final class AtmosphericSkyGenerator {
                 lightState.moonSourceRadiance(),
                 0.0f);
         skyParameters.putFloat(64, mieScatteringAnisotropy);
-        skyParameters.putFloat(68, 0.0f);
+        skyParameters.putFloat(68, DaylightSky.haloBoost());
         skyParameters.putFloat(72, 0.0f);
         skyParameters.putFloat(76, 0.0f);
 
@@ -721,7 +725,7 @@ final class AtmosphericSkyGenerator {
     private static float atmosphereScatteringScale(float sunHeight) {
         float nightFactor =
                 1.0f - smoothstep(-0.15f, 0.05f, sunHeight);
-        return 16.0f * (1.0f - nightFactor) + 70.0f * nightFactor;
+        return DaylightSky.dayScattering() * (1.0f - nightFactor) + 70.0f * nightFactor;
     }
 
     private static float smoothstep(

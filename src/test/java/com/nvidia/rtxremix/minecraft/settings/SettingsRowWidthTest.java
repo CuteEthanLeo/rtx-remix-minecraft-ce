@@ -113,7 +113,12 @@ class SettingsRowWidthTest {
             entry("rtxremix.setting.community.shoreFoam", "OFF"),
             entry("rtxremix.setting.community.wetGround", "OFF"),
             entry("rtxremix.setting.community.rainRipples", "OFF"),
-            entry("rtxremix.setting.community.puddles", "OFF"));
+            entry("rtxremix.setting.community.puddles", "OFF"),
+            entry("rtxremix.setting.community.volumetricQuality", "Standard"),
+            entry("rtxremix.setting.community.naturalDaylight", "OFF"),
+            entry("rtxremix.setting.community.goldenHourShafts", "OFF"),
+            entry("rtxremix.setting.community.rainShafts", "OFF"),
+            entry("rtxremix.setting.community.lightningGlow", "OFF"));
 
     private final DefaultFont font = DefaultFont.load();
     private final Map<String, String> lang = loadLang();

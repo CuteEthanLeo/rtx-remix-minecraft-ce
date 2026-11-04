@@ -15,3 +15,9 @@ ce4cd0c036ecade4a24efb71aa86bd20359c23c7264940349144b7d0cb274368 rtx-remix/mods/
 57f8d65df984dc8ee36574a6cd8a213d77e0dd44c50fa8046e06aa68ec244313 rtx-remix/mods/minecraft-logic/confs/weather/thunder.conf
 dd9213f240325981369fca12d9471c2b99e64d371b9364df5de6e858aedca143 rtx-remix/mods/minecraft-logic/confs/time/dawn.conf
 54be12d396fa41e6c7c8aa123ac9206ca2486be7b9a22124bdc8feb8cf9847e5 rtx-remix/mods/minecraft-logic/confs/time/dusk.conf
+
+# Community Edition 0.1.0-ce.2 (113da2a).
+ae0b2793d072ed87a815263ca1673eda65d65e427530002c3f7f35401bb47c7c rtx-remix/mods/minecraft-logic/confs/time/dawn.conf
+4d613a7e66ee454a0e96ea10262c9b177b76a0fc4b5d9dc59e55899dbdacbf58 rtx-remix/mods/minecraft-logic/confs/time/dusk.conf
+6d9bc1e74eb30406e99d3bd9089e578d83b9f5e85c0f04dd3b9e2db8f16b57bf rtx-remix/mods/minecraft-logic/confs/weather/rain.conf
+843a9dcf63e10d6049ae944d18ddcd74e8cecbf322e88a3a2ad4bc169b496214 rtx-remix/mods/minecraft-logic/confs/weather/thunder.conf

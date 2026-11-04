@@ -1,11 +1,15 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.logic;
 
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.util.math.BlockPos;
@@ -186,6 +190,11 @@ public final class ConfLayerDriver {
                 LayerSource.MOD));
         table.add(new LayerSpec(LogicChannels.TIME_DAY, "confs/time/day.conf", 4001f, 0.5f, false,
                 LayerSource.MOD));
+        // Community Edition: between day and dusk, so at the day profile's own
+        // strength it replaces day exactly under the nested LERP, through both
+        // of day's transitions.
+        table.add(new LayerSpec(LogicChannels.COMMUNITY_DAYLIGHT, "confs/community/daylight.conf", 4001.5f,
+                0.5f, false, LayerSource.MOD));
         table.add(new LayerSpec(LogicChannels.TIME_DUSK, "confs/time/dusk.conf", 4002f, 0.5f, false,
                 LayerSource.MOD));
         table.add(new LayerSpec(LogicChannels.TIME_NIGHT, "confs/time/night.conf", 4003f, 0.5f, false,
@@ -727,6 +736,7 @@ public final class ConfLayerDriver {
                 : TimeLayerStrengths.ZERO;
         setTarget(LogicChannels.TIME_DAWN, time.dawn());
         setTarget(LogicChannels.TIME_DAY, time.day());
+        setTarget(LogicChannels.COMMUNITY_DAYLIGHT, DaylightSky.layerStrength(time.day()));
         setTarget(LogicChannels.TIME_DUSK, time.dusk());
         setTarget(LogicChannels.TIME_NIGHT, time.night());
         boolean weatherMoving = targetWeather(world, tickDelta);

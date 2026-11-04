@@ -46,6 +46,7 @@ final class RtxOptionFactory {
     static final int SENTINEL_SLIDER_VALUE = 33;
     static final String UNFOCUSED_FRAMERATE_ID = "framerate.unfocused";
     static final String MOTION_BLUR_ID = "post.motionBlur";
+    static final String VOLUMETRIC_QUALITY_ID = "community.volumetricQuality";
 
     private RtxOptionFactory() {}
 
@@ -271,6 +272,13 @@ final class RtxOptionFactory {
                 case CameraEffectsSettings.HIGH -> "rtxremix.settings.value.motionBlur.high";
                 case CameraEffectsSettings.CINEMATIC -> "rtxremix.settings.value.motionBlur.cinematic";
                 default -> "rtxremix.settings.value.off";
+            });
+        }
+        if (VOLUMETRIC_QUALITY_ID.equals(settingId)) {
+            return Text.translatable(switch (value) {
+                case VolumetricQualitySettings.HIGH -> "rtxremix.settings.value.volumetricQuality.high";
+                case VolumetricQualitySettings.ULTRA -> "rtxremix.settings.value.volumetricQuality.ultra";
+                default -> "rtxremix.settings.value.volumetricQuality.standard";
             });
         }
         if (UNFOCUSED_FRAMERATE_ID.equals(settingId)) {

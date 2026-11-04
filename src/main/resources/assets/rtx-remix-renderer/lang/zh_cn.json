@@ -151,5 +151,19 @@
   "rtxremix.setting.community.shoreFoam": "岸边浪花",
   "rtxremix.setting.community.shoreFoam.tip": "在水与固体岸边交界处绘制缓缓漂动的泡沫。社区版功能。离开本页时生效，并重建一次已加载地形。",
   "rtxremix.setting.community.starryNight": "星空",
-  "rtxremix.setting.community.starryNight.tip": "用数千颗亮度与颜色各异的星星替换原版星星，加入一条会被明亮月光冲淡的银河，并让月光更强、更冷。社区版功能。"
+  "rtxremix.setting.community.starryNight.tip": "用数千颗亮度与颜色各异的星星替换原版星星，加入一条会被明亮月光冲淡的银河，并让月光更强、更冷。社区版功能。",
+  "rtxremix.settings.group.communityLight": "光照与体积光",
+  "rtxremix.settings.value.volumetricQuality.standard": "标准",
+  "rtxremix.settings.value.volumetricQuality.high": "高",
+  "rtxremix.settings.value.volumetricQuality.ultra": "极高",
+  "rtxremix.setting.community.volumetricQuality": "体积光精度",
+  "rtxremix.setting.community.volumetricQuality.tip": "雾和光柱的精细程度。越高，光柱边缘和雨幕越清楚，但越吃显卡：高大约多掉几个百分点的帧数，极高掉得更多。社区版功能。",
+  "rtxremix.setting.community.goldenHourShafts": "晨昏光柱",
+  "rtxremix.setting.community.goldenHourShafts.tip": "日出和日落时，低空的太阳会把晨雾和傍晚的薄霾照亮，树木和山丘会挡出一道道光柱。社区版功能。",
+  "rtxremix.setting.community.rainShafts": "云隙光柱",
+  "rtxremix.setting.community.rainShafts.tip": "下雨时地面仍是阴天的光照，但阳光会从云层缝隙里斜照下来，在雨雾中照出光柱。社区版功能。",
+  "rtxremix.setting.community.lightningGlow": "闪电照亮雨幕",
+  "rtxremix.setting.community.lightningGlow.tip": "闪电会照亮整片雨雾：每次闪光都照亮闪电周围的雨幕，地面出现一闪而过的冷色光和影子；远处的闪电会让整片天空亮一下。社区版功能。",
+  "rtxremix.setting.community.naturalDaylight": "写实白天",
+  "rtxremix.setting.community.naturalDaylight.tip": "晴天由暖色阳光和蓝天按合理的比例照亮：阳光下更亮，阴影偏蓝而不是发灰，远处变成淡蓝而不是蒙一层白纱，太阳更小、光晕更收敛。整体亮度基本不变。社区版功能。"
 }

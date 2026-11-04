@@ -19,8 +19,11 @@ import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
 import com.nvidia.rtxremix.minecraft.entity.RemixEntityPass;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
+import com.nvidia.rtxremix.minecraft.community.DaylightSky;
+import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
 import com.nvidia.rtxremix.minecraft.community.Puddles;
+import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 
@@ -270,6 +273,23 @@ public final class RtxSettingsFactory {
         list.add(floatSetting("post.motionBlurMaxSize", SettingGroup.CAMERA_EFFECTS,
                 "rtxremix.setting.post.motionBlurMaxSize", 0.01, 0.1,
                 cameraEffects::getMaxBlur, cameraEffects::setMaxBlur));
+
+        // --- Community Edition light and haze ---
+        VolumetricQualitySettings volumetricQuality = renderer.getVolumetricQualitySettings();
+        list.add(RtxSetting.ofInt(RtxOptionFactory.VOLUMETRIC_QUALITY_ID, SettingGroup.COMMUNITY_LIGHT,
+                "rtxremix.setting.community.volumetricQuality",
+                "rtxremix.setting.community.volumetricQuality.tip",
+                VolumetricQualitySettings.STANDARD, VolumetricQualitySettings.ULTRA,
+                VolumetricQualitySettings.DEFAULT_QUALITY,
+                volumetricQuality::getQuality, volumetricQuality::setQuality));
+        list.add(communityLook(renderer, "community.naturalDaylight", SettingGroup.COMMUNITY_LIGHT,
+                DaylightSky.DEFAULT_ENABLED, DaylightSky::isEnabled, DaylightSky::setEnabled));
+        list.add(communityLook(renderer, "community.goldenHourShafts", SettingGroup.COMMUNITY_LIGHT,
+                SunShafts.DEFAULT_GOLDEN_HOUR, SunShafts::isGoldenHour, SunShafts::setGoldenHour));
+        list.add(communityLook(renderer, "community.rainShafts", SettingGroup.COMMUNITY_LIGHT,
+                SunShafts.DEFAULT_RAIN_SHAFTS, SunShafts::isRainShafts, SunShafts::setRainShafts));
+        list.add(communityLook(renderer, "community.lightningGlow", SettingGroup.COMMUNITY_LIGHT,
+                LightningFlash.DEFAULT_ENABLED, LightningFlash::isEnabled, LightningFlash::setEnabled));
 
         // --- Community Edition looks ---
         list.add(communityLook(renderer, "community.overcastWeather", SettingGroup.COMMUNITY_WEATHER,
