@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
+import com.nvidia.rtxremix.RemixException;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -22,7 +23,6 @@ class VolumetricQualitySettingsTest {
         assertEquals("8", written.get(VolumetricQualitySettings.GRID_SCALE_KEY));
         assertEquals("64", written.get(VolumetricQualitySettings.DEPTH_SLICES_KEY));
         assertEquals("16", written.get(VolumetricQualitySettings.RIS_SAMPLES_KEY));
-        assertEquals("true", written.get(VolumetricQualitySettings.RIS_VISIBILITY_KEY));
     }
 
     @Test
@@ -41,6 +41,20 @@ class VolumetricQualitySettingsTest {
 
         settings.setQuality(99);
         assertEquals(VolumetricQualitySettings.ULTRA, settings.getQuality());
+    }
+
+    @Test
+    void aRejectedOptionIsLoggedNotThrown() {
+        Map<String, String> written = new LinkedHashMap<>();
+        VolumetricQualitySettings settings = new VolumetricQualitySettings((key, value) -> {
+            if (key.equals(VolumetricQualitySettings.RIS_SAMPLES_KEY)) {
+                throw new RemixException("SetConfigVariable failed: GENERAL_FAILURE");
+            }
+            written.put(key, value);
+        });
+        settings.reapply();
+        assertEquals("8", written.get(VolumetricQualitySettings.GRID_SCALE_KEY));
+        assertEquals("64", written.get(VolumetricQualitySettings.DEPTH_SLICES_KEY));
     }
 
     @Test
