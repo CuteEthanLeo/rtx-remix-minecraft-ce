@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -52,6 +53,11 @@ public final class NightSkyRenderer {
     private final List<RemixTexture> textures = new ArrayList<>();
     private final RemixMaterial[][] starMaterials =
             new RemixMaterial[StarField.CLASS_COLORS.length][StarField.TIER_RADIANCE.length];
+    /**
+     * Star sprite per colour class, kept here because a material lets go of its texture
+     * list once Remix has created it, and an opacity update needs the sprite again.
+     */
+    private final RemixTexture[] starSprites = new RemixTexture[StarField.CLASS_COLORS.length];
     private RemixMaterial bandMaterial;
     private RemixTexture bandTexture;
     private RemixMesh starMesh;
@@ -142,6 +148,7 @@ public final class NightSkyRenderer {
         }
         destroy(bandMaterial);
         bandMaterial = null;
+        Arrays.fill(starSprites, null);
         for (RemixTexture texture : textures) {
             destroy(texture);
         }
@@ -194,6 +201,7 @@ public final class NightSkyRenderer {
             RemixTexture sprite = createTexture(
                     NightSkyTextures.star(StarField.CLASS_COLORS[colorClass]),
                     NightSkyTextures.STAR_SIZE, NightSkyTextures.STAR_SIZE);
+            starSprites[colorClass] = sprite;
             for (int tier = 0; tier < tiers; tier++) {
                 List<StarField.Star> bucket = buckets.get(colorClass * tiers + tier);
                 if (bucket.isEmpty()) continue;
@@ -288,8 +296,7 @@ public final class NightSkyRenderer {
                 for (int tier = 0; tier < starMaterials[colorClass].length; tier++) {
                     RemixMaterial material = starMaterials[colorClass][tier];
                     if (material == null) continue;
-                    RemixTexture sprite = material.getTextures().get(0);
-                    materials.update(material, materialInfo(sprite, StarField.TIER_RADIANCE[tier],
+                    materials.update(material, materialInfo(starSprites[colorClass], StarField.TIER_RADIANCE[tier],
                             starOpacity, MaterialInfo.WRAP_MODE_CLAMP));
                 }
             }
