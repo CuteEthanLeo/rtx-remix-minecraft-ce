@@ -9,6 +9,25 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.6 - Unreleased
+
+### Fixed
+
+- Distant leaves are no longer darker than near ones: the holes in cutout
+  textures carry their sprite's colour, so the runtime's mips stop averaging
+  black into them.
+- Trees in shade are no longer near-black. Leaves seen directly trace their
+  indirect light instead of reading the radiance cache, which averaged the dark
+  inside of the canopy, at the cost of some leaf shimmer.
+
+### Changed
+
+- Foliage lets more light through: a 0.4-block transmission distance instead of
+  0.25, and 0.7 of the authored single-scattering albedo instead of half.
+- The iron block is smoother polished metal (Auto PBR roughness 0.16 with a
+  faint bump), so its reflection is no longer a smeared band and a torch beside
+  it no longer clips into a white blob.
+
 ## Community Edition 0.1.0-ce.5 - Unreleased
 
 ### Added

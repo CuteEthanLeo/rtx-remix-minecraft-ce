@@ -227,13 +227,123 @@ public final class LabPBRConverter {
      * green is absorbed per scattering event, on top of a tinted surface albedo of about 0.4.
      * Real leaves keep about a quarter of green light per interaction. Near a strong light the
      * path tracer bounced green between blades and through leaves nearly without loss, so
-     * torch-lit foliage glowed fluorescent green. Halving it keeps backlit leaves translucent
-     * while green energy dies out after a few bounces as it does in real foliage.
+     * torch-lit foliage glowed fluorescent green. Keeping 0.7 of it lets green energy die out
+     * after a few bounces as it does in real foliage; halving it, as 0.1.0-ce.4 did, starved
+     * canopies of the light that crosses leaves, so trees in shade read as black blobs.
      */
-    static final float SINGLE_SCATTERING_ALBEDO_SCALE = 0.5f;
+    static final float SINGLE_SCATTERING_ALBEDO_SCALE = 0.7f;
 
     static int scaleSingleScatteringAlbedo(int value) {
         return Math.round(value * SINGLE_SCATTERING_ALBEDO_SCALE);
+    }
+
+    /**
+     * Community Edition: gives the fully transparent texels of one sprite the colour of their
+     * opaque neighbours, keeping their alpha at 0.
+     *
+     * <p>Cutout textures such as leaves store their holes as (0, 0, 0, 0), and the runtime
+     * box-filters the uploaded atlas into mips. Without this the coarse mips average that black
+     * into the leaf colour, so a distant acacia canopy, a third of whose texels are holes,
+     * renders much darker than a near one. Alpha-tested layers discard these texels at every
+     * mip, so their full-resolution image does not change; a cutout sprite drawn in the solid
+     * layer, such as leaves with Fast graphics, shows its holes in the leaf colour instead of
+     * black. The coloured region grows one texel per wave, each texel taking the mean of its
+     * already coloured 8-neighbours within the sprite; every texel is visited once per wave it
+     * joins, so the cost stays linear in the sprite's area. A sprite with no opaque texel is
+     * left alone.
+     */
+    public static void dilateTransparentRgb(byte[] rgba, int atlasW, int ox, int oy, int w, int h) {
+        if (w <= 0 || h <= 0) return;
+        int n = w * h;
+        boolean[] coloured = new boolean[n];
+        int opaqueCount = 0;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                if (rgba[((oy + y) * atlasW + (ox + x)) * 4 + 3] != 0) {
+                    coloured[y * w + x] = true;
+                    opaqueCount++;
+                }
+            }
+        if (opaqueCount == 0 || opaqueCount == n) return;
+
+        boolean[] queued = coloured.clone();
+        int[] wave = new int[n];
+        int[] nextWave = new int[n];
+        int waveSize = 0;
+        for (int i = 0; i < n; i++) {
+            if (!coloured[i] && hasColouredNeighbour(coloured, w, h, i)) {
+                wave[waveSize++] = i;
+                queued[i] = true;
+            }
+        }
+        int[] colours = new int[n];
+        while (waveSize > 0) {
+            // Colours are computed against the previous waves only, then committed together.
+            for (int k = 0; k < waveSize; k++) {
+                int i = wave[k];
+                int x = i % w, y = i / w;
+                int r = 0, g = 0, b = 0, count = 0;
+                for (int dy = -1; dy <= 1; dy++) {
+                    int ny = y + dy;
+                    if (ny < 0 || ny >= h) continue;
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int nx = x + dx;
+                        if (nx < 0 || nx >= w || !coloured[ny * w + nx]) continue;
+                        int idx = ((oy + ny) * atlasW + (ox + nx)) * 4;
+                        r += rgba[idx] & 0xFF;
+                        g += rgba[idx + 1] & 0xFF;
+                        b += rgba[idx + 2] & 0xFF;
+                        count++;
+                    }
+                }
+                colours[k] = (((r + count / 2) / count) << 16)
+                        | (((g + count / 2) / count) << 8)
+                        | ((b + count / 2) / count);
+            }
+            int nextSize = 0;
+            for (int k = 0; k < waveSize; k++) {
+                int i = wave[k];
+                int idx = ((oy + i / w) * atlasW + (ox + i % w)) * 4;
+                rgba[idx]     = (byte) (colours[k] >> 16);
+                rgba[idx + 1] = (byte) (colours[k] >> 8);
+                rgba[idx + 2] = (byte) colours[k];
+                coloured[i] = true;
+            }
+            for (int k = 0; k < waveSize; k++) {
+                int i = wave[k];
+                int x = i % w, y = i / w;
+                for (int dy = -1; dy <= 1; dy++) {
+                    int ny = y + dy;
+                    if (ny < 0 || ny >= h) continue;
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int nx = x + dx;
+                        if (nx < 0 || nx >= w) continue;
+                        int j = ny * w + nx;
+                        if (!queued[j]) {
+                            queued[j] = true;
+                            nextWave[nextSize++] = j;
+                        }
+                    }
+                }
+            }
+            int[] swap = wave;
+            wave = nextWave;
+            nextWave = swap;
+            waveSize = nextSize;
+        }
+    }
+
+    private static boolean hasColouredNeighbour(boolean[] coloured, int w, int h, int i) {
+        int x = i % w, y = i / w;
+        for (int dy = -1; dy <= 1; dy++) {
+            int ny = y + dy;
+            if (ny < 0 || ny >= h) continue;
+            for (int dx = -1; dx <= 1; dx++) {
+                int nx = x + dx;
+                if (nx >= 0 && nx < w && coloured[ny * w + nx]) return true;
+            }
+        }
+        return false;
     }
 
     /** Builds the fallback single-scattering albedo atlas from the current albedo atlas. */

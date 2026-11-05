@@ -22,6 +22,8 @@ class AutoPbrTest {
     void metalBlocksReflectAsMetalAndGemsAreGlossy() {
         assertTrue(surface("gold_block").metal());
         assertTrue(surface("iron_block").metal());
+        assertTrue(surface("iron_block").roughness() <= 0.16f);
+        assertTrue(surface("iron_block").normalStrength() <= 0.2f);
         assertTrue(surface("netherite_block").metal());
         assertTrue(surface("copper_block").metal());
         assertTrue(surface("gold_block").roughness() < 0.3f);

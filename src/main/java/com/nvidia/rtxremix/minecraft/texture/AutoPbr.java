@@ -34,7 +34,13 @@ public final class AutoPbr {
     private static final Surface FOLIAGE = new Surface(0.80f, false, 0.8f, 0.10f);
 
     private static final Surface POLISHED_METAL = new Surface(0.16f, true, 0.35f, 0.08f);
-    private static final Surface METAL = new Surface(0.24f, true, 0.4f, 0.10f);
+    /**
+     * Community Edition: iron block. At 0.24 with a luminance bump of 0.4 its reflection was a
+     * smeared sky-to-ground band, and a torch beside it clipped into a white blob far larger
+     * than the flame. Smoother, with little bump, it reads as polished metal and a nearby
+     * light's highlight stays tight.
+     */
+    private static final Surface METAL = new Surface(0.16f, true, 0.15f, 0.04f);
     private static final Surface COPPER = new Surface(0.28f, true, 0.4f, 0.10f);
     private static final Surface TARNISHED_COPPER = new Surface(0.45f, true, 0.6f, 0.12f);
     private static final Surface PATINA = new Surface(0.72f, false, 1.0f, 0.10f);

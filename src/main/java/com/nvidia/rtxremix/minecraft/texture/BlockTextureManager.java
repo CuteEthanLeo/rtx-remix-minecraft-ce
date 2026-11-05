@@ -77,11 +77,12 @@ public class BlockTextureManager {
     private static final float THIN_SSS_MEASUREMENT_DISTANCE = 0.75f;
     private static final int THIN_SSS_DEFAULT_THICKNESS = Math.round(THIN_SSS_MEASUREMENT_DISTANCE * 255.0f);
     /**
-     * Community Edition: a quarter of a block rather than the full thin-SSS
-     * distance. At the longer distance grass and leaves let so much light
-     * through that they glowed brighter than the lit ground beside them.
+     * Community Edition: shorter than the full thin-SSS distance. At 0.75 grass
+     * and leaves let so much light through that they glowed brighter than the lit
+     * ground beside them; at 0.25 so little came back out of a canopy that shaded
+     * and distant trees went near-black beside their lit trunks.
      */
-    private static final float DEFAULT_CUTOUT_SSS_TRANSMISSION_DISTANCE = 0.25f;
+    private static final float DEFAULT_CUTOUT_SSS_TRANSMISSION_DISTANCE = 0.4f;
     private static final float DEFAULT_CUTOUT_SSS_ANISOTROPY = 0.0f;
     private static final float DEFAULT_CUTOUT_SSS_ALBEDO = 0.5f;
     public static final float DEFAULT_TERRAIN_EMISSION_MULTIPLIER = 1.0f;
@@ -529,7 +530,10 @@ public class BlockTextureManager {
             }
         }
 
-        atlasAlbedo = upload(api, "atlas_albedo", albedoRGBA, atlasW, atlasH,
+        // The runtime builds the mips from what is uploaded; albedoRGBA itself keeps its black
+        // holes because per-sprite extraction and the emissive blits read it.
+        byte[] uploadedAlbedo = dilatedAlbedo();
+        atlasAlbedo = upload(api, "atlas_albedo", uploadedAlbedo, atlasW, atlasH,
                 TextureFormat.RGBA8_UNORM, TexturePurpose.COLOR);
 
         RemixTexture normalTex    = hasAnyNormal ? upload(api, "atlas_normal", normalAtlas, atlasW, atlasH,
@@ -545,6 +549,13 @@ public class BlockTextureManager {
         atlasEmissive = emissiveTex;
         RemixTexture sssTex       = hasAnySSS ? upload(api, "atlas_sss", sssThicknessAtlas, atlasW, atlasH,
                 TextureFormat.RGBA8_UNORM, TexturePurpose.DATA) : null;
+        if (hasAnySSS) {
+            // Sprites without an _sss keep the albedo's black holes here; fill them too, or
+            // distant canopies lose their scattering albedo to the same mip averaging.
+            for (SpriteEntry se : sprites) {
+                LabPBRConverter.dilateTransparentRgb(sssAlbedoAtlas, atlasW, se.pixX, se.pixY, se.pixW, se.pixH);
+            }
+        }
         RemixTexture sssAlbedoTex = hasAnySSS ? upload(api, "atlas_sss_albedo",
                 sssAlbedoAtlas, atlasW, atlasH, TextureFormat.RGBA8_UNORM, TexturePurpose.DATA) : null;
         atlasNormalTex = normalTex;
@@ -572,7 +583,7 @@ public class BlockTextureManager {
                         sssTex, sssAlbedoTex) : null;
             }
         }
-        wetAtlas = new WetAtlas(atlasW, atlasH, albedoRGBA.clone(), roughnessAtlas, porosityAtlas);
+        wetAtlas = new WetAtlas(atlasW, atlasH, uploadedAlbedo, roughnessAtlas, porosityAtlas);
         wetTwinsShowWet = false;
         int sssCount = 0;
         StringBuilder sssSprites = new StringBuilder();
@@ -1336,6 +1347,16 @@ public class BlockTextureManager {
             se.emissive = upload(api, p + "e", ed, w, h, TextureFormat.RGBA8_UNORM, TexturePurpose.COLOR);
             se.lightColor = computeLightColor(alb, ed, w, h);
         }
+    }
+
+    /** A copy of the albedo atlas whose transparent texels carry their sprite's colour; see
+     *  {@link LabPBRConverter#dilateTransparentRgb}. */
+    private byte[] dilatedAlbedo() {
+        byte[] out = albedoRGBA.clone();
+        for (SpriteEntry se : sprites) {
+            LabPBRConverter.dilateTransparentRgb(out, atlasW, se.pixX, se.pixY, se.pixW, se.pixH);
+        }
+        return out;
     }
 
     private byte[] extractRGBA(int sx, int sy, int sw, int sh) {

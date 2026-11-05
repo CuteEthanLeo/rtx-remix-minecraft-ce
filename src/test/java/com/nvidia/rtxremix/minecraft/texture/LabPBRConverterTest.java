@@ -131,6 +131,92 @@ class LabPBRConverterTest {
         return bytes;
     }
 
+    @Test
+    void dilationGivesHolesTheirNeighboursColourAndKeepsThemTransparent() {
+        // 4x1 atlas, sprite covers texels 0..2; texel 3 lies outside it.
+        byte[] atlas = bytes(
+                90, 160, 30, 255,
+                0, 0, 0, 0,
+                110, 180, 50, 255,
+                0, 0, 0, 0);
+
+        LabPBRConverter.dilateTransparentRgb(atlas, 4, 0, 0, 3, 1);
+
+        assertEquals(100, unsigned(atlas[4]));
+        assertEquals(170, unsigned(atlas[5]));
+        assertEquals(40, unsigned(atlas[6]));
+        assertEquals(0, unsigned(atlas[7]));
+        // Opaque texels are untouched.
+        assertEquals(90, unsigned(atlas[0]));
+        assertEquals(110, unsigned(atlas[8]));
+        // Nothing outside the sprite is written.
+        assertEquals(0, unsigned(atlas[12]));
+        assertEquals(0, unsigned(atlas[13]));
+    }
+
+    @Test
+    void dilationReachesHolesFarFromAnyOpaqueTexel() {
+        // 5x1 sprite with one opaque texel at the left end.
+        byte[] atlas = new byte[5 * 4];
+        atlas[0] = (byte) 200;
+        atlas[1] = (byte) 120;
+        atlas[2] = (byte) 40;
+        atlas[3] = (byte) 255;
+
+        LabPBRConverter.dilateTransparentRgb(atlas, 5, 0, 0, 5, 1);
+
+        for (int i = 1; i < 5; i++) {
+            assertEquals(200, unsigned(atlas[i * 4]));
+            assertEquals(120, unsigned(atlas[i * 4 + 1]));
+            assertEquals(40, unsigned(atlas[i * 4 + 2]));
+            assertEquals(0, unsigned(atlas[i * 4 + 3]));
+        }
+    }
+
+    @Test
+    void dilationFillsALargeSpriteFromOneCorner() {
+        int size = 64;
+        byte[] atlas = new byte[size * size * 4];
+        atlas[0] = (byte) 30;
+        atlas[1] = (byte) 140;
+        atlas[2] = (byte) 70;
+        atlas[3] = (byte) 255;
+
+        LabPBRConverter.dilateTransparentRgb(atlas, size, 0, 0, size, size);
+
+        for (int i = 1; i < size * size; i++) {
+            assertEquals(30, unsigned(atlas[i * 4]));
+            assertEquals(140, unsigned(atlas[i * 4 + 1]));
+            assertEquals(70, unsigned(atlas[i * 4 + 2]));
+            assertEquals(0, unsigned(atlas[i * 4 + 3]));
+        }
+    }
+
+    @Test
+    void dilationLeavesFullyTransparentSpritesBlack() {
+        byte[] atlas = new byte[2 * 2 * 4];
+
+        LabPBRConverter.dilateTransparentRgb(atlas, 2, 0, 0, 2, 2);
+
+        for (byte b : atlas) {
+            assertEquals(0, unsigned(b));
+        }
+    }
+
+    @Test
+    void dilationStaysInsideItsSpriteRectangle() {
+        // 2x2 atlas: the sprite is the right column, its neighbour the opaque left column.
+        byte[] atlas = bytes(
+                255, 255, 255, 255,   0, 0, 0, 0,
+                255, 255, 255, 255,   0, 0, 0, 0);
+
+        LabPBRConverter.dilateTransparentRgb(atlas, 2, 1, 0, 1, 2);
+
+        // The sprite has no opaque texel of its own, so the neighbour's white must not bleed in.
+        assertEquals(0, unsigned(atlas[4]));
+        assertEquals(0, unsigned(atlas[12]));
+    }
+
     private static int unsigned(byte value) {
         return value & 0xFF;
     }
@@ -146,7 +232,7 @@ class LabPBRConverterTest {
     @Test
     void foliageSingleScatteringAlbedoLosesEnergyPerBounce() {
         // The baseline leaves' green 240 (0.94) would bounce green almost without loss.
-        assertEquals(120, LabPBRConverter.scaleSingleScatteringAlbedo(240));
+        assertEquals(168, LabPBRConverter.scaleSingleScatteringAlbedo(240));
         assertEquals(0, LabPBRConverter.scaleSingleScatteringAlbedo(0));
     }
 }

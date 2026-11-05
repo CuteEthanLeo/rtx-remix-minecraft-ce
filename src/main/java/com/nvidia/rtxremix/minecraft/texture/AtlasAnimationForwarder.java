@@ -313,6 +313,8 @@ public final class AtlasAnimationForwarder {
                         srcBuf, p.rowPitch,
                         p.width, p.height);
                 }
+                // Keep the frame's holes in its colour, as the initial atlas upload does.
+                LabPBRConverter.dilateTransparentRgb(scratch, p.width, 0, 0, p.width, p.height);
                 ByteBuffer albedoDst = DirectBufferPool.acquire(patchBytes);
                 albedoDst.put(scratch, 0, patchBytes);
                 albedoDst.flip();
