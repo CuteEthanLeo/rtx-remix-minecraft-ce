@@ -8,7 +8,7 @@ import java.util.Arrays;
 
 /**
  * Settings and per-frame state the volumetric clouds' two layers share: the near meshes
- * ({@link VolumetricCloudLayer}, driven by the cloud renderer) and the far layer composited
+ * (driven by the cloud renderer) and the far layer composited
  * into the sky ({@link CloudSkyCompositor}, driven by the sky renderer).
  *
  * <p>The cloud renderer runs after the sky renderer in a frame, so the sky reads the state the
@@ -57,6 +57,8 @@ public final class VolumetricClouds {
     // ---- far-layer results (render thread) ----
     private static float sunTransmittance = 1.0f;
     private static float moonTransmittance = 1.0f;
+    private static float sunDiscTransmittance = 1.0f;
+    private static float moonDiscTransmittance = 1.0f;
     private static float skyCover;
     private static final float[] occlusion = new float[OCCLUSION_MAP_WIDTH * OCCLUSION_MAP_HEIGHT];
     private static boolean farResultsValid;
@@ -146,7 +148,7 @@ public final class VolumetricClouds {
     public static double worldTime() { return worldTime; }
 
     /**
-     * Records which near tiles are drawn as meshes, so the far layer skips them.
+     * Records which near tiles already cast shadows, so distant-light attenuation skips them.
      *
      * @param centreTileX the tile the grid is centred on, field coordinates (unwrapped)
      * @param covered whether a relative tile (dx, dz in [-OCCUPANCY_HALF, OCCUPANCY_HALF)) is covered
@@ -193,7 +195,8 @@ public final class VolumetricClouds {
     //  Far-layer results published by the sky renderer
     // ------------------------------------------------------------------
 
-    static void publishFarResults(float sun, float moon, float cover, float[] map) {
+    static void publishFarResults(float sun, float moon, float sunDisc, float moonDisc,
+                                  float cover, float[] map) {
         // Clouds drift slowly; smoothing keeps a light from stepping when a jittered
         // estimate lands, without lagging behind a real change by more than a second. The sun
         // and moon light the whole world, so they ease in over about a second of updates.
@@ -201,6 +204,9 @@ public final class VolumetricClouds {
         float lightKeep = farResultsValid ? LIGHT_KEEP : 0.0f;
         sunTransmittance = mix(clamp01(sun), sunTransmittance, lightKeep);
         moonTransmittance = mix(clamp01(moon), moonTransmittance, lightKeep);
+        // The visible discs follow the current clouds, without the ground light's long easing.
+        sunDiscTransmittance = clamp01(sunDisc);
+        moonDiscTransmittance = clamp01(moonDisc);
         skyCover = mix(clamp01(cover), skyCover, keep);
         for (int i = 0; i < occlusion.length; i++) {
             occlusion[i] = mix(clamp01(map[i]), occlusion[i], keep);
@@ -211,6 +217,8 @@ public final class VolumetricClouds {
     static void clearFarResults() {
         sunTransmittance = 1.0f;
         moonTransmittance = 1.0f;
+        sunDiscTransmittance = 1.0f;
+        moonDiscTransmittance = 1.0f;
         skyCover = 0.0f;
         Arrays.fill(occlusion, 1.0f);
         farResultsValid = false;
@@ -223,6 +231,16 @@ public final class VolumetricClouds {
 
     public static float moonTransmittance() {
         return active ? moonTransmittance : 1.0f;
+    }
+
+    /** Full cloud transmittance for the visible sun, including near shadow meshes. */
+    public static float sunDiscTransmittance() {
+        return active ? sunDiscTransmittance : 1.0f;
+    }
+
+    /** Full cloud transmittance for the visible moon, including near shadow meshes. */
+    public static float moonDiscTransmittance() {
+        return active ? moonDiscTransmittance : 1.0f;
     }
 
     /** Fraction of the upper sky the clouds hide, 0 when they are off. */

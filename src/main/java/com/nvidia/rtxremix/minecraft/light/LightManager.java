@@ -242,6 +242,8 @@ public class LightManager {
             } else if (entity instanceof DisplayEntity.BlockDisplayEntity display) {
                 ensureDisplayBeaconLight(display, tickDelta);
             } else if (entity instanceof LightningEntity bolt) {
+                Vec3d strike = bolt.getLerpedPos(tickDelta);
+                LightningFlash.observeStrike(strike.x, strike.z, camera.getPos().x, camera.getPos().z);
                 submitLightningLights(bolt, tickDelta);
             }
         }

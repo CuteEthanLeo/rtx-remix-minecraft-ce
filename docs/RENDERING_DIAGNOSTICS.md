@@ -135,6 +135,28 @@ hardcoding its pool size here.
 
 ## Separating Capture From Shading
 
+### Community Volumetric Clouds
+
+The visible dome draws all clouds. Near cloud meshes only supply scene shadows;
+the sun and moon billboards therefore need full cloud transmittance, while the
+distant lights use transmittance excluding the near meshes. Sharing those two
+values makes the discs shine through near clouds or shadows attenuate twice.
+
+Cloud readbacks carry a scene generation. Time commands, sky-model changes and
+world transitions invalidate that generation, and old buffers are only recycled
+after their fences finish; an old image must never publish into the new scene.
+The cloud depth image also lets lightning recompose at frame rate without
+remarching the volume or blending a flash into cloud history.
+
+`gradlew.bat cloudGpuTest -Parch=win64 -x fetchRuntimeTextures` explicitly runs
+offscreen OpenGL 4.4 integration tests for near-cloud disc occlusion, stale
+readbacks, and lightning. Ordinary `test` skips these GPU tests. This does not
+replace a game check: record a fixed pose through day/night time commands,
+near-cloud crossings in first and third person, moonlit cloud drift, lightning,
+and water reflections. Compare haze quality at fixed resolution and DLSS
+settings with motion blur and frame generation disabled; report frame times and
+memory rather than inferring frame rate from froxel counts.
+
 Use a [Remix debug view](GETTING_STARTED.md#viewing-a-remix-debug-view) to isolate
 texture coordinates, normals, emission, or mesh identity. A defect already
 visible in those inputs points toward capture or its native interpretation;

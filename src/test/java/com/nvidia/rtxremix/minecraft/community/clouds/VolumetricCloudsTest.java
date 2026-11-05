@@ -68,7 +68,7 @@ class VolumetricCloudsTest {
         for (int x = 0; x < VolumetricClouds.OCCLUSION_MAP_WIDTH; x++) {
             map[x] = 0.0f;
         }
-        VolumetricClouds.publishFarResults(0.2f, 0.9f, 0.4f, map);
+        VolumetricClouds.publishFarResults(0.2f, 0.9f, 0.1f, 0.8f, 0.4f, map);
         assertEquals(0.0f, VolumetricClouds.skyVisibility(0.01f, 1.0f, 0.0f), 1.0e-6f);
         assertEquals(1.0f, VolumetricClouds.skyVisibility(1.0f, 0.05f, 0.0f), 1.0e-6f);
         assertEquals(0.2f, VolumetricClouds.sunTransmittance(), 1.0e-6f);
@@ -85,5 +85,24 @@ class VolumetricCloudsTest {
         assertNotEquals(version, VolumetricClouds.occupancyVersion());
         int centre = VolumetricClouds.OCCUPANCY_HALF * VolumetricClouds.OCCUPANCY_SIZE + VolumetricClouds.OCCUPANCY_HALF;
         assertEquals(0, VolumetricClouds.occupancy()[centre]);
+    }
+
+    @Test
+    void nearCloudsCanHideDiscsWithoutDimmingTheDistantLightsTwice() {
+        VolumetricClouds.publishFrame(CloudField.Params.defaults(), 0.0);
+        float[] map = new float[VolumetricClouds.OCCLUSION_MAP_WIDTH * VolumetricClouds.OCCLUSION_MAP_HEIGHT];
+        VolumetricClouds.publishFarResults(1.0f, 1.0f, 0.0f, 0.05f, 0.8f, map);
+        assertEquals(1.0f, VolumetricClouds.sunTransmittance());
+        assertEquals(1.0f, VolumetricClouds.moonTransmittance());
+        assertEquals(0.0f, VolumetricClouds.sunDiscTransmittance());
+        assertEquals(0.05f, VolumetricClouds.moonDiscTransmittance());
+
+        VolumetricClouds.clearFarResults();
+        VolumetricClouds.publishFarResults(0.2f, 0.3f, 0.0f, 0.0f, 0.8f, map);
+        assertEquals(0.2f, VolumetricClouds.sunTransmittance(), 1.0e-6f,
+                "a new scene must not blend its light with the old scene");
+        VolumetricClouds.deactivate();
+        assertEquals(1.0f, VolumetricClouds.sunDiscTransmittance());
+        assertEquals(1.0f, VolumetricClouds.moonDiscTransmittance());
     }
 }

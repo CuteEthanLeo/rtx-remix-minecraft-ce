@@ -226,6 +226,11 @@ dependencies {
     // Testing
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    def lwjglNatives = System.getProperty('os.arch').toLowerCase() in ['aarch64', 'arm64']
+            ? 'natives-windows-arm64' : 'natives-windows'
+    ['lwjgl', 'lwjgl-glfw', 'lwjgl-opengl'].each { module ->
+        testRuntimeOnly "org.lwjgl:${module}:3.3.3:${lwjglNatives}"
+    }
     fabricTestRuntime "net.fabricmc:fabric-loader-junit:${fabricLoaderVersion}"
 }
 
@@ -250,6 +255,18 @@ test {
     }
     // Pin the per-frame install cap so tests don't depend on the CPU count
     systemProperty 'rtxremix.chunk.maxInstalledColumnsPerFrame', '8'
+}
+
+// Opt-in: compiles and executes the actual cloud shader on a local OpenGL device.
+tasks.register('cloudGpuTest', Test) {
+    group = 'verification'
+    description = 'Runs offscreen cloud shader integration tests (requires OpenGL 4.4)'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/CloudSkyCompositorGpuTest.class'
+    useJUnitPlatform()
+    systemProperty 'rtxremix.test.cloudGpu', 'true'
 }
 
 def gitBranch = providers.exec { commandLine 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }

@@ -53,4 +53,26 @@ class LightningFlashTest {
         assertEquals(0.0f, LightningFlash.level(), 0.0f);
         assertNull(LightningFlash.boltRadianceNow());
     }
+
+    @Test
+    void cloudFlashUsesTheNearestStrikeAndRetainsItsPositionDuringDecay() {
+        LightningFlash.advance(2, 0.016f);
+        assertEquals(0, LightningFlash.cloudRadiance(2));
+        LightningFlash.observeStrike(100, 100, 0, 0);
+        LightningFlash.observeStrike(20, 30, 0, 0);
+        LightningFlash.observeStrike(200, 200, 0, 0);
+        assertEquals(20, LightningFlash.strikeX());
+        assertEquals(30, LightningFlash.strikeZ());
+        float peak = LightningFlash.cloudRadiance(2);
+        assertEquals(LightningFlash.DEFAULT_BOLT_RADIANCE * LightningFlash.CLOUD_LIGHT_RADIANCE_SCALE, peak);
+        long revision = LightningFlash.cloudRevision();
+        LightningFlash.advance(0, LightningFlash.DECAY_HALF_LIFE_SECONDS);
+        assertEquals(20, LightningFlash.strikeX());
+        assertEquals(peak * 0.5f, LightningFlash.cloudRadiance(2), 1.0e-4f);
+        assertTrue(LightningFlash.cloudRevision() > revision);
+        LightningFlash.advance(0, 1);
+        assertEquals(0, LightningFlash.cloudRadiance(2));
+        LightningFlash.reset();
+        assertEquals(0, LightningFlash.cloudRadiance(2));
+    }
 }

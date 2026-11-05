@@ -23,6 +23,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba16f, binding = 0) uniform image2D CloudLayer;
 layout(rgba16f, binding = 1) uniform image2D FinalSky;
 layout(rgba32f, binding = 2) uniform image2D Partial;
+layout(r32f, binding = 3) uniform image2D CloudDepth;
 
 layout(binding = 8) uniform sampler2D AtmosphereSky;
 layout(binding = 9) uniform sampler2D TransmittanceLut;
@@ -44,6 +45,8 @@ layout(std140, binding = 1) uniform CloudParameters {
     vec4 Medium;           // extinction per block, ambient scale, ground albedo, extra haze per block
     vec4 OccupancyOrigin;  // xy: occupancy grid centre tile minus the camera's tile
     vec4 CirrusOrigin;     // xy: the camera in the cirrus field, wrapped to its 2^20-block period
+    vec4 LightningSource;  // camera-relative x/z, world altitude, emitter radius
+    vec4 LightningColor;   // current RGB radiance of the cloud-base flash
 };
 
 #ifndef SKY_WIDTH
@@ -436,10 +439,15 @@ vec4 cirrusLayer(vec3 viewDirection) {
 
 // rgb: cloud radiance seen through the air, a: how much of the sky behind it is hidden.
 // entry: distance to where the ray enters the cloud shell, or -1 when it misses it.
-vec4 marchClouds(vec3 viewDirection, vec2 pixel, out float entry) {
+// cloudTransmittance: the share of light from beyond the cumulus that passes through them,
+// without the aerial perspective folded into a.
+vec4 marchClouds(vec3 viewDirection, vec2 pixel, out float entry, out float depth,
+        out float cloudTransmittance) {
     float cameraRadius = PHYS_PLANET_RADIUS + CameraField.y;
     vec2 segment = cloudSegment(cameraRadius, viewDirection.y);
     entry = -1.0;
+    depth = 0.0;
+    cloudTransmittance = 1.0;
     if (segment.y <= segment.x) {
         return vec4(0.0);
     }
@@ -509,12 +517,13 @@ vec4 marchClouds(vec3 viewDirection, vec2 pixel, out float entry) {
         }
         t += segmentLength;
     }
+    cloudTransmittance = transmittance;
     if (weightSum <= 0.0) {
         return vec4(0.0);
     }
     // Aerial perspective between the camera and the cloud, from the same atmosphere,
     // plus the haze the daylight conf layer adds near the ground.
-    float depth = depthSum / weightSum;
+    depth = depthSum / weightSum;
     float meanAltitude = max(0.0, 0.5 * (CameraField.y + Shape.x));
     vec3 airExtinction = PHYS_RAYLEIGH_SCATTERING * exp(-meanAltitude / PHYS_RAYLEIGH_SCALE_HEIGHT)
         + vec3(PHYS_MIE_EXTINCTION * exp(-meanAltitude / PHYS_MIE_SCALE_HEIGHT) + Medium.w);
@@ -525,7 +534,7 @@ vec4 marchClouds(vec3 viewDirection, vec2 pixel, out float entry) {
 
 // Far-cloud transmittance along a direction from the camera, for the lights; the near
 // meshes shadow the ground themselves.
-float marchTransmittanceRay(vec3 direction) {
+float marchTransmittanceRay(vec3 direction, bool skipNear) {
     float cameraRadius = PHYS_PLANET_RADIUS + CameraField.y;
     vec2 segment = cloudSegment(cameraRadius, direction.y);
     if (segment.y <= segment.x) {
@@ -540,8 +549,8 @@ float marchTransmittanceRay(vec3 direction) {
         vec3 position = origin + direction * t;
         float altitude = length(position) - PHYS_PLANET_RADIUS;
         vec2 offset = direction.xz * t;
-        if (!nearCovered(offset, altitude)) {
-            opticalDepth += cloudDensity(vec3(CameraField.x + offset.x, altitude, CameraField.z + offset.y), false)
+        if (!skipNear || !nearCovered(offset, altitude)) {
+            opticalDepth += cloudDensity(vec3(CameraField.x + offset.x, altitude, CameraField.z + offset.y), !skipNear)
                 * stepLength;
         }
         t += stepLength;
@@ -551,16 +560,15 @@ float marchTransmittanceRay(vec3 direction) {
 
 // The same over a small cone around the light, so the edge of a cloud dims the light over the
 // seconds it takes to cross the cone instead of switching it as one sample enters a puff.
-float marchTransmittance(vec3 direction) {
+float marchTransmittance(vec3 direction, bool skipNear, float spread) {
     vec3 up = abs(direction.y) < 0.95 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 side = normalize(cross(direction, up));
     vec3 lift = cross(side, direction);
-    const float spread = 0.012;
-    float sum = marchTransmittanceRay(direction);
-    sum += marchTransmittanceRay(normalize(direction + side * spread));
-    sum += marchTransmittanceRay(normalize(direction - side * spread));
-    sum += marchTransmittanceRay(normalize(direction + lift * spread));
-    sum += marchTransmittanceRay(normalize(direction - lift * spread));
+    float sum = marchTransmittanceRay(direction, skipNear);
+    sum += marchTransmittanceRay(normalize(direction + side * spread), skipNear);
+    sum += marchTransmittanceRay(normalize(direction - side * spread), skipNear);
+    sum += marchTransmittanceRay(normalize(direction + lift * spread), skipNear);
+    sum += marchTransmittanceRay(normalize(direction - lift * spread), skipNear);
     return sum * 0.2;
 }
 
@@ -582,11 +590,16 @@ void cloudPass(ivec2 invocation) {
     vec2 uv = (vec2(pixel) + 0.5) / vec2(float(SKY_WIDTH), float(SKY_HEIGHT));
     vec3 direction = worldDirection(uv);
     float entry;
-    vec4 current = marchClouds(direction, vec2(pixel), entry);
-    // The cirrus sheet lies above every cumulus, so it shows through what they leave.
-    vec4 cirrus = cirrusLayer(direction);
-    current = vec4(current.rgb + (1.0 - current.a) * cirrus.rgb,
-            1.0 - (1.0 - current.a) * (1.0 - cirrus.a));
+    float depth;
+    float cumulusTransmittance;
+    vec4 current = marchClouds(direction, vec2(pixel), entry, depth, cumulusTransmittance);
+    // The cirrus sheet lies above every cumulus, so it shows through only what light the
+    // cumulus let pass. current.a also carries the aerial perspective in front of the cumulus,
+    // so weighting by 1 - current.a let cirrus fibres through solid distant cumulus.
+    // Both terms already carry their weight, so the hidden sky adds up: at most
+    // (1 - T) * airMean + T, never above 1.
+    vec4 cirrus = cirrusLayer(direction) * cumulusTransmittance;
+    current = vec4(current.rgb + cirrus.rgb, current.a + cirrus.a);
     // Near clouds sweep across the dome too fast to blend with older marches without leaving
     // trails, and their short steps need no averaging; far ones creep and do.
     float blend = Control.z;
@@ -595,9 +608,32 @@ void cloudPass(ivec2 invocation) {
     }
     if (blend < 1.0) {
         vec4 history = imageLoad(CloudLayer, pixel);
+        float historyDepth = imageLoad(CloudDepth, pixel).r;
+        float oldWeight = (1.0 - blend) * history.a;
+        float newWeight = blend * current.a;
+        depth = (oldWeight * historyDepth + newWeight * depth) / max(oldWeight + newWeight, 1.0e-6);
         current = mix(history, current, blend);
     }
     imageStore(CloudLayer, pixel, current);
+    imageStore(CloudDepth, pixel, vec4(depth));
+}
+
+// A compact emitter just below the cloud base, evaluated at the absorption-weighted cloud
+// position. Keeping depth separate lets the short lightning pulse recompose every frame
+// without remarching millions of cloud rays or accumulating the flash into cloud history.
+vec3 cloudLightning(vec2 uv, float depth, float opacity) {
+    if (depth <= 0.0 || dot(LightningColor.rgb, vec3(1.0)) <= 0.0) {
+        return vec3(0.0);
+    }
+    vec3 direction = worldDirection(uv);
+    vec3 position = vec3(direction.x * depth,
+            length(vec3(0.0, PHYS_PLANET_RADIUS + CameraField.y, 0.0) + direction * depth) - PHYS_PLANET_RADIUS,
+            direction.z * depth);
+    vec3 delta = position - LightningSource.xyz;
+    float radiusSquared = LightningSource.w * LightningSource.w;
+    // Solid angle of a small sphere times the isotropic cloud phase function.
+    float falloff = radiusSquared / (4.0 * max(radiusSquared, dot(delta, delta)));
+    return LightningColor.rgb * falloff * opacity;
 }
 
 void composePass(ivec2 pixel) {
@@ -607,7 +643,8 @@ void composePass(ivec2 pixel) {
         vec2 uv = (vec2(pixel) + 0.5) / vec2(float(SKY_WIDTH), float(SKY_HEIGHT));
         vec3 sky = sampleAtmosphere(uv);
         vec4 cloud = imageLoad(CloudLayer, pixel);
-        vec3 radiance = max(sky * (1.0 - cloud.a) + cloud.rgb, vec3(0.0));
+        vec3 radiance = max(sky * (1.0 - cloud.a) + cloud.rgb
+                + cloudLightning(uv, imageLoad(CloudDepth, pixel).r, cloud.a), vec3(0.0));
         imageStore(FinalSky, pixel, vec4(radiance, 1.0));
         if (pixel.y < UPPER_HEIGHT) {
             vec2 quantizedRg = unpackHalf2x16(packHalf2x16(radiance.rg));
@@ -649,9 +686,18 @@ void reducePass() {
         imageStore(FinalSky, ivec2(0, SKY_HEIGHT), vec4(Reduction[0].rgb / texels, 1.0));
     }
     if (invocation == 1u) {
-        float sun = marchTransmittance(normalize(SunDirection.xyz));
-        float moon = marchTransmittance(normalize(MoonDirection.xyz));
+        float sun = marchTransmittance(normalize(SunDirection.xyz), true, 0.012);
+        float moon = marchTransmittance(normalize(MoonDirection.xyz), true, 0.012);
         imageStore(FinalSky, ivec2(1, SKY_HEIGHT), vec4(sun, moon, Reduction[0].a / texels, 1.0));
+    }
+    if (invocation == 2u) {
+        vec3 sunDirection = normalize(SunDirection.xyz);
+        vec3 moonDirection = normalize(MoonDirection.xyz);
+        float sun = marchTransmittance(sunDirection, false, SunDirection.w)
+            * (1.0 - cirrusLayer(sunDirection).a);
+        float moon = marchTransmittance(moonDirection, false, MoonDirection.w)
+            * (1.0 - cirrusLayer(moonDirection).a);
+        imageStore(FinalSky, ivec2(2, SKY_HEIGHT), vec4(sun, moon, 0.0, 1.0));
     }
     // A coarse map of how much each part of the upper sky the clouds hide, packed four
     // cells to a texel, for the stars and the Milky Way.
@@ -666,7 +712,7 @@ void reducePass() {
                 (cy * UPPER_HEIGHT + UPPER_HEIGHT / 2) / OCCLUSION_MAP_HEIGHT);
             cells[k] = 1.0 - imageLoad(CloudLayer, pixel).a;
         }
-        imageStore(FinalSky, ivec2(2 + texel, SKY_HEIGHT), cells);
+        imageStore(FinalSky, ivec2(3 + texel, SKY_HEIGHT), cells);
     }
 }
 

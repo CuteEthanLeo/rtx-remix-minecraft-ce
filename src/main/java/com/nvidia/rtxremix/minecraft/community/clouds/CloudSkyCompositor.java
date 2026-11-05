@@ -5,6 +5,7 @@
 package com.nvidia.rtxremix.minecraft.community.clouds;
 
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
+import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -34,7 +35,7 @@ import java.nio.charset.StandardCharsets;
  * into what that texel held, so four updates refresh the whole sky and noise averages out; a
  * camera jump, a time skip, or a new cloud base marches everything at once.
  *
- * <p>Render thread only, with the GL context current. Texture units 16–22 and image units 0–2
+ * <p>Render thread only, with the GL context current. Texture units 16–22 and image units 0–3
  * are bound only during an update and released afterwards; vanilla tracks units 0–11 only.
  */
 public final class CloudSkyCompositor {
@@ -53,7 +54,7 @@ public final class CloudSkyCompositor {
     /** GL texture units the samplers above are remapped to, clear of vanilla's 0–11 and the atmosphere's 13–15. */
     private static final int GL_UNIT_OFFSET = 10;
     private static final int UBO_BINDING = 1;
-    private static final int UBO_BYTES = 10 * 4 * Float.BYTES;
+    private static final int UBO_BYTES = 12 * 4 * Float.BYTES;
 
     /** Cloud extinction per block at density 1: a dense cumulus core, about 15 m visibility. */
     static final float EXTINCTION = 0.06f;
@@ -61,15 +62,6 @@ public final class CloudSkyCompositor {
     static final float GROUND_ALBEDO = 0.25f;
     /** Haze the daylight conf layer's medium adds near the ground, per block. */
     static final float EXTRA_HAZE = 1.0f / 90000.0f;
-    /** Camera moves between updates beyond which everything is marched again. */
-    private static final double RESET_DISTANCE = 32.0;
-    /**
-     * Camera moves between updates beyond which the whole dome is marched afresh rather than
-     * a quarter of it: a quarter refreshed from a new position next to three from older ones
-     * shears the nearer clouds while the camera travels.
-     */
-    private static final double MOVING_DISTANCE = 0.75;
-    private static final double RESET_TIME_TICKS = 200.0;
     /** Weight of a fresh march against the texel's history; low enough to average the jitter out. */
     private static final float HISTORY_BLEND = 0.35f;
 
@@ -83,6 +75,7 @@ public final class CloudSkyCompositor {
     private int program;
     private int passLocation;
     private int cloudLayer;
+    private int cloudDepth;
     private int finalSky;
     private int partial;
     private int baseNoise;
@@ -99,6 +92,8 @@ public final class CloudSkyCompositor {
     private final int[] readbackBuffers = new int[READBACK_RING_SIZE];
     private final ByteBuffer[] mappedReadbacks = new ByteBuffer[READBACK_RING_SIZE];
     private final long[] readbackFences = new long[READBACK_RING_SIZE];
+    private final long[] readbackGenerations = new long[READBACK_RING_SIZE];
+    private long generation;
     private int readbackWriteIndex;
     private int readbackReadIndex;
     private int pendingReadbacks;
@@ -106,12 +101,8 @@ public final class CloudSkyCompositor {
     private long lastUpdateTick = Long.MIN_VALUE;
     private int updateIndex;
     private int checkerPhase;
-    private boolean historyValid;
-    private double lastCameraX = Double.NaN;
-    private double lastCameraY = Double.NaN;
-    private double lastCameraZ = Double.NaN;
-    private double lastWorldTime = Double.NaN;
-    private float lastBase = Float.NaN;
+    private final CloudHistory history = new CloudHistory();
+    private long lastLightningRevision = Long.MIN_VALUE;
 
     private final float[] occlusionScratch =
             new float[VolumetricClouds.OCCLUSION_MAP_WIDTH * VolumetricClouds.OCCLUSION_MAP_HEIGHT];
@@ -120,7 +111,8 @@ public final class CloudSkyCompositor {
     public record Inputs(float[] sunDirection, float[] moonDirection,
                          float[] sunIlluminance, float[] moonIlluminance,
                          float sunAngularRadius, float moonAngularRadius,
-                         double cameraX, double cameraY, double cameraZ) {}
+                         double cameraX, double cameraY, double cameraZ,
+                         double dayTime, boolean physicalAtmosphere, float skyFill) {}
 
     public CloudSkyCompositor(VolumetricClouds.Quality quality, int atmosphereWidth, int atmosphereHeight) {
         if (!GL.getCapabilities().OpenGL44) {
@@ -140,6 +132,7 @@ public final class CloudSkyCompositor {
             }
             bindSamplerUnits();
             cloudLayer = createTexture2D(width, height, GL30.GL_RGBA16F, GL11.GL_NEAREST, GL12.GL_CLAMP_TO_EDGE);
+            cloudDepth = createTexture2D(width, height, GL30.GL_R32F, GL11.GL_NEAREST, GL12.GL_CLAMP_TO_EDGE);
             finalSky = createTexture2D(width, height + 1, GL30.GL_RGBA16F, GL11.GL_NEAREST, GL12.GL_CLAMP_TO_EDGE);
             partial = createTexture2D((width + 7) / 8, (upperHeight + 7) / 8, GL30.GL_RGBA32F,
                     GL11.GL_NEAREST, GL12.GL_CLAMP_TO_EDGE);
@@ -177,44 +170,30 @@ public final class CloudSkyCompositor {
         }
         double worldTime = VolumetricClouds.worldTime();
         long tick = (long) Math.floor(worldTime);
-        boolean reset = needsReset(inputs, worldTime);
+        boolean reset = history.needsReset(inputs, worldTime, VolumetricClouds.params().base());
+        if (reset) {
+            invalidate();
+        }
         boolean due = reset || (tick != lastUpdateTick && Math.floorMod(tick, quality.updateTicks()) == 0)
                 || tick < lastUpdateTick;
-        if (due) {
+        if (due || LightningFlash.cloudRevision() != lastLightningRevision) {
             dispatch(noise, atmosphereTexture, transmittanceLut, inputs, worldTime, reset,
-                    reset || isMoving(inputs));
-            lastUpdateTick = tick;
+                    reset || history.isMoving(inputs), due);
+            lastLightningRevision = LightningFlash.cloudRevision();
+            if (due) {
+                lastUpdateTick = tick;
+                history.record(inputs, worldTime, VolumetricClouds.params().base());
+            }
         }
         return consumeCompletedReadback(upperMean);
     }
 
     /** Forgets the accumulated sky, so the next update marches everything. */
     public void invalidate() {
-        historyValid = false;
+        history.invalidate();
+        generation++;
+        VolumetricClouds.clearFarResults();
         lastUpdateTick = Long.MIN_VALUE;
-    }
-
-    private boolean needsReset(Inputs inputs, double worldTime) {
-        if (!historyValid || !Double.isFinite(lastCameraX)) {
-            return true;
-        }
-        double dx = inputs.cameraX() - lastCameraX;
-        double dy = inputs.cameraY() - lastCameraY;
-        double dz = inputs.cameraZ() - lastCameraZ;
-        if (dx * dx + dy * dy + dz * dz > RESET_DISTANCE * RESET_DISTANCE) {
-            return true;
-        }
-        if (Math.abs(worldTime - lastWorldTime) > RESET_TIME_TICKS) {
-            return true;
-        }
-        return Float.compare(lastBase, VolumetricClouds.params().base()) != 0;
-    }
-
-    private boolean isMoving(Inputs inputs) {
-        double dx = inputs.cameraX() - lastCameraX;
-        double dy = inputs.cameraY() - lastCameraY;
-        double dz = inputs.cameraZ() - lastCameraZ;
-        return dx * dx + dy * dy + dz * dz > MOVING_DISTANCE * MOVING_DISTANCE;
     }
 
     /**
@@ -222,7 +201,7 @@ public final class CloudSkyCompositor {
      * @param full whether to march every texel without history, as for a moving camera
      */
     private void dispatch(CloudNoise noise, int atmosphereTexture, int transmittanceLut,
-                          Inputs inputs, double worldTime, boolean reset, boolean full) {
+                          Inputs inputs, double worldTime, boolean reset, boolean full, boolean march) {
         // Restore the exact GL program afterwards. ShaderProgram.bind() skips glUseProgram when
         // vanilla's cache already names that program, which would leave this compute program
         // bound under vanilla's uniform uploads and draws: GL errors and a frame presented
@@ -250,18 +229,21 @@ public final class CloudSkyCompositor {
             GL42.glBindImageTexture(0, cloudLayer, 0, false, 0, GL15.GL_READ_WRITE, GL30.GL_RGBA16F);
             GL42.glBindImageTexture(1, finalSky, 0, false, 0, GL15.GL_READ_WRITE, GL30.GL_RGBA16F);
             GL42.glBindImageTexture(2, partial, 0, false, 0, GL15.GL_READ_WRITE, GL30.GL_RGBA32F);
+            GL42.glBindImageTexture(3, cloudDepth, 0, false, 0, GL15.GL_READ_WRITE, GL30.GL_R32F);
             parameters.position(0).limit(UBO_BYTES);
             GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, parametersBuffer);
             GL15.glBufferSubData(GL31.GL_UNIFORM_BUFFER, 0L, parameters);
             GL30.glBindBufferBase(GL31.GL_UNIFORM_BUFFER, UBO_BINDING, parametersBuffer);
 
-            GL20.glUniform1i(passLocation, PASS_CLOUD);
-            if (phase < 0) {
-                GL43.glDispatchCompute(divideRoundUp(width, 8), divideRoundUp(height, 8), 1);
-            } else {
-                GL43.glDispatchCompute(divideRoundUp((width + 1) / 2, 8), divideRoundUp((height + 1) / 2, 8), 1);
+            if (march) {
+                GL20.glUniform1i(passLocation, PASS_CLOUD);
+                if (phase < 0) {
+                    GL43.glDispatchCompute(divideRoundUp(width, 8), divideRoundUp(height, 8), 1);
+                } else {
+                    GL43.glDispatchCompute(divideRoundUp((width + 1) / 2, 8), divideRoundUp((height + 1) / 2, 8), 1);
+                }
+                GL42.glMemoryBarrier(GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
-            GL42.glMemoryBarrier(GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             GL20.glUniform1i(passLocation, PASS_COMPOSE);
             GL43.glDispatchCompute(divideRoundUp(width, 8), divideRoundUp(height, 8), 1);
             GL42.glMemoryBarrier(GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -271,7 +253,7 @@ public final class CloudSkyCompositor {
                     | GL42.GL_TEXTURE_UPDATE_BARRIER_BIT | GL42.GL_PIXEL_BUFFER_BARRIER_BIT);
             enqueueReadback();
         } finally {
-            for (int unit = 0; unit <= 2; unit++) {
+            for (int unit = 0; unit <= 3; unit++) {
                 GL42.glBindImageTexture(unit, 0, 0, false, 0, GL15.GL_READ_WRITE, GL30.GL_RGBA16F);
             }
             for (int unit : new int[]{UNIT_OCCUPANCY, UNIT_ATMOSPHERE, UNIT_TRANSMITTANCE, UNIT_WEATHER}) {
@@ -284,14 +266,10 @@ public final class CloudSkyCompositor {
             GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, 0);
             GL20.glUseProgram(previousProgram);
         }
-        historyValid = true;
-        checkerPhase = reset ? 0 : (checkerPhase + 1) & 3;
-        updateIndex++;
-        lastCameraX = inputs.cameraX();
-        lastCameraY = inputs.cameraY();
-        lastCameraZ = inputs.cameraZ();
-        lastWorldTime = worldTime;
-        lastBase = VolumetricClouds.params().base();
+        if (march) {
+            checkerPhase = reset ? 0 : (checkerPhase + 1) & 3;
+            updateIndex++;
+        }
     }
 
     private void fillParameters(Inputs inputs, double worldTime, int phase, float blend) {
@@ -323,6 +301,11 @@ public final class CloudSkyCompositor {
                 (float) CloudField.cirrusX(inputs.cameraX(), worldTime),
                 (float) CloudField.cirrusZ(inputs.cameraZ(), worldTime),
                 0.0f, 0.0f);
+        putVec4(160, (float) (LightningFlash.strikeX() - inputs.cameraX()),
+                params.base() - LightningFlash.CLOUD_LIGHT_BELOW_BASE,
+                (float) (LightningFlash.strikeZ() - inputs.cameraZ()), LightningFlash.CLOUD_LIGHT_RADIUS);
+        putVec4(176, LightningFlash.cloudRadiance(0), LightningFlash.cloudRadiance(1),
+                LightningFlash.cloudRadiance(2), 0.0f);
     }
 
     private void putVec4(int offset, float x, float y, float z, float w) {
@@ -396,22 +379,32 @@ public final class CloudSkyCompositor {
         bindTexture(UNIT_ATMOSPHERE, GL11.GL_TEXTURE_2D, finalSky);
         GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL30.GL_HALF_FLOAT, 0L);
         readbackFences[readbackWriteIndex] = GL32.glFenceSync(GL32.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        readbackGenerations[readbackWriteIndex] = generation;
         readbackWriteIndex = (readbackWriteIndex + 1) % READBACK_RING_SIZE;
         pendingReadbacks++;
     }
 
     private ByteBuffer consumeCompletedReadback(float[] upperMean) {
-        if (pendingReadbacks == 0) {
-            return null;
+        while (pendingReadbacks > 0) {
+            long fence = readbackFences[readbackReadIndex];
+            int status = GL32.glClientWaitSync(fence, 0, 0L);
+            if (status != GL32.GL_ALREADY_SIGNALED && status != GL32.GL_CONDITION_SATISFIED) {
+                return null;
+            }
+            GL32.glDeleteSync(fence);
+            readbackFences[readbackReadIndex] = 0L;
+            int index = readbackReadIndex;
+            readbackReadIndex = (readbackReadIndex + 1) % READBACK_RING_SIZE;
+            pendingReadbacks--;
+            // Keep in-flight buffers fenced until completion, but never publish an older scene.
+            if (readbackGenerations[index] == generation) {
+                return decodeReadback(mappedReadbacks[index], upperMean);
+            }
         }
-        long fence = readbackFences[readbackReadIndex];
-        int status = GL32.glClientWaitSync(fence, 0, 0L);
-        if (status != GL32.GL_ALREADY_SIGNALED && status != GL32.GL_CONDITION_SATISFIED) {
-            return null;
-        }
-        GL32.glDeleteSync(fence);
-        readbackFences[readbackReadIndex] = 0L;
-        ByteBuffer mapped = mappedReadbacks[readbackReadIndex];
+        return null;
+    }
+
+    private ByteBuffer decodeReadback(ByteBuffer mapped, float[] upperMean) {
         mapped.position(0).limit(readbackBytes);
 
         int row = outputBytes;
@@ -421,17 +414,17 @@ public final class CloudSkyCompositor {
         float sun = half(mapped, row + 8);
         float moon = half(mapped, row + 10);
         float cover = half(mapped, row + 12);
+        float sunDisc = half(mapped, row + 16);
+        float moonDisc = half(mapped, row + 18);
         for (int texel = 0; texel < occlusionScratch.length / 4; texel++) {
-            int offset = row + (2 + texel) * 8;
+            int offset = row + (3 + texel) * 8;
             for (int k = 0; k < 4; k++) {
                 occlusionScratch[texel * 4 + k] = half(mapped, offset + k * 2);
             }
         }
-        VolumetricClouds.publishFarResults(sun, moon, cover, occlusionScratch);
+        VolumetricClouds.publishFarResults(sun, moon, sunDisc, moonDisc, cover, occlusionScratch);
 
         mapped.position(0).limit(outputBytes);
-        readbackReadIndex = (readbackReadIndex + 1) % READBACK_RING_SIZE;
-        pendingReadbacks--;
         return mapped;
     }
 
@@ -571,13 +564,13 @@ public final class CloudSkyCompositor {
         }
         GL15.glBindBuffer(GL21.GL_PIXEL_PACK_BUFFER, 0);
         pendingReadbacks = 0;
-        for (int texture : new int[]{cloudLayer, finalSky, partial, baseNoise, detailNoise, weatherMap,
+        for (int texture : new int[]{cloudLayer, cloudDepth, finalSky, partial, baseNoise, detailNoise, weatherMap,
                 occupancyTexture}) {
             if (texture != 0) {
                 GL11.glDeleteTextures(texture);
             }
         }
-        cloudLayer = finalSky = partial = baseNoise = detailNoise = weatherMap = occupancyTexture = 0;
+        cloudLayer = cloudDepth = finalSky = partial = baseNoise = detailNoise = weatherMap = occupancyTexture = 0;
         noiseUploaded = false;
         uploadedOccupancyVersion = -1;
         if (parametersBuffer != 0) {
@@ -588,7 +581,7 @@ public final class CloudSkyCompositor {
             GL20.glDeleteProgram(program);
             program = 0;
         }
-        historyValid = false;
+        history.invalidate();
     }
 
     private static int divideRoundUp(int value, int divisor) {

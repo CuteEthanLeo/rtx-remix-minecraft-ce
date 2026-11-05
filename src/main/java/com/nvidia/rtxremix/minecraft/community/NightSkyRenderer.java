@@ -83,8 +83,8 @@ public final class NightSkyRenderer {
     private static final float OCCLUSION_REBUILD_DELTA = 0.08f;
     private final List<List<StarField.Star>> starBuckets = new ArrayList<>();
     private final List<RemixMaterial> starBucketMaterials = new ArrayList<>();
-    private float[] starVisibility = new float[0];
-    private float[] bandVisibility = new float[0];
+    private final SkyVisibility starVisibility = new SkyVisibility();
+    private final SkyVisibility bandVisibility = new SkyVisibility();
     private long lastOcclusionNanos = Long.MIN_VALUE;
     private boolean occluded;
 
@@ -178,8 +178,8 @@ public final class NightSkyRenderer {
         lastBandOpacity = -1.0f;
         starBuckets.clear();
         starBucketMaterials.clear();
-        starVisibility = new float[0];
-        bandVisibility = new float[0];
+        starVisibility.reset(0);
+        bandVisibility.reset(0);
         lastOcclusionNanos = Long.MIN_VALUE;
         occluded = false;
     }
@@ -242,8 +242,7 @@ public final class NightSkyRenderer {
                 starTotal += bucket.size();
             }
         }
-        starVisibility = new float[starTotal];
-        Arrays.fill(starVisibility, 1.0f);
+        starVisibility.reset(starTotal);
         starMesh = buildStarMesh();
         lastStarOpacity = 1.0f;
     }
@@ -253,7 +252,7 @@ public final class NightSkyRenderer {
         int offset = 0;
         for (int i = 0; i < starBuckets.size(); i++) {
             List<StarField.Star> bucket = starBuckets.get(i);
-            surfaces.add(starSurface(starBucketMaterials.get(i), bucket, starVisibility, offset));
+            surfaces.add(starSurface(starBucketMaterials.get(i), bucket, starVisibility.values(), offset));
             offset += bucket.size();
         }
         return RemixMeshStore.get().create(new RemixMesh(surfaces.toArray(new RemixMeshSurface[0])));
@@ -275,19 +274,16 @@ public final class NightSkyRenderer {
         }
         lastOcclusionNanos = now;
         float[] m = skyTransform.matrix;
-        float changed = 0.0f;
         int index = 0;
         for (List<StarField.Star> bucket : starBuckets) {
             for (StarField.Star star : bucket) {
                 float visibility = clouds ? visibility(m, star.x(), star.y(), star.z()) : 1.0f;
-                changed = Math.max(changed, Math.abs(visibility - starVisibility[index]));
-                starVisibility[index++] = visibility;
+                starVisibility.values()[index++] = visibility;
             }
         }
         int segments = StarField.BAND_SEGMENTS;
-        if (bandVisibility.length != (segments + 1) * 2) {
-            bandVisibility = new float[(segments + 1) * 2];
-            Arrays.fill(bandVisibility, 1.0f);
+        if (bandVisibility.values().length != (segments + 1) * 2) {
+            bandVisibility.reset((segments + 1) * 2);
         }
         float[] point = new float[3];
         for (int i = 0; i <= segments; i++) {
@@ -295,18 +291,29 @@ public final class NightSkyRenderer {
                 StarField.bandPoint(i / (float) segments, side == 0 ? -1.0f : 1.0f, point);
                 float visibility = clouds ? visibility(m, point[0], point[1], point[2]) : 1.0f;
                 int v = i * 2 + side;
-                changed = Math.max(changed, Math.abs(visibility - bandVisibility[v]));
-                bandVisibility[v] = visibility;
+                bandVisibility.values()[v] = visibility;
             }
         }
-        occluded = clouds;
-        if (changed < OCCLUSION_REBUILD_DELTA) {
+        // Disabling clouds must restore even a below-threshold residual dimming.
+        if (!starVisibility.changed(OCCLUSION_REBUILD_DELTA)
+                && !bandVisibility.changed(OCCLUSION_REBUILD_DELTA) && (clouds || !occluded)) {
             return;
         }
         RemixMesh previousStars = starMesh;
         RemixMesh previousBand = bandMesh;
-        starMesh = buildStarMesh();
-        bandMesh = buildBandMesh();
+        RemixMesh nextStars = buildStarMesh();
+        RemixMesh nextBand;
+        try {
+            nextBand = buildBandMesh();
+        } catch (RuntimeException e) {
+            destroy(nextStars);
+            throw e;
+        }
+        starMesh = nextStars;
+        bandMesh = nextBand;
+        starVisibility.publish();
+        bandVisibility.publish();
+        occluded = clouds;
         destroy(previousStars);
         destroy(previousBand);
     }
@@ -384,8 +391,8 @@ public final class NightSkyRenderer {
                 float length = (float) Math.sqrt(point[0] * point[0] + point[1] * point[1] + point[2] * point[2]);
                 vertices[i * 2 + side] = HardcodedVertex.create(point[0], point[1], point[2],
                         -point[0] / length, -point[1] / length, -point[2] / length,
-                        along, side, grey(bandVisibility.length == vertices.length
-                                ? bandVisibility[i * 2 + side] : 1.0f));
+                        along, side, grey(bandVisibility.values().length == vertices.length
+                                ? bandVisibility.values()[i * 2 + side] : 1.0f));
             }
         }
         int[] indices = new int[segments * 6];

@@ -350,7 +350,7 @@ public class SkyRenderer {
         }
 
         try (ProfileScope ignored = ProfileScope.begin("Sky.Atmosphere")) {
-            updateAtmosphericDomeLight(api, lightState, cameraPos);
+            updateAtmosphericDomeLight(api, lightState, cameraPos, world.getTimeOfDay() + (double) tickDelta);
         }
         try (ProfileScope ignored = ProfileScope.begin("Sky.Celestial")) {
             renderCelestialMeshes(
@@ -427,8 +427,8 @@ public class SkyRenderer {
     private void updateAtmosphericDomeLight(
             RemixAPI api,
             LightManager.SkyLightState lightState,
-            Vec3d cameraPos) {
-        regenerateSkyTexture(api, lightState, cameraPos);
+            Vec3d cameraPos, double dayTime) {
+        regenerateSkyTexture(api, lightState, cameraPos, dayTime);
         publishSkyDome(api);
     }
 
@@ -540,7 +540,7 @@ public class SkyRenderer {
     private void regenerateSkyTexture(
             RemixAPI api,
             LightManager.SkyLightState lightState,
-            Vec3d cameraPos) {
+            Vec3d cameraPos, double dayTime) {
         boolean clouds = VolumetricClouds.isActive() && VolumetricClouds.isUsable();
         // Both assets must be live for a skip to be safe. They are released whenever the world
         // changes, and a world whose time never advances keeps the parameters constant forever,
@@ -557,7 +557,7 @@ public class SkyRenderer {
                 mieScatteringAnisotropy,
                 publishedOutputValid);
         if (clouds && atmosphericGenerator.hasOutput()) {
-            if (compositeClouds(api, lightState, cameraPos)) {
+            if (compositeClouds(api, lightState, cameraPos, dayTime)) {
                 return;
             }
         } else if (cloudCompositor != null && !clouds) {
@@ -579,7 +579,8 @@ public class SkyRenderer {
      *
      * @return whether the clouds own the dome this frame, so the bare sky must not be uploaded
      */
-    private boolean compositeClouds(RemixAPI api, LightManager.SkyLightState lightState, Vec3d cameraPos) {
+    private boolean compositeClouds(RemixAPI api, LightManager.SkyLightState lightState,
+                                    Vec3d cameraPos, double dayTime) {
         try {
             VolumetricClouds.Quality quality = VolumetricClouds.currentQuality();
             if (cloudCompositor != null && cloudCompositor.quality().domeWidth() != quality.domeWidth()) {
@@ -605,7 +606,8 @@ public class SkyRenderer {
                                 cloudSunDirection, cloudMoonDirection,
                                 cloudSunIlluminance, cloudMoonIlluminance,
                                 lightState.sunAngularRadius(), lightState.moonAngularRadius(),
-                                cameraPos.x, cameraPos.y, cameraPos.z),
+                                 cameraPos.x, cameraPos.y, cameraPos.z,
+                                 dayTime, DaylightSky.isPhysicalAtmosphere(), DaylightSky.skyFill()),
                         atmosphericMean);
             }
             if (pixels != null) {
@@ -781,12 +783,12 @@ public class SkyRenderer {
         celestialMoonDirection[0] = -sunDirection[0];
         celestialMoonDirection[1] = -sunDirection[1];
         celestialMoonDirection[2] = -sunDirection[2];
-        // Community Edition: far volumetric clouds hide the discs (near clouds are meshes that
-        // hide them by themselves).
+        // Sky billboards are composited separately from scene meshes; both cloud layers must
+        // attenuate their visible discs, even where a near mesh already shadows the ground.
         float sunOpacity = celestialBodyOpacity(sunDirection[1]) * weatherVisibility
-                * VolumetricClouds.sunTransmittance();
+                * VolumetricClouds.sunDiscTransmittance();
         float moonOpacity = celestialBodyOpacity(celestialMoonDirection[1]) * weatherVisibility
-                * VolumetricClouds.moonTransmittance();
+                * VolumetricClouds.moonDiscTransmittance();
         boolean roundSun = DaylightSky.isRoundSun();
         updateCelestialOpacity(roundSun ? 0.0f : sunOpacity, moonOpacity);
 

@@ -43,15 +43,26 @@ public final class LightningFlash {
     private static volatile boolean enabled = DEFAULT_ENABLED;
     private static volatile float boltRadiance = DEFAULT_BOLT_RADIANCE;
     private static float level;
+    private static double strikeX, strikeZ;
+    private static double nearestStrikeSquared = Double.POSITIVE_INFINITY;
+    private static boolean hasStrike;
+    private static long cloudRevision;
 
     private LightningFlash() {}
 
     public static boolean isEnabled() { return enabled; }
-    public static void setEnabled(boolean value) { enabled = value; }
+    public static void setEnabled(boolean value) {
+        if (enabled != value) cloudRevision++;
+        enabled = value;
+    }
 
     /** Live tuning for {@code /rtx ce lightning}. */
     public static float getBoltRadiance() { return boltRadiance; }
-    public static void setBoltRadiance(float value) { boltRadiance = Math.max(0.0f, value); }
+    public static void setBoltRadiance(float value) {
+        float next = Math.max(0.0f, value);
+        if (Float.compare(boltRadiance, next) != 0) cloudRevision++;
+        boltRadiance = next;
+    }
 
     /** Number of lights along one bolt. */
     public static int boltLightCount() {
@@ -69,7 +80,40 @@ public final class LightningFlash {
      * @param lightningTicksLeft the client world's flash counter, above zero while a bolt is bright
      */
     public static void advance(int lightningTicksLeft, float dtSeconds) {
-        level = enabled ? nextLevel(level, lightningTicksLeft > 0, dtSeconds) : 0.0f;
+        float next = enabled ? nextLevel(level, lightningTicksLeft > 0, dtSeconds) : 0.0f;
+        if (Float.compare(level, next) != 0) {
+            cloudRevision++;
+        }
+        level = next;
+        nearestStrikeSquared = Double.POSITIVE_INFINITY;
+        if (level == 0.0f) {
+            hasStrike = false;
+        }
+    }
+
+    /** Keeps the nearest loaded strike for local cloud illumination, retaining it during decay. */
+    public static void observeStrike(double x, double z, double cameraX, double cameraZ) {
+        if (level <= 0.0f) return;
+        double dx = x - cameraX;
+        double dz = z - cameraZ;
+        double distance = dx * dx + dz * dz;
+        if (distance >= nearestStrikeSquared) return;
+        nearestStrikeSquared = distance;
+        if (!hasStrike || strikeX != x || strikeZ != z) {
+            strikeX = x;
+            strikeZ = z;
+            hasStrike = true;
+            cloudRevision++;
+        }
+    }
+
+    public static double strikeX() { return strikeX; }
+    public static double strikeZ() { return strikeZ; }
+    public static long cloudRevision() { return cloudRevision; }
+
+    /** Current cloud-light radiance; zero without a located strike or when the feature is off. */
+    public static float cloudRadiance(int channel) {
+        return enabled && hasStrike ? BOLT_TINT[channel] * boltRadiance * level * CLOUD_LIGHT_RADIANCE_SCALE : 0.0f;
     }
 
     static float nextLevel(float previous, boolean flashing, float dtSeconds) {
@@ -102,5 +146,8 @@ public final class LightningFlash {
     /** Clears the flash, for a world change. */
     public static void reset() {
         level = 0.0f;
+        hasStrike = false;
+        nearestStrikeSquared = Double.POSITIVE_INFINITY;
+        cloudRevision++;
     }
 }

@@ -13,6 +13,18 @@ also part of every mod file name.
 
 ### Fixed
 
+- Near volumetric clouds hide the sun and moon discs without attenuating the
+  ground's sunlight twice. Cirrus also attenuates the visible discs.
+- Time commands, sky-model changes, teleports and world changes reset cloud
+  accumulation and reject queued images from the previous scene.
+- Small changes to star and Milky Way cloud occlusion accumulate against the
+  last uploaded mesh, preventing slowly moving clouds from leaving stars visible.
+- Lightning illuminates the visible cloud dome with the nearest strike's cold
+  light. The flash recomposes the existing cloud depth without a new volume march
+  and disappears without entering the cloud's temporal history.
+- Cirrus no longer shows through solid distant cumulus: it was weighted by the
+  cumulus's sky coverage, which includes the haze in front of them, instead of by
+  the light the cumulus let through.
 - Distant leaves are no longer darker than near ones: the holes in cutout
   textures carry their sprite's colour, so the runtime's mips stop averaging
   black into them.
