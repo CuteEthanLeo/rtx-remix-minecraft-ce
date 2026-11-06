@@ -105,4 +105,25 @@ class VolumetricCloudsTest {
         assertEquals(1.0f, VolumetricClouds.sunDiscTransmittance());
         assertEquals(1.0f, VolumetricClouds.moonDiscTransmittance());
     }
+
+    @Test
+    void aRestartKeepsTheCloudsUpUntilTheNextResultsReplaceThem() {
+        VolumetricClouds.publishFrame(CloudField.Params.defaults(), 0.0);
+        float[] map = new float[VolumetricClouds.OCCLUSION_MAP_WIDTH * VolumetricClouds.OCCLUSION_MAP_HEIGHT];
+        VolumetricClouds.clearFarResults();
+        VolumetricClouds.publishFarResults(0.3f, 0.4f, 0.1f, 0.2f, 0.8f, map);
+
+        VolumetricClouds.restartFarResults();
+        assertEquals(0.1f, VolumetricClouds.sunDiscTransmittance(), 1.0e-6f,
+                "a restart must not show a cloudless sun before the new march lands");
+        assertEquals(0.3f, VolumetricClouds.sunTransmittance(), 1.0e-6f);
+        assertEquals(0.0f, VolumetricClouds.skyVisibility(0.0f, 1.0f, 0.0f), 1.0e-6f);
+
+        Arrays.fill(map, 1.0f);
+        VolumetricClouds.publishFarResults(0.9f, 0.9f, 0.6f, 0.6f, 0.1f, map);
+        assertEquals(0.9f, VolumetricClouds.sunTransmittance(), 1.0e-6f,
+                "the new scene replaces the old one outright");
+        assertEquals(1.0f, VolumetricClouds.skyVisibility(0.0f, 1.0f, 0.0f), 1.0e-6f);
+        VolumetricClouds.deactivate();
+    }
 }

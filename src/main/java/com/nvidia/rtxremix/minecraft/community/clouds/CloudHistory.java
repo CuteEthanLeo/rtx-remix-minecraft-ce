@@ -10,6 +10,13 @@ final class CloudHistory {
     private static final double MOVING_DISTANCE_SQUARED = 0.75 * 0.75;
     private static final double RESET_TIME_TICKS = 200.0;
     private static final double RESET_DIRECTION_COSINE = Math.cos(Math.toRadians(3.0));
+    /**
+     * The sky passes the time of day plus the frame's tick delta. With the daylight cycle frozen
+     * only the tick delta moves, so the time of day can step back by up to a tick from one
+     * update to the next without any time command; resetting on that every other update threw
+     * away the accumulated sky and published a cloudless sun for a frame.
+     */
+    private static final double DAY_TIME_INTERPOLATION_TICKS = 1.0;
 
     private boolean valid;
     private double cameraX, cameraY, cameraZ;
@@ -21,7 +28,7 @@ final class CloudHistory {
     boolean needsReset(CloudSkyCompositor.Inputs frame, double time, float cloudBase) {
         if (!valid || distanceSquared(frame) > RESET_DISTANCE_SQUARED
                 || time < worldTime || Math.abs(time - worldTime) > RESET_TIME_TICKS
-                || frame.dayTime() < dayTime
+                || frame.dayTime() <= dayTime - DAY_TIME_INTERPOLATION_TICKS
                 || Math.abs((frame.dayTime() - dayTime) - (time - worldTime)) > RESET_TIME_TICKS
                 || Float.compare(base, cloudBase) != 0
                 || physicalAtmosphere != frame.physicalAtmosphere()

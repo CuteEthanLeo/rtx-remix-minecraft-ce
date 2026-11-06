@@ -62,6 +62,8 @@ public final class VolumetricClouds {
     private static float skyCover;
     private static final float[] occlusion = new float[OCCLUSION_MAP_WIDTH * OCCLUSION_MAP_HEIGHT];
     private static boolean farResultsValid;
+    /** Whether the next published results may ease from the current ones (same scene). */
+    private static boolean easeFarResults;
 
     static {
         Arrays.fill(occlusion, 1.0f);
@@ -200,8 +202,9 @@ public final class VolumetricClouds {
         // Clouds drift slowly; smoothing keeps a light from stepping when a jittered
         // estimate lands, without lagging behind a real change by more than a second. The sun
         // and moon light the whole world, so they ease in over about a second of updates.
-        float keep = farResultsValid ? 0.6f : 0.0f;
-        float lightKeep = farResultsValid ? LIGHT_KEEP : 0.0f;
+        boolean ease = farResultsValid && easeFarResults;
+        float keep = ease ? 0.6f : 0.0f;
+        float lightKeep = ease ? LIGHT_KEEP : 0.0f;
         sunTransmittance = mix(clamp01(sun), sunTransmittance, lightKeep);
         moonTransmittance = mix(clamp01(moon), moonTransmittance, lightKeep);
         // The visible discs follow the current clouds, without the ground light's long easing.
@@ -212,6 +215,15 @@ public final class VolumetricClouds {
             occlusion[i] = mix(clamp01(map[i]), occlusion[i], keep);
         }
         farResultsValid = true;
+        easeFarResults = true;
+    }
+
+    /**
+     * A scene change within the same world: the current results stay published until the next
+     * ones land, which then replace them outright rather than easing from the old scene.
+     */
+    static void restartFarResults() {
+        easeFarResults = false;
     }
 
     static void clearFarResults() {

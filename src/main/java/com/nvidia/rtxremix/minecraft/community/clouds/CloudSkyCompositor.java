@@ -172,7 +172,7 @@ public final class CloudSkyCompositor {
         long tick = (long) Math.floor(worldTime);
         boolean reset = history.needsReset(inputs, worldTime, VolumetricClouds.params().base());
         if (reset) {
-            invalidate();
+            restart();
         }
         boolean due = reset || (tick != lastUpdateTick && Math.floorMod(tick, quality.updateTicks()) == 0)
                 || tick < lastUpdateTick;
@@ -188,11 +188,25 @@ public final class CloudSkyCompositor {
         return consumeCompletedReadback(upperMean);
     }
 
-    /** Forgets the accumulated sky, so the next update marches everything. */
+    /** Forgets the accumulated sky and its published results, for a new world. */
     public void invalidate() {
+        discardHistory();
+        VolumetricClouds.clearFarResults();
+    }
+
+    /**
+     * Forgets the accumulated sky within the same world, so the next update marches everything,
+     * but keeps the published results until that march lands. Clearing them here would show a
+     * cloudless sun and sky for the frames before the readback.
+     */
+    private void restart() {
+        discardHistory();
+        VolumetricClouds.restartFarResults();
+    }
+
+    private void discardHistory() {
         history.invalidate();
         generation++;
-        VolumetricClouds.clearFarResults();
         lastUpdateTick = Long.MIN_VALUE;
     }
 

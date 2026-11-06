@@ -17,6 +17,12 @@ also part of every mod file name.
   ground's sunlight twice. Cirrus also attenuates the visible discs.
 - Time commands, sky-model changes, teleports and world changes reset cloud
   accumulation and reject queued images from the previous scene.
+- Distant volumetric clouds no longer flicker, and the sun no longer flashes
+  through them ten times a second, with the daylight cycle frozen. The sky's
+  frame-interpolated time of day stepped back within a tick on about half the
+  cloud updates, which counted as a time command: each one discarded the
+  accumulated sky and showed a cloudless sun until the next march landed. A
+  real reset now keeps the previous clouds published until then.
 - Small changes to star and Milky Way cloud occlusion accumulate against the
   last uploaded mesh, preventing slowly moving clouds from leaving stars visible.
 - Lightning illuminates the visible cloud dome with the nearest strike's cold

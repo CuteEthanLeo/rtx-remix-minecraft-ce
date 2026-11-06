@@ -39,6 +39,19 @@ class CloudHistoryTest {
     }
 
     @Test
+    void aFrozenDaylightCycleKeepsHistoryWhateverTheTickDelta() {
+        // The sky passes getTimeOfDay() + tickDelta; with the cycle frozen only the tick delta
+        // moves, so successive updates can land on an earlier fraction of the same tick.
+        CloudHistory history = new CloudHistory();
+        history.record(frame(0, 6000.9, true, 1), 100.9, 400);
+        assertFalse(history.needsReset(frame(0, 6000.05, true, 1), 102.05, 400));
+        history.record(frame(0, 6000.05, true, 1), 102.05, 400);
+        assertFalse(history.needsReset(frame(0, 6000.7, true, 1), 104.7, 400));
+        assertTrue(history.needsReset(frame(0, 5999.0, true, 1), 104.0, 400),
+                "a whole tick back is a time command");
+    }
+
+    @Test
     void skyModeSunDirectionAndWorldInvalidationResetHistory() {
         CloudHistory history = new CloudHistory();
         var initial = frame(0, 1000, true, 1);
