@@ -7,8 +7,9 @@ name: release
 
 on:
   push:
-    # A bare + in a filter means "one or more of the preceding character".
-    tags: ['v*\+mc*']
+    # A + in a filter pattern is a quantifier, so match broadly here and
+    # select release tags in the job's if.
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -20,6 +21,7 @@ permissions:
 
 jobs:
   release:
+    if: contains(github.event.inputs.tag || github.ref_name, '+mc')
     runs-on: windows-latest
     timeout-minutes: 120
     env:
