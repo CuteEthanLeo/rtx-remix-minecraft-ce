@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Publishes one GitHub Release per tag. Tags are v<mod_version>+mc<minecraft_version>,
+# cut from the main branch (latest Minecraft) or an mc/<version> branch.
+name: release
+
+on:
+  push:
+    # A bare + in a filter means "one or more of the preceding character".
+    tags: ['v*\+mc*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build and publish'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          persist-credentials: false
+
+      - name: Read target versions
+        id: props
+        shell: pwsh
+        run: |
+          $props = @{}
+          Get-Content gradle.properties | Where-Object { $_ -match '^\s*([\w.]+)\s*=\s*(.*)$' } |
+            ForEach-Object { $props[$Matches[1]] = $Matches[2].Trim() }
+          $expected = "v$($props.mod_version)+mc$($props.minecraft_version)"
+          if ($env:TAG -ne $expected) { throw "Tag $env:TAG does not match gradle.properties ($expected)" }
+          "mc=$($props.minecraft_version)" >> $env:GITHUB_OUTPUT
+          "mod=$($props.mod_version)" >> $env:GITHUB_OUTPUT
+          "java=$($props.release_java_version)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ steps.props.outputs.java }}
+
+      # The pinned runtime comes from public Packman; no credentials are used.
+      - name: Build and test
+        run: '& "$env:GITHUB_WORKSPACE\gradlew.bat" build test -Prelease -Parch=win64'
+
+      - name: Build the full release archive
+        run: '& "$env:GITHUB_WORKSPACE\gradlew.bat" releaseArchive -Prelease -Parch=win64'
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MC: ${{ steps.props.outputs.mc }}
+          MOD: ${{ steps.props.outputs.mod }}
+        run: |
+          $zip = Get-ChildItem build/distributions -Filter '*.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'releaseArchive produced no ZIP' }
+          $hash = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($zip.Name)" | Out-File -Encoding ascii "$($zip.FullName).sha256"
+          $notes = @"
+          RTX Remix for Minecraft Community Edition (Unofficial) $env:MOD for **Minecraft $env:MC** (Fabric, Windows x64).
+
+          ### Install
+          1. Download ``$($zip.Name)`` and extract it.
+          2. Run ``install.bat`` and follow the prompts (it sets up Prism Launcher, Fabric, and the mod).
+          3. The JAR bundles the RTX Remix runtime; the first launch unpacks it.
+
+          Requires a GeForce RTX GPU. Not affiliated with or endorsed by NVIDIA, Mojang, or Microsoft.
+
+          SHA-256: ``$hash``
+          "@
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $zip.FullName "$($zip.FullName).sha256" --clobber
+          } else {
+            gh release create $env:TAG $zip.FullName "$($zip.FullName).sha256" `
+              --title "$env:MOD for Minecraft $env:MC" --notes $notes
+          }

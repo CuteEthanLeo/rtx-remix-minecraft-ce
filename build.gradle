@@ -42,7 +42,13 @@ logger.lifecycle("Build target arches: ${buildArches.join(', ')}" +
         (isSingleArchJar ? " (single-arch JAR mode)" : " (fat JAR)"))
 
 def archSuffix = isSingleArchJar ? "-${archProperty}" : ''
-version = "${baseVersion}-${buildTimestamp}-${gitShortHash.get()}${gitDirty.get()}${archSuffix}"
+def minecraftVersion = providers.gradleProperty('minecraft_version').get()
+// -Prelease builds the published artifact: <mod_version>+mc<minecraft_version>,
+// with no timestamp or commit hash, so each GitHub Release names its target.
+def isReleaseBuild = project.hasProperty('release')
+version = isReleaseBuild
+        ? "${baseVersion}+mc${minecraftVersion}${archSuffix}"
+        : "${baseVersion}-${buildTimestamp}-${gitShortHash.get()}${gitDirty.get()}${archSuffix}"
 def resolvedBuildVersion = version.toString()
 group = 'com.nvidia.rtxremix'
 def benchmarkJfrPath = providers.gradleProperty("benchmarkJfrPath")
@@ -206,8 +212,8 @@ loom {
 // Fabric API (keep in sync with FABRIC_API_VERSION in packaging/installer.ps1,
 // which is what gets installed at runtime on the user's machine). One literal
 // serves both the compile dependency and stageFabricApi.
-def fabricApiCoordinate = "net.fabricmc.fabric-api:fabric-api:0.116.10+1.21.1"
-def fabricLoaderVersion = "0.16.5"
+def fabricApiCoordinate = "net.fabricmc.fabric-api:fabric-api:${providers.gradleProperty('fabric_api_version').get()}"
+def fabricLoaderVersion = providers.gradleProperty('fabric_loader_version').get()
 
 configurations {
     fabricTestRuntime {
@@ -217,8 +223,8 @@ configurations {
 
 dependencies {
     // Minecraft and Fabric
-    minecraft "com.mojang:minecraft:1.21.1"
-    mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    mappings "net.fabricmc:yarn:${providers.gradleProperty('yarn_mappings').get()}:v2"
     modImplementation "net.fabricmc:fabric-loader:${fabricLoaderVersion}"
 
     modImplementation fabricApiCoordinate

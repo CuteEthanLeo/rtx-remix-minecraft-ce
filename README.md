@@ -8,6 +8,12 @@
 >
 > **RTX Remix for Minecraft 社区版（非官方）**，基于上方官方仓库的衍生版本，与 NVIDIA 无关联。
 > 改动与维护方式见 [COMMUNITY.md](COMMUNITY.md)。
+>
+> **Downloads / 下载**: every supported Minecraft version has its own full installer package on
+> [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases), tagged
+> `v<mod version>+mc<Minecraft version>`. The `main` branch targets the newest supported
+> Minecraft version; older versions live on `mc/<version>` branches.
+> 每个支持的 Minecraft 版本在 Releases 中都有独立的完整安装包。
 
 
 Play Minecraft Java Edition 1.21.1 with real-time path tracing on a GeForce RTX

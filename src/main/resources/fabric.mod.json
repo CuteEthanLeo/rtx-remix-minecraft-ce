@@ -11,9 +11,9 @@
         "RTX Remix for Minecraft Community Edition contributors"
     ],
     "contact": {
-        "homepage": "https://github.com/NVIDIAGameWorks/rtx-remix-minecraft",
-        "sources": "https://github.com/NVIDIAGameWorks/rtx-remix-minecraft",
-        "issues": "https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/issues"
+        "homepage": "https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce",
+        "sources": "https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce",
+        "issues": "https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/issues"
     },
     "license": "Apache-2.0",
     "environment": "*",
