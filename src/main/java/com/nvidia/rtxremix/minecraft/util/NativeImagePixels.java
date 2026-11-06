@@ -1,7 +1,7 @@
 package com.nvidia.rtxremix.minecraft.util;
 
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.util.math.ColorHelper;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.util.ARGB;
 
 /**
  * Reads a {@link NativeImage} pixel in its native little-endian RGBA (big-endian ABGR) order.
@@ -12,6 +12,6 @@ public final class NativeImagePixels {
 
     /** Returns the pixel as ABGR (red in the lowest byte), matching the 1.21.1 {@code getColor}. */
     public static int abgr(NativeImage image, int x, int y) {
-        return ColorHelper.toAbgr(image.getColorArgb(x, y));
+        return ARGB.toABGR(image.getPixel(x, y));
     }
 }

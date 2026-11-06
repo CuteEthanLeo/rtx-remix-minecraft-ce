@@ -7,7 +7,7 @@ import javax.inject.Inject
 import org.gradle.process.ExecOperations
 
 plugins {
-    id 'fabric-loom' version '1.15.5'
+    id 'net.fabricmc.fabric-loom' version '1.19.3'
     id 'java'
 }
 
@@ -132,10 +132,10 @@ repositories {
     }
 }
 
-// Minecraft 1.21.x requires Java 21
+// Minecraft 26.x requires Java 25
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
     withSourcesJar()
 }
@@ -159,9 +159,6 @@ loom {
     // longer needed. Without it, Loom derives the refmap name from the
     // project; our mixins.json doesn't reference the refmap by literal name,
     // so the auto-derived name works fine.
-    mixin {
-        useLegacyMixinAp = true
-    }
 
     runs {
         client {
@@ -224,18 +221,17 @@ configurations {
 dependencies {
     // Minecraft and Fabric
     minecraft "com.mojang:minecraft:${minecraftVersion}"
-    mappings "net.fabricmc:yarn:${providers.gradleProperty('yarn_mappings').get()}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${fabricLoaderVersion}"
+    implementation "net.fabricmc:fabric-loader:${fabricLoaderVersion}"
 
-    modImplementation fabricApiCoordinate
+    implementation fabricApiCoordinate
 
     // Testing
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     def lwjglNatives = System.getProperty('os.arch').toLowerCase() in ['aarch64', 'arm64']
             ? 'natives-windows-arm64' : 'natives-windows'
-    ['lwjgl', 'lwjgl-glfw', 'lwjgl-opengl'].each { module ->
-        testRuntimeOnly "org.lwjgl:${module}:3.3.3:${lwjglNatives}"
+    ['lwjgl', 'lwjgl-glfw', 'lwjgl-opengl', 'lwjgl-jemalloc', 'lwjgl-stb'].each { module ->
+        testRuntimeOnly "org.lwjgl:${module}:3.4.1:${lwjglNatives}"
     }
     fabricTestRuntime "net.fabricmc:fabric-loader-junit:${fabricLoaderVersion}"
 }
@@ -295,7 +291,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
-    options.release = 21
+    options.release = 25
 }
 
 def currentRuntimeArch = System.getProperty("os.arch") == "aarch64" ? "arm64" : "win64"
@@ -537,7 +533,7 @@ jar {
 // selected native payload, writing the distributable JAR to build/distributions.
 // Packaging therefore depends on an explicit task instead of guessing intent
 // from Gradle's command-line task names (`package` versus `:package`).
-def remapJarTask = tasks.named('remapJar')
+def remapJarTask = tasks.named('jar')
 def packageJarTask = tasks.register('packageJar', Zip) {
     description = 'Assembles the remapped distributable JAR with the selected platform SDKs bundled'
     group = 'build'

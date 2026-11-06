@@ -4,19 +4,19 @@
  */
 package com.nvidia.rtxremix.minecraft.entity;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.nvidia.rtxremix.InstanceCategoryBit;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.entity.EntityRenderManager;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.IdentityHashMap;
 import java.util.List;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Captures block-entity geometry where vanilla dispatches it and submits it through
@@ -65,7 +65,7 @@ public final class RemixBlockEntityPass {
          * Since 1.21.9 vanilla's renderer submits to a command queue; the pass flushes
          * that queue into its capture provider once the call returns.
          */
-        void render(MatrixStack matrices, OrderedRenderCommandQueue queue);
+        void render(PoseStack matrices, SubmitNodeCollector queue);
     }
 
     /**
@@ -99,13 +99,13 @@ public final class RemixBlockEntityPass {
      * spawner's display entity casts only the shadow Remix traces.
      */
     public void capture(BlockEntity be, BlockEntityRenderCall call,
-                        EntityRenderManager dispatcher, RemixEntitySubmitter submitter) {
+                        EntityRenderDispatcher dispatcher, RemixEntitySubmitter submitter) {
         long captureStart = System.nanoTime();
         EntityRenderContext ctx = EntityRenderContext.get();
         // TODO(1.21.11): blob shadows of display entities (spawner) are no longer
         // suppressed here; the dispatcher's renderShadows flag is gone.
         provider.beginEntity();
-        matrices.push();
+        matrices.pushPose();
         ctx.begin(true);
         List<RemixVertexConsumerProvider.CapturedLayer> layers;
         try {
@@ -114,7 +114,7 @@ public final class RemixBlockEntityPass {
             layers = provider.endEntity();
         } catch (Exception e) {
             commandCapture.discard();
-            failures.noteFailure("capturing", "block entity " + typeKey(be), be.getPos(), e);
+            failures.noteFailure("capturing", "block entity " + typeKey(be), be.getBlockPos(), e);
             return;
         } finally {
             // Both restore even if the renderer threw mid-traversal: the identity
@@ -135,7 +135,7 @@ public final class RemixBlockEntityPass {
         reusableBoneData = ctx.snapshotBoneTransforms(reusableBoneData);
         RemixEntityPass.EntityCaptureResult result = new RemixEntityPass.EntityCaptureResult(
                 be,
-                Vec3d.of(be.getPos()),
+                Vec3.atLowerCornerOf(be.getBlockPos()),
                 0.0f,
                 layers,
                 reusableBoneData,
@@ -159,7 +159,7 @@ public final class RemixBlockEntityPass {
             submitter.submitEntity(result, STATIC_WORLD_CANVASES);
             frameCount++;
         } catch (Exception e) {
-            failures.noteFailure("submitting", "block entity " + typeKey(be), be.getPos(), e);
+            failures.noteFailure("submitting", "block entity " + typeKey(be), be.getBlockPos(), e);
         } finally {
             frameSubmitNanos += System.nanoTime() - submitStart;
             frameParts += submitter.getLastDrawCount() - partsBefore;
@@ -186,6 +186,6 @@ public final class RemixBlockEntityPass {
 
     private String typeKey(BlockEntity be) {
         return typeKeyCache.computeIfAbsent(be.getType(),
-                type -> Registries.BLOCK_ENTITY_TYPE.getId(type).toString());
+                type -> BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString());
     }
 }

@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.model.MultipartBlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.multipart.MultiPartModel;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -16,6 +16,6 @@ import org.spongepowered.asm.mixin.Mixin;
  * is disabled until it is re-measured against the new model pipeline; this mixin is an
  * empty shell so the mixin config keeps loading.
  */
-@Mixin(MultipartBlockStateModel.class)
+@Mixin(MultiPartModel.class)
 public abstract class MultipartBakedModelMixin {
 }

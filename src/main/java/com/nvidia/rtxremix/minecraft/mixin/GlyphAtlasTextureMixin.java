@@ -7,9 +7,9 @@ package com.nvidia.rtxremix.minecraft.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.nvidia.rtxremix.minecraft.texture.GlyphPageMirror;
+import net.minecraft.client.gui.font.FontTexture;
+import com.mojang.blaze3d.font.GlyphBitmap;
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.minecraft.client.font.GlyphAtlasTexture;
-import net.minecraft.client.font.UploadableGlyph;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,10 +25,10 @@ import org.spongepowered.asm.mixin.injection.At;
  * bitmap, TrueType and built-in glyphs and {@code GlStateManager._upload} for Unihex,
  * which is why the scope is opened here and the pixels are read where they are uploaded.
  */
-@Mixin(GlyphAtlasTexture.class)
+@Mixin(FontTexture.class)
 public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
 
-    @Shadow @Final private boolean hasColor;
+    @Shadow @Final private boolean colored;
 
     private GlyphPageMirror rtxremix$mirror;
 
@@ -37,16 +37,16 @@ public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
         // Created on first use: hasColor is assigned by the constructor, so a field
         // initialiser could not read it.
         if (rtxremix$mirror == null) {
-            rtxremix$mirror = new GlyphPageMirror(!hasColor);
+            rtxremix$mirror = new GlyphPageMirror(!colored);
         }
         return rtxremix$mirror;
     }
 
     @WrapOperation(
-        method = "bake",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/UploadableGlyph;upload(IILcom/mojang/blaze3d/textures/GpuTexture;)V")
+        method = "add",
+        at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/font/GlyphBitmap;upload(IILcom/mojang/blaze3d/textures/GpuTexture;)V")
     )
-    private void rtxremix$mirrorGlyphUpload(UploadableGlyph glyph, int x, int y, GpuTexture texture,
+    private void rtxremix$mirrorGlyphUpload(GlyphBitmap glyph, int x, int y, GpuTexture texture,
                                             Operation<Void> original) {
         // TODO(1.21.11): glyph pixels now reach the GPU through GpuDevice/CommandEncoder rather than
         // NativeImage.uploadInternal or GlStateManager._upload, so the mirror scope opens but

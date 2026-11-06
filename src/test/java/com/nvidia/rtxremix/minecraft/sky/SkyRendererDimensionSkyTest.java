@@ -4,11 +4,11 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
-import net.minecraft.world.dimension.DimensionType;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import net.minecraft.world.level.dimension.DimensionType;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

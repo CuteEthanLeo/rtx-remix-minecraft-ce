@@ -4,10 +4,10 @@
  */
 package com.nvidia.rtxremix.minecraft.gl;
 
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.texture.GlTexture;
+import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL45;
@@ -28,10 +28,10 @@ public class TextureOverlay {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(TextureOverlay.class);
     
-    private final MinecraftClient client;
+    private final Minecraft client;
     
     public TextureOverlay() {
-        this.client = MinecraftClient.getInstance();
+        this.client = Minecraft.getInstance();
         LOGGER.info("TextureOverlay initialized");
     }
     
@@ -62,15 +62,15 @@ public class TextureOverlay {
     private int destinationTexture;
 
     private void renderTextureOverlay(int texId) {
-        Framebuffer framebuffer = client.getFramebuffer();
+        RenderTarget framebuffer = client.gameRenderer.mainRenderTarget();
         if (framebuffer == null) {
             return;
         }
-        GpuTexture color = framebuffer.getColorAttachment();
+        GpuTexture color = framebuffer.getColorTexture();
         if (!(color instanceof GlTexture glColor)) {
             return;
         }
-        int dstTex = glColor.getGlId();
+        int dstTex = glColor.glId();
         if (sourceFbo == 0) {
             sourceFbo = GL45.glCreateFramebuffers();
         }
@@ -87,8 +87,8 @@ public class TextureOverlay {
         }
         int srcWidth = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_WIDTH);
         int srcHeight = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_HEIGHT);
-        int dstWidth = framebuffer.textureWidth;
-        int dstHeight = framebuffer.textureHeight;
+        int dstWidth = framebuffer.width;
+        int dstHeight = framebuffer.height;
         if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
             return;
         }

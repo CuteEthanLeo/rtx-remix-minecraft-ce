@@ -4,20 +4,19 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.nvidia.rtxremix.minecraft.GameRendererFovAccess;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ItemInHandRenderer;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -32,48 +31,50 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin implements GameRendererFovAccess {
 
-    @Shadow
-    private float getFov(Camera camera, float tickProgress, boolean changingFov) {
-        throw new AssertionError();
-    }
-
+    /**
+     * 26.2 moved the FOV computation from GameRenderer into Camera: the world FOV is
+     * {@link Camera#getFov()} and the hand FOV is the extracted camera state's HUD FOV.
+     */
     @Override
     public float rtxremix$getFov(Camera camera, float tickDelta, boolean changingFov) {
-        return getFov(camera, tickDelta, changingFov);
+        if (changingFov) {
+            return camera.getFov();
+        }
+        return ((GameRenderer) (Object) this).gameRenderState().levelRenderState.cameraRenderState.hudFov;
     }
 
     @Redirect(
-            method = "renderHand",
+            method = "renderItemInHand",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/network/ClientPlayerEntity;I)V"
+                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;submitHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/player/LocalPlayer;I)V"
             ))
     private void rtxremix$captureFirstPersonModel(
-            HeldItemRenderer heldItemRenderer,
+            ItemInHandRenderer heldItemRenderer,
             float tickDelta,
-            MatrixStack matrices,
-            OrderedRenderCommandQueue vertexConsumers,
-            ClientPlayerEntity player,
+            PoseStack matrices,
+            SubmitNodeCollector vertexConsumers,
+            LocalPlayer player,
             int light) {
         RemixRenderer renderer = RtxRemixMod.renderer;
         if (!RtxRemixMod.shouldCaptureFirstPersonModel()) {
-            heldItemRenderer.renderItem(tickDelta, matrices, vertexConsumers, player, light);
+            heldItemRenderer.submitHandsWithItems(tickDelta, matrices, vertexConsumers, player, light);
             return;
         }
 
         renderer.captureFirstPersonModel(heldItemRenderer, tickDelta, matrices, player, light);
     }
 
-    // 1.21.11: the screen overlays moved from renderHand into renderWorld.
+    // 26.2: screen overlays are submitted through ScreenEffectRenderer.submit in renderLevel.
     @Inject(
-            method = "renderWorld",
+            method = "renderLevel",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/hud/InGameOverlayRenderer;renderOverlays(ZFLnet/minecraft/client/render/command/OrderedRenderCommandQueue;)V",
+                    target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;submit(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V",
                     shift = At.Shift.BEFORE
             ))
     private void rtxremix$submitBeforeScreenOverlays(
-            RenderTickCounter tickCounter,
+            DeltaTracker tickCounter,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }
@@ -82,9 +83,9 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
      * Covers third person, sleeping, hidden-hand, panorama, and other paths
      * where HeldItemRenderer or InGameOverlayRenderer is skipped.
      */
-    @Inject(method = "renderWorld", at = @At("TAIL"))
+    @Inject(method = "renderLevel", at = @At("TAIL"))
     private void rtxremix$submitAtRenderWorldTail(
-            RenderTickCounter tickCounter,
+            DeltaTracker tickCounter,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }
@@ -102,10 +103,11 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
             method = "render",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V"
+                    target = "Lnet/minecraft/util/profiling/ProfilerFiller;push(Ljava/lang/String;)V",
+                    ordinal = 2 // 26.2: push("render"), push("world"), push("gui")
             ))
     private void rtxremix$beginGuiScope(
-            RenderTickCounter tickCounter,
+            DeltaTracker tickCounter,
             boolean tick,
             CallbackInfo ci) {
         rtxremix$closeGuiScope();
@@ -118,7 +120,7 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
     /** Before any screen draws, so the frame's hover state already matches input capture. */
     @Inject(method = "render", at = @At("HEAD"))
     private void rtxremix$followRemixMenuVisibility(
-            RenderTickCounter tickCounter,
+            DeltaTracker tickCounter,
             boolean tick,
             CallbackInfo ci) {
         RtxRemixMod.followRemixMenuVisibility();
@@ -126,7 +128,7 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
 
     @Inject(method = "render", at = @At("RETURN"))
     private void rtxremix$endGuiScope(
-            RenderTickCounter tickCounter,
+            DeltaTracker tickCounter,
             boolean tick,
             CallbackInfo ci) {
         rtxremix$closeGuiScope();

@@ -8,17 +8,16 @@
 package com.nvidia.rtxremix.minecraft.texture;
 
 import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 
 /**
  * Converts LabPBR _n/_s textures into Remix-compatible PBR channel data.
@@ -548,7 +547,7 @@ public final class LabPBRConverter {
     /**
      * Pre-computes a flat AO byte table from a LabPBR {@code _n} image.
      * AO is stored in the blue channel (byte index 2 of the ABGR layout
-     * returned by {@link NativeImage#getColor}, i.e. shift 16).
+     * returned by {@link NativeImage#getPixelABGR}, i.e. shift 16).
      */
     public static byte[] buildAOTable(NativeImage n) {
         int w = n.getWidth(), h = n.getHeight();
@@ -735,7 +734,7 @@ public final class LabPBRConverter {
     }
 
     public static VariantCache buildVariantCache(ResourceManager rm) {
-        return new VariantCache(rm.findResources("textures", LabPBRConverter::isVariantResource));
+        return new VariantCache(rm.listResources("textures", LabPBRConverter::isVariantResource));
     }
 
     private static boolean isVariantResource(Identifier id) {
@@ -745,7 +744,7 @@ public final class LabPBRConverter {
 
     private static NativeImage loadResource(Resource resource) {
         if (resource == null) return null;
-        try (InputStream stream = resource.getInputStream()) {
+        try (InputStream stream = resource.open()) {
             return NativeImage.read(stream);
         } catch (IOException | RuntimeException e) {
             return null;
@@ -753,7 +752,7 @@ public final class LabPBRConverter {
     }
 
     private static Identifier variantId(Identifier spriteId, String suffix) {
-        return Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + suffix + ".png");
+        return Identifier.fromNamespaceAndPath(spriteId.getNamespace(), "textures/" + spriteId.getPath() + suffix + ".png");
     }
 
     /**

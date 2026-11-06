@@ -8,10 +8,6 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RenderRegionStoragePool;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSnapshotRelease;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.collection.PackedIntegerArray;
-import net.minecraft.world.chunk.PalettedContainer;
-import net.minecraft.world.chunk.WorldChunk;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -21,6 +17,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import net.minecraft.util.SimpleBitStorage;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.PalettedContainer;
 
 /**
  * A section snapshot for a render region whose block-state copy draws its storage from
@@ -33,19 +33,19 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>1.21.11 snapshots one section per {@code RenderedChunk} rather than a column, and the
  * builder caches them itself, so the former {@code ClientChunkMixin} hook lives here.
  */
-@Mixin(targets = "net.minecraft.client.render.chunk.RenderedChunk")
+@Mixin(targets = "net.minecraft.client.renderer.chunk.SectionCopy")
 public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
 
     @Shadow
     @Final
     @Mutable
-    private PalettedContainer<BlockState> blockPalette;
+    private PalettedContainer<BlockState> section;
 
     private final AtomicInteger rtxremix$regions = new AtomicInteger();
 
     @WrapOperation(
             method = "<init>",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/PalettedContainer;copy()Lnet/minecraft/world/chunk/PalettedContainer;"))
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/PalettedContainer;copy()Lnet/minecraft/world/level/chunk/PalettedContainer;"))
     private PalettedContainer<BlockState> rtxremix$pooledCopy(
             PalettedContainer<BlockState> container, Operation<PalettedContainer<BlockState>> original) {
         RenderRegionStoragePool.beginCopying();
@@ -57,7 +57,7 @@ public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
     }
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void rtxremix$builderReference(WorldChunk chunk, int sectionIndex, CallbackInfo ci) {
+    private void rtxremix$builderReference(LevelChunk chunk, int sectionIndex, CallbackInfo ci) {
         rtxremix$retain();
     }
 
@@ -68,14 +68,14 @@ public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
 
     @Override
     public void rtxremix$release() {
-        if (rtxremix$regions.decrementAndGet() != 0 || blockPalette == null) {
+        if (rtxremix$regions.decrementAndGet() != 0 || section == null) {
             return;
         }
-        if (blockPalette.data.storage() instanceof PackedIntegerArray packed) {
-            RenderRegionStoragePool.release(packed.getData());
+        if (section.data.storage() instanceof SimpleBitStorage packed) {
+            RenderRegionStoragePool.release(packed.getRaw());
         }
         // Nothing may read the snapshot after its last release; a stale read sees air
         // instead of whatever the recycled arrays hold next.
-        blockPalette = null;
+        section = null;
     }
 }

@@ -4,35 +4,35 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.particle.BillboardParticle;
+import net.minecraft.client.particle.SingleQuadParticle;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(BillboardParticle.class)
+@Mixin(SingleQuadParticle.class)
 public interface BillboardParticleAccessor {
-    @Accessor("scale")
+    @Accessor("quadSize")
     float getScale();
 
-    @Accessor("red") float getRed();
-    @Accessor("green") float getGreen();
-    @Accessor("blue") float getBlue();
+    @Accessor("rCol") float getRed();
+    @Accessor("gCol") float getGreen();
+    @Accessor("bCol") float getBlue();
     @Accessor("alpha") float getAlpha();
-    @Accessor("zRotation") float getAngle();
-    @Accessor("lastZRotation") float getPrevAngle();
+    @Accessor("roll") float getAngle();
+    @Accessor("oRoll") float getPrevAngle();
 
-    @Invoker("getRenderType")
-    BillboardParticle.RenderType invokeGetRenderType();
+    @Invoker("getLayer")
+    SingleQuadParticle.Layer invokeGetRenderType();
 
-    @Invoker("getMinU")
+    @Invoker("getU0")
     float invokeGetMinU();
 
-    @Invoker("getMaxU")
+    @Invoker("getU1")
     float invokeGetMaxU();
 
-    @Invoker("getMinV")
+    @Invoker("getV0")
     float invokeGetMinV();
 
-    @Invoker("getMaxV")
+    @Invoker("getV1")
     float invokeGetMaxV();
 }

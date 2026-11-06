@@ -4,22 +4,22 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.particle.ParticleManager;
-import net.minecraft.client.particle.ParticleRenderer;
-import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.client.particle.ParticleTextureSheet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import java.util.Map;
+import net.minecraft.client.particle.ParticleEngine;
+import net.minecraft.client.particle.ParticleGroup;
+import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.ParticleResources;
 
-@Mixin(ParticleManager.class)
+@Mixin(ParticleEngine.class)
 public interface ParticleManagerAccessor {
     /** One renderer per texture sheet since 1.21.9; each renderer owns its particle queue. */
     @Accessor("particles")
-    Map<ParticleTextureSheet, ParticleRenderer<?>> getParticles();
+    Map<ParticleRenderType, ParticleGroup<?>> getParticles();
 
-    /** Sprite providers moved to {@link ParticleSpriteManager}; see {@link ParticleSpriteManagerAccessor}. */
-    @Accessor("spriteManager")
-    ParticleSpriteManager rtxremix$getSpriteManager();
+    /** Sprite providers moved to {@link ParticleResources}; see {@link ParticleSpriteManagerAccessor}. */
+    @Accessor("resourceManager")
+    ParticleResources rtxremix$getSpriteManager();
 }

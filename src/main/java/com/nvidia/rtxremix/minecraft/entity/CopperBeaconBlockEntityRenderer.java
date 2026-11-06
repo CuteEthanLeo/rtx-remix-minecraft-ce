@@ -7,35 +7,35 @@ package com.nvidia.rtxremix.minecraft.entity;
 import com.nvidia.rtxremix.minecraft.block.CopperBeaconBlock;
 import com.nvidia.rtxremix.minecraft.block.CopperBeaconBlockEntity;
 import com.nvidia.rtxremix.minecraft.block.CopperBeaconPose;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.resources.model.sprite.SpriteGetter;
+import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.model.ModelData;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.model.ModelPartBuilder;
-import net.minecraft.client.model.ModelPartData;
-import net.minecraft.client.model.ModelTransform;
-import net.minecraft.client.model.TexturedModelData;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayers;
-import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
-import net.minecraft.client.render.command.ModelCommandRenderer;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.util.math.Vec3d;
 import org.jspecify.annotations.Nullable;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.render.entity.model.EntityModelLayer;
-import net.minecraft.client.util.SpriteIdentifier;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.texture.SpriteHolder;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Direction;
 import org.joml.Quaternionf;
 
 /** Renders the independently rotating yoke and lamp head above the static mount. */
@@ -53,84 +53,84 @@ public final class CopperBeaconBlockEntityRenderer
         int lensTint = -1;
     }
 
-    public static final EntityModelLayer BODY_MODEL_LAYER = new EntityModelLayer(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "body");
-    public static final EntityModelLayer LENS_MODEL_LAYER = new EntityModelLayer(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "lens");
-    private static final SpriteIdentifier COPPER_TEXTURE = new SpriteIdentifier(
-            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
-            Identifier.ofVanilla("block/copper_block"));
+    public static final ModelLayerLocation BODY_MODEL_LAYER = new ModelLayerLocation(
+            Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "body");
+    public static final ModelLayerLocation LENS_MODEL_LAYER = new ModelLayerLocation(
+            Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "lens");
+    private static final SpriteId COPPER_TEXTURE = new SpriteId(
+            TextureAtlas.LOCATION_BLOCKS,
+            Identifier.withDefaultNamespace("block/copper_block"));
     static final Identifier LENS_SPRITE_ID =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens");
+            Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens");
     static final Identifier UNLIT_LENS_SPRITE_ID =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens_unlit");
-    private static final SpriteIdentifier LENS_TEXTURE = new SpriteIdentifier(
-            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
+            Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens_unlit");
+    private static final SpriteId LENS_TEXTURE = new SpriteId(
+            TextureAtlas.LOCATION_BLOCKS,
             LENS_SPRITE_ID);
-    private static final SpriteIdentifier UNLIT_LENS_TEXTURE = new SpriteIdentifier(
-            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
+    private static final SpriteId UNLIT_LENS_TEXTURE = new SpriteId(
+            TextureAtlas.LOCATION_BLOCKS,
             UNLIT_LENS_SPRITE_ID);
 
     private final ModelPart yoke;
     private final ModelPart head;
     private final ModelPart lens;
-    private final SpriteHolder spriteHolder;
+    private final SpriteGetter spriteHolder;
     private final CopperBeaconPose.Pose pose = new CopperBeaconPose.Pose();
     private final VerticalUvStripConsumer copperUvConsumer = new VerticalUvStripConsumer();
 
-    public CopperBeaconBlockEntityRenderer(BlockEntityRendererFactory.Context context) {
-        ModelPart bodyRoot = context.getLayerModelPart(BODY_MODEL_LAYER);
+    public CopperBeaconBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
+        ModelPart bodyRoot = context.bakeLayer(BODY_MODEL_LAYER);
         yoke = bodyRoot.getChild("yoke");
         head = yoke.getChild("head");
-        lens = context.getLayerModelPart(LENS_MODEL_LAYER).getChild("lens");
-        spriteHolder = context.spriteHolder();
+        lens = context.bakeLayer(LENS_MODEL_LAYER).getChild("lens");
+        spriteHolder = context.sprites();
     }
 
-    public static TexturedModelData getBodyTexturedModelData() {
-        ModelData modelData = new ModelData();
-        ModelPartData root = modelData.getRoot();
-        ModelPartData yokeData = root.addChild(
+    public static LayerDefinition getBodyTexturedModelData() {
+        MeshDefinition modelData = new MeshDefinition();
+        PartDefinition root = modelData.getRoot();
+        PartDefinition yokeData = root.addOrReplaceChild(
                 "yoke",
-                ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-3.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
-                        .uv(0, 0).cuboid(0.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
-                        .uv(0, 0).cuboid(-5.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f)
-                        .uv(0, 0).cuboid(3.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f),
-                ModelTransform.origin(8.0f, 10.0f, 8.0f));
-        yokeData.addChild(
+                CubeListBuilder.create()
+                        .texOffs(0, 0).addBox(-3.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
+                        .texOffs(0, 0).addBox(0.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
+                        .texOffs(0, 0).addBox(-5.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f)
+                        .texOffs(0, 0).addBox(3.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f),
+                PartPose.offset(8.0f, 10.0f, 8.0f));
+        yokeData.addOrReplaceChild(
                 "head",
-                ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-4.0f, -4.0f, -3.0f, 4.0f, 8.0f, 1.0f)
-                        .uv(0, 0).cuboid(0.0f, -4.0f, -3.0f, 4.0f, 8.0f, 1.0f)
-                        .uv(0, 0).cuboid(-4.0f, -4.0f, 3.0f, 4.0f, 8.0f, 1.0f)
-                        .uv(0, 0).cuboid(0.0f, -4.0f, 3.0f, 4.0f, 8.0f, 1.0f)
-                        .uv(0, 0).cuboid(-4.0f, -3.0f, -2.0f, 1.0f, 6.0f, 5.0f)
-                        .uv(0, 0).cuboid(3.0f, -3.0f, -2.0f, 1.0f, 6.0f, 5.0f)
-                        .uv(0, 0).cuboid(-3.0f, -4.0f, -2.0f, 3.0f, 1.0f, 5.0f)
-                        .uv(0, 0).cuboid(0.0f, -4.0f, -2.0f, 3.0f, 1.0f, 5.0f)
-                        .uv(0, 0).cuboid(-3.0f, 3.0f, -2.0f, 3.0f, 1.0f, 5.0f)
-                        .uv(0, 0).cuboid(0.0f, 3.0f, -2.0f, 3.0f, 1.0f, 5.0f)
-                        .uv(0, 0).cuboid(-6.0f, -1.0f, -1.0f, 2.0f, 2.0f, 3.0f)
-                        .uv(0, 0).cuboid(4.0f, -1.0f, -1.0f, 2.0f, 2.0f, 3.0f)
-                        .uv(0, 0).cuboid(-4.0f, -4.0f, -4.0f, 4.0f, 1.0f, 1.0f)
-                        .uv(0, 0).cuboid(0.0f, -4.0f, -4.0f, 4.0f, 1.0f, 1.0f)
-                        .uv(0, 0).cuboid(-4.0f, 3.0f, -4.0f, 4.0f, 1.0f, 1.0f)
-                        .uv(0, 0).cuboid(0.0f, 3.0f, -4.0f, 4.0f, 1.0f, 1.0f)
-                        .uv(0, 0).cuboid(-4.0f, -3.0f, -4.0f, 1.0f, 6.0f, 1.0f)
-                        .uv(0, 0).cuboid(3.0f, -3.0f, -4.0f, 1.0f, 6.0f, 1.0f),
-                ModelTransform.NONE);
-        return TexturedModelData.of(modelData, 16, 16);
+                CubeListBuilder.create()
+                        .texOffs(0, 0).addBox(-4.0f, -4.0f, -3.0f, 4.0f, 8.0f, 1.0f)
+                        .texOffs(0, 0).addBox(0.0f, -4.0f, -3.0f, 4.0f, 8.0f, 1.0f)
+                        .texOffs(0, 0).addBox(-4.0f, -4.0f, 3.0f, 4.0f, 8.0f, 1.0f)
+                        .texOffs(0, 0).addBox(0.0f, -4.0f, 3.0f, 4.0f, 8.0f, 1.0f)
+                        .texOffs(0, 0).addBox(-4.0f, -3.0f, -2.0f, 1.0f, 6.0f, 5.0f)
+                        .texOffs(0, 0).addBox(3.0f, -3.0f, -2.0f, 1.0f, 6.0f, 5.0f)
+                        .texOffs(0, 0).addBox(-3.0f, -4.0f, -2.0f, 3.0f, 1.0f, 5.0f)
+                        .texOffs(0, 0).addBox(0.0f, -4.0f, -2.0f, 3.0f, 1.0f, 5.0f)
+                        .texOffs(0, 0).addBox(-3.0f, 3.0f, -2.0f, 3.0f, 1.0f, 5.0f)
+                        .texOffs(0, 0).addBox(0.0f, 3.0f, -2.0f, 3.0f, 1.0f, 5.0f)
+                        .texOffs(0, 0).addBox(-6.0f, -1.0f, -1.0f, 2.0f, 2.0f, 3.0f)
+                        .texOffs(0, 0).addBox(4.0f, -1.0f, -1.0f, 2.0f, 2.0f, 3.0f)
+                        .texOffs(0, 0).addBox(-4.0f, -4.0f, -4.0f, 4.0f, 1.0f, 1.0f)
+                        .texOffs(0, 0).addBox(0.0f, -4.0f, -4.0f, 4.0f, 1.0f, 1.0f)
+                        .texOffs(0, 0).addBox(-4.0f, 3.0f, -4.0f, 4.0f, 1.0f, 1.0f)
+                        .texOffs(0, 0).addBox(0.0f, 3.0f, -4.0f, 4.0f, 1.0f, 1.0f)
+                        .texOffs(0, 0).addBox(-4.0f, -3.0f, -4.0f, 1.0f, 6.0f, 1.0f)
+                        .texOffs(0, 0).addBox(3.0f, -3.0f, -4.0f, 1.0f, 6.0f, 1.0f),
+                PartPose.ZERO);
+        return LayerDefinition.create(modelData, 16, 16);
     }
 
-    public static TexturedModelData getLensTexturedModelData() {
-        ModelData modelData = new ModelData();
-        ModelPartData root = modelData.getRoot();
-        root.addChild(
+    public static LayerDefinition getLensTexturedModelData() {
+        MeshDefinition modelData = new MeshDefinition();
+        PartDefinition root = modelData.getRoot();
+        root.addOrReplaceChild(
                 "lens",
-                ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-3.0f, -3.0f, -4.01f, 6.0f, 6.0f, 0.0f),
-                ModelTransform.origin(8.0f, 10.0f, 8.0f));
-        return TexturedModelData.of(modelData, 6, 6);
+                CubeListBuilder.create()
+                        .texOffs(0, 0).addBox(-3.0f, -3.0f, -4.01f, 6.0f, 6.0f, 0.0f),
+                PartPose.offset(8.0f, 10.0f, 8.0f));
+        return LayerDefinition.create(modelData, 6, 6);
     }
 
     @Override
@@ -139,17 +139,17 @@ public final class CopperBeaconBlockEntityRenderer
     }
 
     @Override
-    public void updateRenderState(
+    public void extractRenderState(
             CopperBeaconBlockEntity beacon,
             State state,
             float tickDelta,
-            Vec3d cameraPos,
-            ModelCommandRenderer.@Nullable CrumblingOverlayCommand crumblingOverlay) {
-        BlockEntityRenderer.super.updateRenderState(beacon, state, tickDelta, cameraPos, crumblingOverlay);
-        BlockState blockState = beacon.getCachedState();
-        state.up = blockState.get(CopperBeaconBlock.MOUNT);
-        state.forward = blockState.get(Properties.FACING);
-        double animationTick = CopperBeaconAnimationClock.sample(beacon.getWorld(), tickDelta);
+            Vec3 cameraPos,
+            ModelFeatureRenderer.@Nullable CrumblingOverlay crumblingOverlay) {
+        BlockEntityRenderer.super.extractRenderState(beacon, state, tickDelta, cameraPos, crumblingOverlay);
+        BlockState blockState = beacon.getBlockState();
+        state.up = blockState.getValue(CopperBeaconBlock.MOUNT);
+        state.forward = blockState.getValue(BlockStateProperties.FACING);
+        double animationTick = CopperBeaconAnimationClock.sample(beacon.getLevel(), tickDelta);
         state.yawAngle = beacon.yawAngleAt(animationTick);
         state.pitchAngle = beacon.pitchAngleAt(animationTick);
         state.active = beacon.isActive();
@@ -158,15 +158,15 @@ public final class CopperBeaconBlockEntityRenderer
     }
 
     @Override
-    public void render(
+    public void submit(
             State state,
-            MatrixStack matrices,
-            OrderedRenderCommandQueue queue,
+            PoseStack matrices,
+            SubmitNodeCollector queue,
             CameraRenderState cameraState) {
-        int light = state.lightmapCoordinates;
-        int overlay = OverlayTexture.DEFAULT_UV;
+        int light = state.lightCoords;
+        int overlay = OverlayTexture.NO_OVERLAY;
 
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(0.5, 0.5, 0.5);
         CopperBeaconPose.evaluate(
                 state.up,
@@ -174,7 +174,7 @@ public final class CopperBeaconBlockEntityRenderer
                 state.yawAngle,
                 state.pitchAngle,
                 pose);
-        matrices.multiply(pose.mountingRotation());
+        matrices.mulPose(pose.mountingRotation());
         matrices.translate(-0.5, -0.5, -0.5);
 
         // 1.21.9+: geometry is submitted as commands and replayed later, after every
@@ -182,37 +182,37 @@ public final class CopperBeaconBlockEntityRenderer
         // from values captured now rather than once here.
         float yawRadians = pose.modelYawRadians();
         float pitchRadians = pose.modelPitchRadians();
-        Sprite copperSprite = spriteHolder.getSprite(COPPER_TEXTURE);
-        RenderLayer copperLayer = COPPER_TEXTURE.getRenderLayer(RenderLayers::entitySolid);
-        queue.submitCustom(matrices, copperLayer, (entry, buffer) -> {
+        TextureAtlasSprite copperSprite = spriteHolder.get(COPPER_TEXTURE);
+        RenderType copperLayer = COPPER_TEXTURE.renderType(RenderTypes::entitySolid);
+        queue.submitCustomGeometry(matrices, copperLayer, (entry, buffer) -> {
             poseParts(yawRadians, pitchRadians);
             VertexConsumer copperVertices = copperUvConsumer.wrap(
-                    copperSprite.getTextureSpecificVertexConsumer(buffer));
+                    copperSprite.wrap(buffer));
             yoke.render(stackAt(entry), copperVertices, light, overlay);
         });
-        SpriteIdentifier lensTexture = lensTexture(state.active, state.intensityMultiplier);
-        Sprite lensSprite = spriteHolder.getSprite(lensTexture);
+        SpriteId lensTexture = lensTexture(state.active, state.intensityMultiplier);
+        TextureAtlasSprite lensSprite = spriteHolder.get(lensTexture);
         int lensTint = state.lensTint;
-        queue.submitCustom(matrices, lensTexture.getRenderLayer(RenderLayers::entitySolid), (entry, buffer) -> {
+        queue.submitCustomGeometry(matrices, lensTexture.renderType(RenderTypes::entitySolid), (entry, buffer) -> {
             poseParts(yawRadians, pitchRadians);
-            lens.render(stackAt(entry), lensSprite.getTextureSpecificVertexConsumer(buffer),
+            lens.render(stackAt(entry), lensSprite.wrap(buffer),
                     light, overlay, lensTint);
         });
-        matrices.pop();
+        matrices.popPose();
     }
 
     private void poseParts(float yawRadians, float pitchRadians) {
-        yoke.yaw = yawRadians;
-        yoke.pitch = 0.0f;
-        head.yaw = 0.0f;
-        head.pitch = pitchRadians;
-        lens.yaw = yawRadians;
-        lens.pitch = pitchRadians;
+        yoke.yRot = yawRadians;
+        yoke.xRot = 0.0f;
+        head.yRot = 0.0f;
+        head.xRot = pitchRadians;
+        lens.yRot = yawRadians;
+        lens.xRot = pitchRadians;
     }
 
-    private static MatrixStack stackAt(MatrixStack.Entry entry) {
-        MatrixStack stack = new MatrixStack();
-        stack.peek().copy(entry);
+    private static PoseStack stackAt(PoseStack.Pose entry) {
+        PoseStack stack = new PoseStack();
+        stack.last().set(entry);
         return stack;
     }
 
@@ -226,15 +226,15 @@ public final class CopperBeaconBlockEntityRenderer
             ModelPart head,
             ModelPart lens,
             CopperBeaconPose.Pose pose) {
-        yoke.yaw = pose.modelYawRadians();
-        yoke.pitch = 0.0f;
-        head.yaw = 0.0f;
-        head.pitch = pose.modelPitchRadians();
-        lens.yaw = pose.modelYawRadians();
-        lens.pitch = pose.modelPitchRadians();
+        yoke.yRot = pose.modelYawRadians();
+        yoke.xRot = 0.0f;
+        head.yRot = 0.0f;
+        head.xRot = pose.modelPitchRadians();
+        lens.yRot = pose.modelYawRadians();
+        lens.xRot = pose.modelPitchRadians();
     }
 
-    static SpriteIdentifier lensTexture(boolean active, float intensityMultiplier) {
+    static SpriteId lensTexture(boolean active, float intensityMultiplier) {
         return active && intensityMultiplier > 0.0f
                 ? LENS_TEXTURE
                 : UNLIT_LENS_TEXTURE;
@@ -257,50 +257,50 @@ public final class CopperBeaconBlockEntityRenderer
         }
 
         @Override
-        public VertexConsumer vertex(float x, float y, float z) {
-            delegate.vertex(x, y, z);
+        public VertexConsumer addVertex(float x, float y, float z) {
+            delegate.addVertex(x, y, z);
             return this;
         }
 
         @Override
-        public VertexConsumer color(int argb) {
-            delegate.color(argb);
+        public VertexConsumer setColor(int argb) {
+            delegate.setColor(argb);
             return this;
         }
 
         @Override
-        public VertexConsumer color(int red, int green, int blue, int alpha) {
-            delegate.color(red, green, blue, alpha);
+        public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+            delegate.setColor(red, green, blue, alpha);
             return this;
         }
 
         @Override
-        public VertexConsumer texture(float u, float v) {
-            delegate.texture(u, copperTextureV(v));
+        public VertexConsumer setUv(float u, float v) {
+            delegate.setUv(u, copperTextureV(v));
             return this;
         }
 
         @Override
-        public VertexConsumer overlay(int u, int v) {
-            delegate.overlay(u, v);
+        public VertexConsumer setUv1(int u, int v) {
+            delegate.setUv1(u, v);
             return this;
         }
 
         @Override
-        public VertexConsumer light(int u, int v) {
-            delegate.light(u, v);
+        public VertexConsumer setUv2(int u, int v) {
+            delegate.setUv2(u, v);
             return this;
         }
 
         @Override
-        public VertexConsumer lineWidth(float width) {
-            delegate.lineWidth(width);
+        public VertexConsumer setLineWidth(float width) {
+            delegate.setLineWidth(width);
             return this;
         }
 
         @Override
-        public VertexConsumer normal(float x, float y, float z) {
-            delegate.normal(x, y, z);
+        public VertexConsumer setNormal(float x, float y, float z) {
+            delegate.setNormal(x, y, z);
             return this;
         }
     }

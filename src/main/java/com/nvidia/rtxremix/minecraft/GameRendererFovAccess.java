@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft;
 
-import net.minecraft.client.render.Camera;
+import net.minecraft.client.Camera;
 
 /**
  * Duck interface on {@code GameRenderer} (implemented by {@code GameRendererMixin}) exposing the

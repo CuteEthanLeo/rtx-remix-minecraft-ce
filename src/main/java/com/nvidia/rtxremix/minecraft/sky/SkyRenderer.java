@@ -8,6 +8,7 @@
 package com.nvidia.rtxremix.minecraft.sky;
 
 import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.InstanceCategoryBit;
 import com.nvidia.rtxremix.InstanceInfoBlendEXT;
@@ -48,12 +49,6 @@ import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.world.dimension.DimensionType;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
 import org.joml.Quaternionf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +58,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Manages sky rendering for RTX Remix.
@@ -91,9 +91,9 @@ public class SkyRenderer {
     /** Share of the previous cloud-dome mean kept per readback (about 10 a second). */
     private static final float CLOUD_MEAN_KEEP = 0.8f;
     private static final Identifier SUN_TEXTURE =
-            Identifier.ofVanilla("textures/environment/sun.png");
+            Identifier.withDefaultNamespace("textures/environment/sun.png");
     private static final Identifier MOON_PHASES_TEXTURE =
-            Identifier.ofVanilla("textures/environment/moon_phases.png");
+            Identifier.withDefaultNamespace("textures/environment/moon_phases.png");
     private static final float CELESTIAL_DISTANCE = 100.0f;
     private static final float SUN_HALF_SIZE = 30.0f;
     private static final float MOON_HALF_SIZE = 20.0f;
@@ -173,7 +173,7 @@ public class SkyRenderer {
     // ---- Instance state ----
 
     private final RemixRenderer renderer;
-    private ClientWorld currentWorld;
+    private ClientLevel currentWorld;
     private RemixTexture skyTextureAsset;
     private RemixLight skyDomeLightAsset;
     private long overcastTextureHandle;
@@ -275,7 +275,7 @@ public class SkyRenderer {
     //  Main render entry
     // ====================================================================
 
-    public void render(ClientWorld world, Vec3d cameraPos, float tickDelta) {
+    public void render(ClientLevel world, Vec3 cameraPos, float tickDelta) {
         if (world == null || renderer.getRemixApi() == null || !enabled) return;
 
         // A portal replaces the world without a disconnect, and each sky type publishes a
@@ -309,8 +309,8 @@ public class SkyRenderer {
 
     private void renderAtmosphericSky(
             RemixAPI api,
-            ClientWorld world,
-            Vec3d cameraPos,
+            ClientLevel world,
+            Vec3 cameraPos,
             float tickDelta) {
         float skyAngle;
         LightManager.SkyLightState lightState;
@@ -323,8 +323,8 @@ public class SkyRenderer {
                     confLayers != null && confLayers.isActive()
                             ? confLayers.weatherStrengths()
                             : new ConfLayerDriver.WeatherStrengths(
-                                    world.getRainGradient(tickDelta),
-                                    world.getThunderGradient(tickDelta));
+                                    world.getRainLevel(tickDelta),
+                                    world.getThunderLevel(tickDelta));
             LightManager lightManager = renderer.getLightManager();
             lightState = lightManager != null
                     ? lightManager.getSkyLightState()
@@ -351,7 +351,7 @@ public class SkyRenderer {
         }
 
         try (ProfileScope ignored = ProfileScope.begin("Sky.Atmosphere")) {
-            updateAtmosphericDomeLight(api, lightState, cameraPos, world.getTimeOfDay() + (double) tickDelta);
+            updateAtmosphericDomeLight(api, lightState, cameraPos, world.getDefaultClockTime() + (double) tickDelta);
         }
         try (ProfileScope ignored = ProfileScope.begin("Sky.Celestial")) {
             renderCelestialMeshes(
@@ -428,7 +428,7 @@ public class SkyRenderer {
     private void updateAtmosphericDomeLight(
             RemixAPI api,
             LightManager.SkyLightState lightState,
-            Vec3d cameraPos, double dayTime) {
+            Vec3 cameraPos, double dayTime) {
         regenerateSkyTexture(api, lightState, cameraPos, dayTime);
         publishSkyDome(api);
     }
@@ -521,8 +521,8 @@ public class SkyRenderer {
             return false;
         }
 
-        String gameDirectory = MinecraftClient.getInstance()
-                .runDirectory.getAbsolutePath();
+        String gameDirectory = Minecraft.getInstance()
+                .gameDirectory.getAbsolutePath();
         String texturePath = gameDirectory + File.separator + OVERCAST_TEXTURE_DDS;
         try {
             overcastTextureHandle = api.createTextureFromFile(texturePath);
@@ -541,7 +541,7 @@ public class SkyRenderer {
     private void regenerateSkyTexture(
             RemixAPI api,
             LightManager.SkyLightState lightState,
-            Vec3d cameraPos, double dayTime) {
+            Vec3 cameraPos, double dayTime) {
         boolean clouds = VolumetricClouds.isActive() && VolumetricClouds.isUsable();
         // Both assets must be live for a skip to be safe. They are released whenever the world
         // changes, and a world whose time never advances keeps the parameters constant forever,
@@ -581,7 +581,7 @@ public class SkyRenderer {
      * @return whether the clouds own the dome this frame, so the bare sky must not be uploaded
      */
     private boolean compositeClouds(RemixAPI api, LightManager.SkyLightState lightState,
-                                    Vec3d cameraPos, double dayTime) {
+                                    Vec3 cameraPos, double dayTime) {
         try {
             VolumetricClouds.Quality quality = VolumetricClouds.currentQuality();
             if (cloudCompositor != null && cloudCompositor.quality().domeWidth() != quality.domeWidth()) {
@@ -759,8 +759,8 @@ public class SkyRenderer {
 
     private void renderCelestialMeshes(
             RemixAPI api,
-            ClientWorld world,
-            Vec3d cameraPos,
+            ClientLevel world,
+            Vec3 cameraPos,
             float skyAngle,
             float tickDelta,
             float[] sunDirection,
@@ -850,8 +850,8 @@ public class SkyRenderer {
      */
     private boolean drawStarryNight(
             RemixAPI api,
-            ClientWorld world,
-            Vec3d cameraPos,
+            ClientLevel world,
+            Vec3 cameraPos,
             float skyAngle,
             float starBrightness,
             float weatherVisibility) {
@@ -867,7 +867,7 @@ public class SkyRenderer {
                 NightSkyRenderer.bandOpacity(stars, WorldSky.moonSize(world, 1.0f)));
         if (drawn) {
             nightSky.drawMeteors(api, cameraPos.x, cameraPos.y, cameraPos.z, celestialBlendPNext,
-                    stars, world.getTimeOfDay() / 24000L);
+                    stars, world.getDefaultClockTime() / 24000L);
         }
         return drawn;
     }
@@ -943,14 +943,14 @@ public class SkyRenderer {
     }
 
     private RemixTexture loadCelestialTexture(Identifier textureId) throws IOException {
-        var client = MinecraftClient.getInstance();
+        var client = Minecraft.getInstance();
         var resource = client.getResourceManager().getResource(textureId)
                 .orElseThrow(() -> new IOException("Missing texture " + textureId));
 
         byte[] pixels;
         int width;
         int height;
-        try (NativeImage image = NativeImage.read(resource.getInputStream())) {
+        try (NativeImage image = NativeImage.read(resource.open())) {
             width = image.getWidth();
             height = image.getHeight();
             pixels = new byte[width * height * 4];
@@ -1104,7 +1104,7 @@ public class SkyRenderer {
     }
 
     private static float[] getVanillaStarVertices() {
-        var worldRenderer = MinecraftClient.getInstance().worldRenderer;
+        var worldRenderer = Minecraft.getInstance().levelRenderer;
         if (!(worldRenderer instanceof WorldRendererStarAccess starAccess)) {
             throw new IllegalStateException("WorldRenderer star capture is unavailable");
         }
@@ -1132,7 +1132,7 @@ public class SkyRenderer {
 
     private static void updateCelestialTransform(
             Transform transform,
-            Vec3d cameraPos,
+            Vec3 cameraPos,
             float[] direction,
             float halfSize) {
         float dx = direction[0];
@@ -1170,7 +1170,7 @@ public class SkyRenderer {
 
     private static void updateStarTransform(
             Transform transform,
-            Vec3d cameraPos,
+            Vec3 cameraPos,
             float skyAngle) {
         Quaternionf rotation = new Quaternionf()
                 .rotateX((float) Math.toRadians(SUN_PATH_ROTATION_DEG))

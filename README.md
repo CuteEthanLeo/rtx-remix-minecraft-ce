@@ -68,7 +68,7 @@ The step-by-step version, with launcher advice and troubleshooting, is in
 - An internet connection while the installer runs.
 - 16 GB of system memory is recommended.
 
-Java 21, Fabric, and the RTX Remix runtime are installed for you.
+Java 25, Fabric, and the RTX Remix runtime are installed for you.
 
 Building and running from source has its own
 [prerequisites](docs/GETTING_STARTED.md#prerequisites), including Prism

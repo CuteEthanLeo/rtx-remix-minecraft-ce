@@ -7,9 +7,9 @@ package com.nvidia.rtxremix.minecraft.mixin;
 import com.nvidia.rtxremix.minecraft.entity.EntityRenderContext;
 import com.nvidia.rtxremix.minecraft.terrain.capture.BlockQuadEmitter;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
-import net.minecraft.client.render.item.ItemRenderer;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.renderer.item.ItemModelResolver;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -24,7 +24,8 @@ import org.spongepowered.asm.mixin.Mixin;
  * Block-item layer classification and the held flame/smoke are disabled until they are
  * re-hooked on {@code ItemRenderState} / {@code ItemCommandRenderer}.
  */
-@Mixin(ItemRenderer.class)
+// TODO(26.2): ItemRenderer is gone; parked on ItemModelResolver (no injections) until the held-block hook is re-added.
+@Mixin(ItemModelResolver.class)
 public class ItemRendererMixin {
 
     /**
@@ -36,7 +37,7 @@ public class ItemRendererMixin {
     private static int rtxremix$blockLayer(ItemStack stack) {
         return stack.getItem() instanceof BlockItem blockItem
                 ? BlockTextureManager.layerType(
-                        BlockQuadEmitter.classifyBlockLayer(blockItem.getBlock().getDefaultState()))
+                        BlockQuadEmitter.classifyBlockLayer(blockItem.getBlock().defaultBlockState()))
                 : EntityRenderContext.NO_BLOCK_ITEM;
     }
 }

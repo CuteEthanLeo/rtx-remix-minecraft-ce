@@ -21,6 +21,7 @@ import org.lwjgl.opengl.GL30;
 import static org.junit.jupiter.api.Assertions.*;
 
 
+
 /** Actual GPU and readback coverage, run explicitly with Gradle's cloudGpuTest task. */
 @EnabledIfSystemProperty(named = "rtxremix.test.cloudGpu", matches = "true")
 class CloudSkyCompositorGpuTest {

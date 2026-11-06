@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.entity.EntityRenderManager;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -17,6 +17,6 @@ import org.spongepowered.asm.mixin.Mixin;
  * render and the flush of its private queue, and this mixin is an empty shell.
  * TODO(1.21.11): drop it from the mixin config once nothing needs the target.
  */
-@Mixin(EntityRenderManager.class)
+@Mixin(EntityRenderDispatcher.class)
 public abstract class EntityRenderDispatcherMixin {
 }

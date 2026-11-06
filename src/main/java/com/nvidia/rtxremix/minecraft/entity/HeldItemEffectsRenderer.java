@@ -6,27 +6,26 @@ package com.nvidia.rtxremix.minecraft.entity;
 
 import com.nvidia.rtxremix.minecraft.light.HeldLightState;
 import com.nvidia.rtxremix.minecraft.particle.ParticleTint;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.mixin.ParticleManagerAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.ParticleSpriteManagerAccessor;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.particle.SpriteProvider;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderLayers;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ItemDisplayContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.ParticleType;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.particle.SimpleParticleType;
-import net.minecraft.registry.Registries;
 import org.joml.Matrix4f;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
@@ -54,8 +53,8 @@ import org.joml.Vector3fc;
  */
 public final class HeldItemEffectsRenderer {
 
-    private static final RenderLayer EFFECT_LAYER =
-            RenderLayers.entityTranslucentEmissive(SpriteAtlasTexture.PARTICLE_ATLAS_TEXTURE);
+    private static final RenderType EFFECT_LAYER =
+            RenderTypes.entityTranslucentEmissive(TextureAtlas.LOCATION_PARTICLES);
     private static final float TICKS_PER_SECOND = 20.0f;
     private static final int OPAQUE = 255;
     private static final int WHITE = 255;
@@ -85,7 +84,7 @@ public final class HeldItemEffectsRenderer {
      *                  transforms from the baked model to the item model)
      */
     public static void render(ItemStack stack, ItemDisplayContext mode,
-                              MatrixStack matrices, VertexConsumerProvider consumers,
+                              PoseStack matrices, RemixBufferSource consumers,
                               float displayScale) {
         EntityRenderContext context = EntityRenderContext.get();
         if (!context.isRemixPass() || !HeldItemFlame.isHandMode(mode)) return;
@@ -97,37 +96,37 @@ public final class HeldItemEffectsRenderer {
         LivingEntity holder = context.getHeldItemHolder();
         if (holder != null && !HeldLightState.isLit(holder, stack)) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null) return;
-        SpriteProvider flameSprites = spriteProvider(client, flameParticle);
-        SpriteProvider smokeSprites = spriteProvider(client, ParticleTypes.SMOKE);
+        Minecraft client = Minecraft.getInstance();
+        if (client.level == null) return;
+        SpriteSet flameSprites = spriteProvider(client, flameParticle);
+        SpriteSet smokeSprites = spriteProvider(client, ParticleTypes.SMOKE);
         if (flameSprites == null || smokeSprites == null) return;
 
-        Quaternionfc facing = client.gameRenderer.getCamera().getRotation();
+        Quaternionfc facing = client.gameRenderer.mainCamera().rotation();
         Quaternionfc frame = HeldItemFlame.riseFrame(mode, facing);
-        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickProgress(false);
+        double ticks = client.level.getGameTime() + client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
         float phase = mode.ordinal();
         float cameraOffset = HeldItemFlame.cameraOffset(mode);
         // Null when the capture does not know where the eye is; the poses then stay at depth 1.
         Vector3fc eye = context.getEye();
         float depthFraction = HeldItemFlame.depthFraction(mode);
-        Matrix4f itemPose = matrices.peek().getPositionMatrix();
+        Matrix4f itemPose = matrices.last().pose();
         // A hand draws its item scaled down (item/generated: 0.68 in first person,
         // 0.55 in third). The flame and smoke are world-sized, so the poses divide
         // that scale back out.
         VertexConsumer buffer = consumers.getBuffer(EFFECT_LAYER);
 
-        matrices.push();
-        MatrixStack.Entry entry = matrices.peek();
-        entry.getNormalMatrix().rotation(facing);
+        matrices.pushPose();
+        PoseStack.Pose entry = matrices.last();
+        entry.normal().rotation(facing);
 
         double seconds = ticks / TICKS_PER_SECOND;
         HeldItemFlame.composePose(itemPose, displayScale, facing, frame,
                 HeldItemFlame.flicker(seconds, phase), HeldItemFlame.bob(seconds, phase),
                 cameraOffset, eye, depthFraction, scratchAnchor, scratchScale, scratchPose);
-        entry.getPositionMatrix().set(scratchPose);
+        entry.pose().set(scratchPose);
         // A freshly spawned particle of the type shows the provider's first sprite.
-        emitQuad(buffer, entry, flameSprites.getSprite(0, 1), WHITE, OPAQUE);
+        emitQuad(buffer, entry, flameSprites.get(0, 1), WHITE, OPAQUE);
 
         // Every slot is emitted, dormant ones included, so part ordinals stay
         // fixed: the retained instance behind each quad keeps its identity.
@@ -136,20 +135,20 @@ public final class HeldItemEffectsRenderer {
             for (HeldItemSmoke.Puff puff : scratchPuffs) {
                 HeldItemSmoke.composePose(itemPose, displayScale, facing, frame, puff, cameraOffset, eye,
                         depthFraction, scratchAnchor, scratchScale, scratchPose);
-                entry.getPositionMatrix().set(scratchPose);
-                emitQuad(buffer, entry, smokeSprites.getSprite(puff.age, puff.maxAge),
+                entry.pose().set(scratchPose);
+                emitQuad(buffer, entry, smokeSprites.get(puff.age, puff.maxAge),
                         SMOKE_GREY, SMOKE_ALPHA);
             }
         }
-        matrices.pop();
+        matrices.popPose();
     }
 
-    private static SpriteProvider spriteProvider(MinecraftClient client, ParticleType<?> particle) {
+    private static SpriteSet spriteProvider(Minecraft client, ParticleType<?> particle) {
         Object provider = ((ParticleSpriteManagerAccessor)
-                ((ParticleManagerAccessor) client.particleManager).rtxremix$getSpriteManager())
+                ((ParticleManagerAccessor) client.particleEngine).rtxremix$getSpriteManager())
                 .getSpriteAwareFactories()
-                .get(Registries.PARTICLE_TYPE.getId(particle));
-        return provider instanceof SpriteProvider spriteProvider ? spriteProvider : null;
+                .get(BuiltInRegistries.PARTICLE_TYPE.getKey(particle));
+        return provider instanceof SpriteSet spriteProvider ? spriteProvider : null;
     }
 
     /**
@@ -157,25 +156,25 @@ public final class HeldItemEffectsRenderer {
      * The vertex colour multiplies the sprite, alpha included, under the
      * vertex-colour blend state the submitter gives these parts.
      */
-    private static void emitQuad(VertexConsumer buffer, MatrixStack.Entry entry, Sprite sprite,
+    private static void emitQuad(VertexConsumer buffer, PoseStack.Pose entry, TextureAtlasSprite sprite,
                                  int grey, int alpha) {
-        float u0 = sprite.getMinU();
-        float u1 = sprite.getMaxU();
-        float v0 = sprite.getMinV();
-        float v1 = sprite.getMaxV();
+        float u0 = sprite.getU0();
+        float u1 = sprite.getU1();
+        float v0 = sprite.getV0();
+        float v1 = sprite.getV1();
         vertex(buffer, entry, -1.0f, -1.0f, u0, v1, grey, alpha);
         vertex(buffer, entry, 1.0f, -1.0f, u1, v1, grey, alpha);
         vertex(buffer, entry, 1.0f, 1.0f, u1, v0, grey, alpha);
         vertex(buffer, entry, -1.0f, 1.0f, u0, v0, grey, alpha);
     }
 
-    private static void vertex(VertexConsumer buffer, MatrixStack.Entry entry,
+    private static void vertex(VertexConsumer buffer, PoseStack.Pose entry,
                                float x, float y, float u, float v, int grey, int alpha) {
-        buffer.vertex(entry, x, y, 0.0f)
-                .color(grey, grey, grey, alpha)
-                .texture(u, v)
-                .overlay(OverlayTexture.DEFAULT_UV)
-                .light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0.0f, 0.0f, 1.0f);
+        buffer.addVertex(entry, x, y, 0.0f)
+                .setColor(grey, grey, grey, alpha)
+                .setUv(u, v)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(LightCoordsUtil.FULL_BRIGHT)
+                .setNormal(entry, 0.0f, 0.0f, 1.0f);
     }
 }

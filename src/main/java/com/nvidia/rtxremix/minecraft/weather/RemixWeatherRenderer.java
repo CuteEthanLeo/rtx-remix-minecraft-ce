@@ -4,11 +4,6 @@
  */
 package com.nvidia.rtxremix.minecraft.weather;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.BuiltBuffer;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.lwjgl.opengl.GL11;
@@ -17,11 +12,14 @@ import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryStack;
-
+import com.mojang.blaze3d.vertex.MeshData;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.Lightmap;
+import net.minecraft.resources.Identifier;
 
 /**
  * Draws rain and snow with GL directly onto the composited Remix colour image,
@@ -36,11 +34,11 @@ public final class RemixWeatherRenderer {
     private static final float NEAR_PLANE = 0.05f;
     private static final float FAR_PLANE = 1000.0f;
     private static final Identifier RAIN_TEXTURE =
-            Identifier.ofVanilla("textures/environment/rain.png");
+            Identifier.withDefaultNamespace("textures/environment/rain.png");
     private final List<DeferredDraw> draws = new ArrayList<>(2);
     private Matrix4f projection;
     private Matrix4f modelView;
-    private LightmapTextureManager lightmap;
+    private Lightmap lightmap;
     private DepthSeeder depthSeeder;
     private int capturedQuadCount;
     private int lastDrawCount;
@@ -51,7 +49,7 @@ public final class RemixWeatherRenderer {
         // shader must become a RenderPipeline before rain can be drawn over the Remix image again.
     }
 
-    public void beginCaptureFrame(LightmapTextureManager lightmapTextureManager) {
+    public void beginCaptureFrame(Lightmap lightmapTextureManager) {
         closePendingDraws();
         lightmap = lightmapTextureManager;
         capturedQuadCount = 0;
@@ -60,7 +58,7 @@ public final class RemixWeatherRenderer {
     }
 
     public void updateCamera(Camera camera, float fovYDegrees, float aspect) {
-        Quaternionf cameraRotation = camera.getRotation().conjugate(new Quaternionf());
+        Quaternionf cameraRotation = camera.rotation().conjugate(new Quaternionf());
         modelView = new Matrix4f().rotation(cameraRotation);
         projection = new Matrix4f().perspective(
                 (float) Math.toRadians(fovYDegrees),
@@ -69,12 +67,12 @@ public final class RemixWeatherRenderer {
                 FAR_PLANE);
     }
 
-    public void capture(BuiltBuffer buffer, Identifier texture) {
+    public void capture(MeshData buffer, Identifier texture) {
         if (texture == null) {
             buffer.close();
             throw new IllegalStateException("Weather draw did not bind a texture");
         }
-        capturedQuadCount += buffer.getDrawParameters().vertexCount() / 4;
+        capturedQuadCount += buffer.drawState().vertexCount() / 4;
         draws.add(new DeferredDraw(buffer, texture, texture.equals(RAIN_TEXTURE)));
     }
 
@@ -160,7 +158,7 @@ public final class RemixWeatherRenderer {
         }
     }
 
-    private record DeferredDraw(BuiltBuffer buffer, Identifier texture, boolean rain) {
+    private record DeferredDraw(MeshData buffer, Identifier texture, boolean rain) {
     }
 
     private static final class DepthSeeder {

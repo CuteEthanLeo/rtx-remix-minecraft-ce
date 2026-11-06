@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.model.WeightedBlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.WeightedVariants;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -16,6 +16,6 @@ import org.spongepowered.asm.mixin.Mixin;
  * is disabled until it is re-measured against the new model pipeline; this mixin is an
  * empty shell so the mixin config keeps loading.
  */
-@Mixin(WeightedBlockStateModel.class)
+@Mixin(WeightedVariants.class)
 public abstract class WeightedBakedModelMixin {
 }

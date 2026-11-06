@@ -14,8 +14,8 @@ public interface ParticleAccessor {
     @Accessor("x") double getX();
     @Accessor("y") double getY();
     @Accessor("z") double getZ();
-    @Accessor("lastX") double getPrevPosX();
-    @Accessor("lastY") double getPrevPosY();
-    @Accessor("lastZ") double getPrevPosZ();
-    @Accessor("dead") boolean getDead();
+    @Accessor("xo") double getPrevPosX();
+    @Accessor("yo") double getPrevPosY();
+    @Accessor("zo") double getPrevPosZ();
+    @Accessor("removed") boolean getDead();
 }

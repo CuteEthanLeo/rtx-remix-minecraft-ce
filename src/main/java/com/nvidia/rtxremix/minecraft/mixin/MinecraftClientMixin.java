@@ -5,10 +5,10 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.thread.BlockableEventLoop;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.thread.ThreadExecutor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Hooks into MinecraftClient lifecycle events.
  */
-@Mixin(MinecraftClient.class)
+@Mixin(Minecraft.class)
 public abstract class MinecraftClientMixin {
     private static final ThreadLocal<ProfileScope> rtxremix$renderScope = new ThreadLocal<>();
     private static final ThreadLocal<ProfileScope> rtxremix$renderPhaseScope = new ThreadLocal<>();
@@ -32,7 +32,7 @@ public abstract class MinecraftClientMixin {
     private static final ThreadLocal<ProfileScope> rtxremix$blitScope = new ThreadLocal<>();
     private static final ThreadLocal<Long> rtxremix$renderStartNanos = new ThreadLocal<>();
 
-    @Inject(method = "render", at = @At("HEAD"))
+    @Inject(method = "runTick", at = @At("HEAD"))
     private void rtxremix$renderHead(boolean tick, CallbackInfo ci) {
         ProfileScope.beginFrame();
         rtxremix$renderStartNanos.set(System.nanoTime());
@@ -42,10 +42,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/RenderTickCounter$Dynamic;beginRenderTick(JZ)I"
+            target = "Lnet/minecraft/client/DeltaTracker$Timer;advanceGameTime(J)I"
         ),
         require = 0
     )
@@ -55,10 +55,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/RenderTickCounter$Dynamic;beginRenderTick(JZ)I",
+            target = "Lnet/minecraft/client/DeltaTracker$Timer;advanceGameTime(J)I",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -68,10 +68,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/MinecraftClient;runTasks()V"
+            target = "Lnet/minecraft/client/Minecraft;runAllTasks()V"
         ),
         require = 0
     )
@@ -83,10 +83,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/MinecraftClient;runTasks()V",
+            target = "Lnet/minecraft/client/Minecraft;runAllTasks()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -97,10 +97,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/sound/SoundManager;updateListenerPosition(Lnet/minecraft/client/render/Camera;)V"
+            target = "Lnet/minecraft/client/sounds/SoundManager;updateSource(Lnet/minecraft/client/Camera;)V"
         ),
         require = 0
     )
@@ -113,10 +113,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/sound/SoundManager;updateListenerPosition(Lnet/minecraft/client/render/Camera;)V",
+            target = "Lnet/minecraft/client/sounds/SoundManager;updateSource(Lnet/minecraft/client/Camera;)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -125,14 +125,9 @@ public abstract class MinecraftClientMixin {
         rtxremix$closeScope(rtxremix$soundScope);
     }
 
-    @Inject(
-        method = "render",
-        at = @At(
-            value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/RenderSystem;clear(IZ)V"
-        ),
-        require = 0
-    )
+    // 26.2: the frame is split into update/extract/render inside Minecraft.renderFrame; display
+    // prep opens at the top of renderFrame.
+    @Inject(method = "renderFrame", at = @At("HEAD"))
     private void rtxremix$beforeDisplayPrep(boolean tick, CallbackInfo ci) {
         rtxremix$closeScope(rtxremix$preGamePrepScope);
         rtxremix$closeScope(rtxremix$beginRenderTickScope);
@@ -143,10 +138,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Mouse;tick()V"
+            target = "Lnet/minecraft/client/MouseHandler;handleAccumulatedMovement()V"
         ),
         require = 0
     )
@@ -155,10 +150,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "runTick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Mouse;tick()V",
+            target = "Lnet/minecraft/client/MouseHandler;handleAccumulatedMovement()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -167,11 +162,29 @@ public abstract class MinecraftClientMixin {
         rtxremix$closeScope(rtxremix$mouseScope);
     }
 
+    /**
+     * Apply interactive or benchmark camera poses before GameRenderer.update builds
+     * Minecraft's interpolated Camera for this frame (26.2 moved that out of render).
+     */
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;render(Lnet/minecraft/client/render/RenderTickCounter;Z)V"
+            target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;)V"
+        )
+    )
+    private void rtxremix$beforeCameraUpdate(boolean tick, CallbackInfo ci) {
+        RemixRenderer renderer = RtxRemixMod.renderer;
+        if (renderer != null) {
+            renderer.onMinecraftWorldRenderFrameStart((Minecraft) (Object) this, tick);
+        }
+    }
+
+    @Inject(
+        method = "renderFrame",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V"
         )
     )
     private void rtxremix$beforeGameRenderer(boolean tick, CallbackInfo ci) {
@@ -183,20 +196,13 @@ public abstract class MinecraftClientMixin {
         rtxremix$closeScope(rtxremix$mouseScope);
         rtxremix$closeScope(rtxremix$displayPrepScope);
         rtxremix$transitionRenderPhase("MinecraftClient.render.gameRenderer");
-
-        // Apply interactive or benchmark camera poses before GameRenderer.renderWorld
-        // constructs Minecraft's interpolated Camera for this frame.
-        RemixRenderer renderer = RtxRemixMod.renderer;
-        if (renderer != null) {
-            renderer.onMinecraftWorldRenderFrameStart((MinecraftClient) (Object) this, tick);
-        }
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;render(Lnet/minecraft/client/render/RenderTickCounter;Z)V",
+            target = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V",
             shift = At.Shift.AFTER
         )
     )
@@ -205,10 +211,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/Framebuffer;endWrite()V"
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
         ),
         require = 0
     )
@@ -224,10 +230,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/Framebuffer;blitToScreen(II)V",
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -237,10 +243,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/util/Window;swapBuffers()V"
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V"
         )
     )
     private void rtxremix$beforeSwapBuffers(boolean tick, CallbackInfo ci) {
@@ -248,10 +254,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/util/Window;swapBuffers()V",
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V",
             shift = At.Shift.AFTER
         )
     )
@@ -260,10 +266,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/RenderSystem;limitDisplayFPS(I)V"
+            target = "Lnet/minecraft/client/FramerateLimiter;limitDisplayFPS(I)V"
         ),
         require = 0
     )
@@ -272,10 +278,10 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(
-        method = "render",
+        method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/RenderSystem;limitDisplayFPS(I)V",
+            target = "Lnet/minecraft/client/FramerateLimiter;limitDisplayFPS(I)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -284,32 +290,15 @@ public abstract class MinecraftClientMixin {
         rtxremix$transitionRenderPhase("MinecraftClient.render.afterFrameLimit");
     }
 
-    @Inject(
-        method = "render",
-        at = @At(
-            value = "INVOKE",
-            target = "Ljava/lang/Thread;yield()V"
-        )
-    )
-    private void rtxremix$beforeYield(boolean tick, CallbackInfo ci) {
-        rtxremix$transitionRenderPhase("MinecraftClient.render.yield");
-    }
-
-    @Inject(
-        method = "render",
-        at = @At(
-            value = "INVOKE",
-            target = "Ljava/lang/Thread;yield()V",
-            shift = At.Shift.AFTER
-        )
-    )
+    // 26.2: the run loop no longer yields; the post-frame phase starts when renderFrame returns.
+    @Inject(method = "renderFrame", at = @At("RETURN"))
     private void rtxremix$afterYield(boolean tick, CallbackInfo ci) {
         rtxremix$transitionRenderPhase("MinecraftClient.render.postFrame");
     }
 
     // Tracy frames come from the runtime's FrameMark inside Present; a second
     // mark here would split every frame at the present boundary.
-    @Inject(method = "render", at = @At("RETURN"))
+    @Inject(method = "runTick", at = @At("RETURN"))
     private void rtxremix$renderReturn(boolean tick, CallbackInfo ci) {
         rtxremix$closeRenderChildScopes();
         rtxremix$closeRenderPhase();
@@ -338,7 +327,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/hud/InGameHud;tick(Z)V"
+            target = "Lnet/minecraft/client/gui/Gui;tick()V"
         ),
         require = 0
     )
@@ -350,7 +339,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/hud/InGameHud;tick(Z)V",
+            target = "Lnet/minecraft/client/gui/Gui;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -363,7 +352,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;updateCrosshairTarget(F)V"
+            target = "Lnet/minecraft/client/Minecraft;pick(F)V"
         ),
         require = 0
     )
@@ -375,7 +364,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;updateCrosshairTarget(F)V",
+            target = "Lnet/minecraft/client/Minecraft;pick(F)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -388,7 +377,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;tick()V"
+            target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;tick()V"
         ),
         require = 0
     )
@@ -400,7 +389,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;tick()V",
+            target = "Lnet/minecraft/client/multiplayer/MultiPlayerGameMode;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -413,7 +402,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/texture/TextureManager;tick()V"
+            target = "Lnet/minecraft/client/renderer/texture/TextureManager;tick()V"
         ),
         require = 0
     )
@@ -425,7 +414,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/texture/TextureManager;tick()V",
+            target = "Lnet/minecraft/client/renderer/texture/TextureManager;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -438,7 +427,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/MinecraftClient;handleInputEvents()V"
+            target = "Lnet/minecraft/client/Minecraft;handleKeybinds()V"
         ),
         require = 0
     )
@@ -450,7 +439,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/MinecraftClient;handleInputEvents()V",
+            target = "Lnet/minecraft/client/Minecraft;handleKeybinds()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -463,7 +452,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;tick()V"
+            target = "Lnet/minecraft/client/renderer/GameRenderer;tick()V"
         ),
         require = 0
     )
@@ -475,7 +464,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;tick()V",
+            target = "Lnet/minecraft/client/renderer/GameRenderer;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -488,7 +477,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/WorldRenderer;tick()V"
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;tick()V"
         ),
         require = 0
     )
@@ -500,7 +489,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/WorldRenderer;tick()V",
+            target = "Lnet/minecraft/client/renderer/LevelRenderer;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -513,7 +502,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;tickEntities()V"
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;tickEntities()V"
         ),
         require = 0
     )
@@ -525,7 +514,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;tickEntities()V",
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;tickEntities()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -538,7 +527,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;tick(Ljava/util/function/BooleanSupplier;)V"
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;tick(Ljava/util/function/BooleanSupplier;)V"
         ),
         require = 0
     )
@@ -550,7 +539,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;tick(Ljava/util/function/BooleanSupplier;)V",
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;tick(Ljava/util/function/BooleanSupplier;)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -563,7 +552,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;doRandomBlockDisplayTicks(III)V"
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;animateTick(III)V"
         ),
         require = 0
     )
@@ -575,7 +564,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/world/ClientWorld;doRandomBlockDisplayTicks(III)V",
+            target = "Lnet/minecraft/client/multiplayer/ClientLevel;animateTick(III)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -588,7 +577,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/particle/ParticleManager;tick()V"
+            target = "Lnet/minecraft/client/particle/ParticleEngine;tick()V"
         ),
         require = 0
     )
@@ -600,7 +589,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/particle/ParticleManager;tick()V",
+            target = "Lnet/minecraft/client/particle/ParticleEngine;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -613,7 +602,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/sound/SoundManager;tick(Z)V"
+            target = "Lnet/minecraft/client/sounds/SoundManager;tick(Z)V"
         ),
         require = 0
     )
@@ -625,7 +614,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/sound/SoundManager;tick(Z)V",
+            target = "Lnet/minecraft/client/sounds/SoundManager;tick(Z)V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -638,7 +627,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Keyboard;pollDebugCrash()V"
+            target = "Lnet/minecraft/client/KeyboardHandler;tick()V"
         ),
         require = 0
     )
@@ -650,7 +639,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/Keyboard;pollDebugCrash()V",
+            target = "Lnet/minecraft/client/KeyboardHandler;tick()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -762,14 +751,14 @@ public abstract class MinecraftClientMixin {
         if (!ProfileScope.isClientTaskProfilingEnabled()) {
             return 0;
         }
-        return ((ThreadExecutor<?>)(Object)this).getTaskCount();
+        return ((BlockableEventLoop<?>)(Object)this).getPendingTasksCount();
     }
 
     private static void rtxremix$closeClientTaskDrain() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         int taskCount = 0;
         if (client != null && ProfileScope.isClientTaskProfilingEnabled()) {
-            taskCount = ((ThreadExecutor<?>)client).getTaskCount();
+            taskCount = ((BlockableEventLoop<?>)client).getPendingTasksCount();
         }
         ProfileScope.endClientTaskDrain(taskCount);
     }

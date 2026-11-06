@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.entity.feature.Deadmau5FeatureRenderer;
+import net.minecraft.client.renderer.entity.layers.Deadmau5EarsLayer;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -14,6 +14,6 @@ import org.spongepowered.asm.mixin.Mixin;
  * ({@code updateRenderState}) and the per-frame call this redirected is gone; the mixin
  * is an empty shell until the cache is re-pointed at the render-state extraction.
  */
-@Mixin(Deadmau5FeatureRenderer.class)
+@Mixin(Deadmau5EarsLayer.class)
 public abstract class Deadmau5FeatureRendererMixin {
 }

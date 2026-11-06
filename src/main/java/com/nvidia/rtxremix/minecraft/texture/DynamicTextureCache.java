@@ -4,12 +4,8 @@
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
-import net.minecraft.client.texture.AbstractTexture;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.util.Identifier;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,6 +14,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.resources.Identifier;
 
 /**
  * Pixel cache for dynamic textures (maps, player skins, etc.) that are not
@@ -175,8 +174,8 @@ public final class DynamicTextureCache {
         Set<Identifier> liveIds = new HashSet<>();
         synchronized (TEXTURE_IDS) {
             for (var entry : TEXTURE_IDS.entrySet()) {
-                if (!(entry.getKey() instanceof NativeImageBackedTexture texture)
-                        || texture.getImage() != null) {
+                if (!(entry.getKey() instanceof DynamicTexture texture)
+                        || (texture.getPixels() != null && !texture.getPixels().isClosed())) {
                     liveIds.add(entry.getValue());
                 }
             }

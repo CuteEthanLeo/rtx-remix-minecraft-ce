@@ -5,20 +5,21 @@
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import com.nvidia.rtxremix.minecraft.light.BlockLightRuleManager;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.render.model.BlockStateModel;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.BlockView;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.LocalRandom;
+import net.minecraft.client.renderer.block.BlockStateModelSet;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.SingleThreadedRandomSource;
 
 /**
  * Samples the baked model of the block currently being meshed, so a block light
  * rule can be positioned against the geometry that actually rendered.
  *
- * <p>Rules see only a {@link BlockState} and a {@link net.minecraft.util.math.BlockPos},
+ * <p>Rules see only a {@link BlockState} and a {@link net.minecraft.core.BlockPos},
  * which is enough for a block whose model is fixed. It is not enough for one
  * whose blockstate picks among rotated variants: the rotation lives in the
  * blockstate JSON, not in a property, so no offset table written against the
@@ -38,14 +39,14 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
     };
 
     /** Own random, so sampling cannot perturb the emitter's model randomisation. */
-    private final LocalRandom random = new LocalRandom(0L);
+    private final SingleThreadedRandomSource random = new SingleThreadedRandomSource(0L);
 
-    private BlockRenderManager blockRenderManager;
+    private BlockStateModelSet blockRenderManager;
     private BlockState state;
     private long seed;
-    private BlockView world;
-    private final BlockPos.Mutable origin = new BlockPos.Mutable();
-    private final BlockPos.Mutable neighbor = new BlockPos.Mutable();
+    private BlockGetter world;
+    private final BlockPos.MutableBlockPos origin = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos neighbor = new BlockPos.MutableBlockPos();
 
     private BlockStateModel model;
     private boolean modelResolved;
@@ -58,13 +59,13 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
     private boolean centroidComputed;
 
     /** Rebinds this sampler to a new block and drops everything memoised. */
-    public void begin(BlockRenderManager blockRenderManager, BlockState state, long seed) {
+    public void begin(BlockStateModelSet blockRenderManager, BlockState state, long seed) {
         begin(blockRenderManager, state, seed, null, null);
     }
 
     /** Rebinds to a block in a world, so rules can ask which faces are exposed. */
-    public void begin(BlockRenderManager blockRenderManager, BlockState state, long seed,
-                      BlockView world, BlockPos pos) {
+    public void begin(BlockStateModelSet blockRenderManager, BlockState state, long seed,
+                      BlockGetter world, BlockPos pos) {
         this.world = world;
         if (pos != null) {
             this.origin.set(pos);
@@ -84,9 +85,9 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         if (world == null) {
             return true;
         }
-        neighbor.set(origin, face);
+        neighbor.setWithOffset(origin, face);
         BlockState other = world.getBlockState(neighbor);
-        return !other.isOpaqueFullCube();
+        return !other.isSolidRender();
     }
 
     @Override
@@ -121,20 +122,21 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         if (!modelResolved) {
             modelResolved = true;
             model = (blockRenderManager != null && state != null)
-                    ? blockRenderManager.getModel(state)
+                    ? blockRenderManager.get(state)
                     : null;
         }
         if (model == null) return;
 
         // 1.21.11: models resolve their parts once from the seeded random, as the emitter does.
         random.setSeed(seed);
-        java.util.List<net.minecraft.client.render.model.BlockModelPart> parts = model.getParts(random);
+        java.util.List<BlockStateModelPart> parts = new java.util.ArrayList<>();
+        model.collectParts(random, parts);
         for (Direction dir : DIRECTIONS) {
-            for (net.minecraft.client.render.model.BlockModelPart part : parts) {
+            for (BlockStateModelPart part : parts) {
                 for (BakedQuad quad : part.getQuads(dir)) {
                     ensureCapacity(vertexCount + 4);
                     for (int v = 0; v < 4; v++) {
-                        org.joml.Vector3fc position = quad.getPosition(v);
+                        org.joml.Vector3fc position = quad.position(v);
                         int w = vertexCount * 3;
                         vertices[w] = position.x();
                         vertices[w + 1] = position.y();

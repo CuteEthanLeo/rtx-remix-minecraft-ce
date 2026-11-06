@@ -9,14 +9,17 @@ import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.google.common.collect.Queues;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.client.render.BuiltChunkStorage;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.ChunkRenderingDataPreparer;
-import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.TracingExecutor;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.state.level.ChunkLoadingRenderState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.client.renderer.SectionOcclusionGraph;
+import net.minecraft.client.renderer.ViewArea;
+import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.util.Util;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.thread.NameableExecutor;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -40,11 +43,11 @@ import java.util.function.Consumer;
  * as is. {@code -Drtxremix.vanillaVisibilityWalk} and {@code -Drtxremix.logVisibleSet} have no
  * effect until the port is redone against the new walk.
  */
-@Mixin(ChunkRenderingDataPreparer.class)
+@Mixin(SectionOcclusionGraph.class)
 public abstract class ChunkRenderingDataPreparerMixin {
 
-    private static final NameableExecutor rtxremix$visibilityExecutor =
-            new NameableExecutor(Executors.newSingleThreadExecutor(task -> {
+    private static final TracingExecutor rtxremix$visibilityExecutor =
+            new TracingExecutor(Executors.newSingleThreadExecutor(task -> {
                 Thread thread = new Thread(task, "RTX Remix chunk visibility");
                 thread.setDaemon(true);
                 thread.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 2));
@@ -76,89 +79,79 @@ public abstract class ChunkRenderingDataPreparerMixin {
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$seedScope = new ThreadLocal<>();
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$walkScope = new ThreadLocal<>();
 
-    @Inject(method = "setStorage", at = @At("HEAD"))
-    private void rtxremix$storageHead(BuiltChunkStorage storage, CallbackInfo ci) {
+    @Inject(method = "waitAndReset", at = @At("HEAD"))
+    private void rtxremix$storageHead(ViewArea storage, CallbackInfo ci) {
         rtxremix$open(rtxremix$storageScope, "ChunkVisibility.setStorage");
     }
 
-    @Inject(method = "setStorage", at = @At("RETURN"))
-    private void rtxremix$storageReturn(BuiltChunkStorage storage, CallbackInfo ci) {
+    @Inject(method = "waitAndReset", at = @At("RETURN"))
+    private void rtxremix$storageReturn(ViewArea storage, CallbackInfo ci) {
         rtxremix$propagationQueue.clear();
         rtxremix$propagationSeeds = null;
         rtxremix$close(rtxremix$storageScope);
     }
 
-    @Inject(method = "collectChunks", at = @At("HEAD"))
+    @Inject(method = "addSectionsInFrustum", at = @At("HEAD"))
     private void rtxremix$frustumHead(
             Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            List<ChunkBuilder.BuiltChunk> nearbyChunks,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            List<SectionRenderDispatcher.RenderSection> nearbyChunks,
             CallbackInfo ci) {
         rtxremix$open(rtxremix$frustumScope, "ChunkVisibility.applyFrustum", rtxremix$sizeOf(builtChunks));
     }
 
-    @Inject(method = "collectChunks", at = @At("RETURN"))
+    @Inject(method = "addSectionsInFrustum", at = @At("RETURN"))
     private void rtxremix$frustumReturn(
             Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            List<ChunkBuilder.BuiltChunk> nearbyChunks,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            List<SectionRenderDispatcher.RenderSection> nearbyChunks,
             CallbackInfo ci) {
         rtxremix$captureCount(rtxremix$frustumScope, rtxremix$sizeOf(builtChunks));
         rtxremix$close(rtxremix$frustumScope);
     }
 
-    @Inject(method = "updateSectionOcclusionGraph", at = @At("HEAD"))
+    @Inject(method = "update", at = @At("HEAD"))
     private void rtxremix$prepareHead(
-            boolean cullChunks,
-            Camera camera,
-            Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            LongOpenHashSet activeSections,
+            CameraRenderState camera,
+            int fov,
+            ChunkLoadingRenderState chunkLoadingRenderState,
             CallbackInfo ci) {
-        rtxremix$open(rtxremix$prepareScope, "ChunkVisibility.prepare", rtxremix$sizeOf(builtChunks));
+        rtxremix$open(rtxremix$prepareScope, "ChunkVisibility.prepare", -1);
     }
 
-    @Inject(method = "updateSectionOcclusionGraph", at = @At("RETURN"))
+    @Inject(method = "update", at = @At("RETURN"))
     private void rtxremix$prepareReturn(
-            boolean cullChunks,
-            Camera camera,
-            Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            LongOpenHashSet activeSections,
+            CameraRenderState camera,
+            int fov,
+            ChunkLoadingRenderState chunkLoadingRenderState,
             CallbackInfo ci) {
         rtxremix$close(rtxremix$prepareScope);
     }
 
     @Redirect(
-            method = "updateTerrain",
+            method = "scheduleFullUpdate",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/util/Util;getMainWorkerExecutor()Lnet/minecraft/util/thread/NameableExecutor;"
+                    target = "Lnet/minecraft/util/Util;backgroundExecutor()Lnet/minecraft/TracingExecutor;"
             ))
-    private NameableExecutor rtxremix$visibilityExecutor() {
+    private TracingExecutor rtxremix$visibilityExecutor() {
         return RtxRemixMod.isRtxEnabled()
                 ? rtxremix$visibilityExecutor
-                : Util.getMainWorkerExecutor();
+                : Util.backgroundExecutor();
     }
 
-    @Inject(method = "updateNow", at = @At("HEAD"))
+    @Inject(method = "runPartialUpdate", at = @At("HEAD"))
     private void rtxremix$graphHead(
-            boolean cullChunks,
-            Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            Vec3d cameraPos,
-            LongOpenHashSet activeSections,
+            CameraRenderState camera,
+            LongSet loadedExpectedChunks,
             CallbackInfo ci) {
-        rtxremix$open(rtxremix$graphScope, "ChunkVisibility.rebuildGraph", rtxremix$sizeOf(builtChunks));
+        rtxremix$open(rtxremix$graphScope, "ChunkVisibility.rebuildGraph", -1);
     }
 
-    @Inject(method = "updateNow", at = @At("RETURN"))
+    @Inject(method = "runPartialUpdate", at = @At("RETURN"))
     private void rtxremix$graphReturn(
-            boolean cullChunks,
-            Frustum frustum,
-            List<ChunkBuilder.BuiltChunk> builtChunks,
-            Vec3d cameraPos,
-            LongOpenHashSet activeSections,
+            CameraRenderState camera,
+            LongSet loadedExpectedChunks,
             CallbackInfo ci) {
         rtxremix$budgetHit(rtxremix$graphScope, rtxremix$propagationQueue.budgetHit());
         rtxremix$close(rtxremix$graphScope);
@@ -167,7 +160,7 @@ public abstract class ChunkRenderingDataPreparerMixin {
     // Vanilla only propagates when new seeds arrived. Sections left over from a budgeted
     // slice must keep draining even on frames with no new seeds.
     @Redirect(
-            method = "updateNow",
+            method = "runPartialUpdate",
             at = @At(
                     value = "INVOKE",
                     target = "Ljava/util/concurrent/BlockingQueue;isEmpty()Z",
@@ -185,7 +178,7 @@ public abstract class ChunkRenderingDataPreparerMixin {
     // persistent sliced queue instead bounds the walk to this frame's budget and resumes it
     // from the same entries next frame.
     @Redirect(
-            method = "updateNow",
+            method = "runPartialUpdate",
             at = @At(
                     value = "INVOKE",
                     target = "Lcom/google/common/collect/Queues;newArrayDeque()Ljava/util/ArrayDeque;"
@@ -212,36 +205,38 @@ public abstract class ChunkRenderingDataPreparerMixin {
         }
     }
 
-    @Inject(method = "scheduleLater", at = @At("HEAD"))
-    private void rtxremix$seedHead(Camera camera, Queue<?> queue, CallbackInfo ci) {
+    @Inject(method = "initializeQueueForFullUpdate", at = @At("HEAD"))
+    private void rtxremix$seedHead(BlockPos cameraPosition, Queue<?> queue, CallbackInfo ci) {
         rtxremix$open(rtxremix$seedScope, "ChunkVisibility.seedQueue", rtxremix$sizeOf(queue));
     }
 
-    @Inject(method = "scheduleLater", at = @At("RETURN"))
-    private void rtxremix$seedReturn(Camera camera, Queue<?> queue, CallbackInfo ci) {
+    @Inject(method = "initializeQueueForFullUpdate", at = @At("RETURN"))
+    private void rtxremix$seedReturn(BlockPos cameraPosition, Queue<?> queue, CallbackInfo ci) {
         rtxremix$close(rtxremix$seedScope);
     }
 
-    @Inject(method = "update", at = @At("HEAD"))
+    @Inject(method = "runUpdates", at = @At("HEAD"))
     private void rtxremix$walkHead(
-            ChunkRenderingDataPreparer.RenderableChunks renderableChunks,
-            Vec3d cameraPos,
+            SectionOcclusionGraph.GraphStorage renderableChunks,
+            Vec3 cameraPos,
             Queue<?> queue,
-            boolean cullChunks,
-            Consumer<ChunkBuilder.BuiltChunk> chunkConsumer,
-            LongOpenHashSet activeSections,
+            boolean smartCull,
+            Consumer<SectionRenderDispatcher.RenderSection> onSectionAdded,
+            LongOpenHashSet emptySections,
+            LongOpenHashSet loadedChunks,
             CallbackInfo ci) {
         rtxremix$open(rtxremix$walkScope, "ChunkVisibility.walkVisibleGraph", rtxremix$sizeOf(queue));
     }
 
-    @Inject(method = "update", at = @At("RETURN"))
+    @Inject(method = "runUpdates", at = @At("RETURN"))
     private void rtxremix$walkReturn(
-            ChunkRenderingDataPreparer.RenderableChunks renderableChunks,
-            Vec3d cameraPos,
+            SectionOcclusionGraph.GraphStorage renderableChunks,
+            Vec3 cameraPos,
             Queue<?> queue,
-            boolean cullChunks,
-            Consumer<ChunkBuilder.BuiltChunk> chunkConsumer,
-            LongOpenHashSet activeSections,
+            boolean smartCull,
+            Consumer<SectionRenderDispatcher.RenderSection> onSectionAdded,
+            LongOpenHashSet emptySections,
+            LongOpenHashSet loadedChunks,
             CallbackInfo ci) {
         rtxremix$close(rtxremix$walkScope);
     }

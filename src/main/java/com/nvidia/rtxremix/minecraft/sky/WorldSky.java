@@ -4,14 +4,14 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.ColorHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.util.ARGB;
 import net.minecraft.world.attribute.EnvironmentAttribute;
-import net.minecraft.world.attribute.EnvironmentAttributeInterpolator;
+import net.minecraft.world.attribute.EnvironmentAttributeProbe;
 import net.minecraft.world.attribute.EnvironmentAttributes;
-import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The 1.21.1 sky queries ({@code World.getSkyAngle}, {@code getStarBrightness},
@@ -25,50 +25,50 @@ public final class WorldSky {
     private WorldSky() {}
 
     private static <T> T visual(EnvironmentAttribute<T> attribute, float tickDelta) {
-        EnvironmentAttributeInterpolator interpolator =
-                MinecraftClient.getInstance().gameRenderer.getCamera().getEnvironmentAttributeInterpolator();
-        return interpolator.get(attribute, tickDelta);
+        EnvironmentAttributeProbe interpolator =
+                Minecraft.getInstance().gameRenderer.mainCamera().attributeProbe();
+        return interpolator.getValue(attribute, tickDelta);
     }
 
     /** The dimension's sky type, formerly {@code DimensionEffects.SkyType}. */
-    public static DimensionType.Skybox skybox(ClientWorld world) {
-        return world.getDimension().skybox();
+    public static DimensionType.Skybox skybox(ClientLevel world) {
+        return world.dimensionType().skybox();
     }
 
     /** Fraction of a day turned since noon, in [0, 1): 0 at noon, 0.25 at sunset, as 1.21.1. */
-    public static float skyAngle(ClientWorld world, float tickDelta) {
-        float degrees = visual(EnvironmentAttributes.SUN_ANGLE_VISUAL, tickDelta);
+    public static float skyAngle(ClientLevel world, float tickDelta) {
+        float degrees = visual(EnvironmentAttributes.SUN_ANGLE, tickDelta);
         float fraction = degrees / 360.0f;
         return fraction - (float) Math.floor(fraction);
     }
 
-    public static float starBrightness(ClientWorld world, float tickDelta) {
-        return visual(EnvironmentAttributes.STAR_BRIGHTNESS_VISUAL, tickDelta);
+    public static float starBrightness(ClientLevel world, float tickDelta) {
+        return visual(EnvironmentAttributes.STAR_BRIGHTNESS, tickDelta);
     }
 
-    public static int moonPhase(ClientWorld world, float tickDelta) {
-        return visual(EnvironmentAttributes.MOON_PHASE_VISUAL, tickDelta).getIndex();
+    public static int moonPhase(ClientLevel world, float tickDelta) {
+        return visual(EnvironmentAttributes.MOON_PHASE, tickDelta).index();
     }
 
-    public static float moonSize(ClientWorld world, float tickDelta) {
+    public static float moonSize(ClientLevel world, float tickDelta) {
         return MOON_SIZES[moonPhase(world, tickDelta) & 7];
     }
 
     /** Cloud base height, or NaN when the dimension draws no clouds (transparent cloud colour). */
-    public static float cloudHeight(ClientWorld world, float tickDelta) {
-        int color = visual(EnvironmentAttributes.CLOUD_COLOR_VISUAL, tickDelta);
-        if (ColorHelper.getAlpha(color) == 0) {
+    public static float cloudHeight(ClientLevel world, float tickDelta) {
+        int color = visual(EnvironmentAttributes.CLOUD_COLOR, tickDelta);
+        if (ARGB.alpha(color) == 0) {
             return Float.NaN;
         }
-        return visual(EnvironmentAttributes.CLOUD_HEIGHT_VISUAL, tickDelta);
+        return visual(EnvironmentAttributes.CLOUD_HEIGHT, tickDelta);
     }
 
     /** Cloud colour as linear-in-byte RGB in [0, 1], formerly {@code ClientWorld.getCloudsColor}. */
-    public static Vec3d cloudColor(ClientWorld world, float tickDelta) {
-        int color = visual(EnvironmentAttributes.CLOUD_COLOR_VISUAL, tickDelta);
-        return new Vec3d(
-                ColorHelper.getRed(color) / 255.0,
-                ColorHelper.getGreen(color) / 255.0,
-                ColorHelper.getBlue(color) / 255.0);
+    public static Vec3 cloudColor(ClientLevel world, float tickDelta) {
+        int color = visual(EnvironmentAttributes.CLOUD_COLOR, tickDelta);
+        return new Vec3(
+                ARGB.red(color) / 255.0,
+                ARGB.green(color) / 255.0,
+                ARGB.blue(color) / 255.0);
     }
 }

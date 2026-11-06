@@ -6,57 +6,57 @@ package com.nvidia.rtxremix.minecraft.particle.rapids;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.BillboardParticle;
-import net.minecraft.client.particle.SpriteProvider;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.SimpleParticleType;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.SingleQuadParticle;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.util.RandomSource;
 
 @Environment(EnvType.CLIENT)
-public class RapidFoamParticle extends BillboardParticle {
-    private RapidFoamParticle(ClientWorld world, double x, double y, double z,
+public class RapidFoamParticle extends SingleQuadParticle {
+    private RapidFoamParticle(ClientLevel world, double x, double y, double z,
                               double velocityX, double velocityY, double velocityZ,
-                              SpriteProvider spriteProvider) {
-        super(world, x, y, z, spriteProvider.getSprite(world.random));
-        this.setBoundingBoxSpacing(0.015f, 0.015f);
-        this.scale *= this.random.nextFloat() * 0.45f + 0.35f;
-        this.maxAge = 14 + this.random.nextInt(22);
-        this.gravityStrength = 1.25f;
-        this.velocityMultiplier = 0.95f;
-        this.collidesWithWorld = true;
-        this.velocityX = velocityX;
-        this.velocityY = velocityY;
-        this.velocityZ = velocityZ;
+                              SpriteSet spriteProvider) {
+        super(world, x, y, z, spriteProvider.get(world.getRandom()));
+        this.setSize(0.015f, 0.015f);
+        this.quadSize *= this.random.nextFloat() * 0.45f + 0.35f;
+        this.lifetime = 14 + this.random.nextInt(22);
+        this.gravity = 1.25f;
+        this.friction = 0.95f;
+        this.hasPhysics = true;
+        this.xd = velocityX;
+        this.yd = velocityY;
+        this.zd = velocityZ;
     }
 
     @Override
-    protected BillboardParticle.RenderType getRenderType() {
-        return BillboardParticle.RenderType.PARTICLE_ATLAS_OPAQUE;
+    protected SingleQuadParticle.Layer getLayer() {
+        return SingleQuadParticle.Layer.OPAQUE;
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (!this.dead && this.onGround && this.random.nextFloat() < 0.35f) {
-            this.markDead();
+        if (!this.removed && this.onGround && this.random.nextFloat() < 0.35f) {
+            this.remove();
         }
     }
 
     @Environment(EnvType.CLIENT)
-    public static final class Factory implements ParticleFactory<SimpleParticleType> {
-        private final SpriteProvider spriteProvider;
+    public static final class Factory implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet spriteProvider;
 
-        public Factory(SpriteProvider spriteProvider) {
+        public Factory(SpriteSet spriteProvider) {
             this.spriteProvider = spriteProvider;
         }
 
         @Override
-        public Particle createParticle(SimpleParticleType type, ClientWorld world,
+        public Particle createParticle(SimpleParticleType type, ClientLevel world,
                                        double x, double y, double z,
                                        double velocityX, double velocityY, double velocityZ,
-                                       Random random) {
+                                       RandomSource random) {
             return new RapidFoamParticle(world, x, y, z, velocityX, velocityY, velocityZ, spriteProvider);
         }
     }

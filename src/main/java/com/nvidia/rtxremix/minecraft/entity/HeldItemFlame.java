@@ -5,13 +5,13 @@
 package com.nvidia.rtxremix.minecraft.entity;
 
 import com.nvidia.rtxremix.minecraft.mixin.TorchBlockAccessor;
-import net.minecraft.block.Block;
-import net.minecraft.block.RedstoneTorchBlock;
-import net.minecraft.block.TorchBlock;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemDisplayContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.RedstoneTorchBlock;
+import net.minecraft.world.level.block.TorchBlock;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
@@ -106,7 +106,7 @@ public final class HeldItemFlame {
         }
         Block block = blockItem.getBlock();
         if (!(block instanceof TorchBlock) || block instanceof RedstoneTorchBlock
-                || block.getDefaultState().getLuminance() <= 0) {
+                || block.defaultBlockState().getLightEmission() <= 0) {
             return null;
         }
         return ((TorchBlockAccessor) block).getParticle();
@@ -114,19 +114,19 @@ public final class HeldItemFlame {
 
     /** Whether an item render mode is a hand, in first or third person. */
     public static boolean isHandMode(ItemDisplayContext mode) {
-        return mode.isFirstPerson()
+        return mode.firstPerson()
                 || mode == ItemDisplayContext.THIRD_PERSON_LEFT_HAND
                 || mode == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
     }
 
     /** The toward-camera placement offset for a hand mode, in block space. */
     static float cameraOffset(ItemDisplayContext mode) {
-        return mode.isFirstPerson() ? FIRST_PERSON_CAMERA_OFFSET : 0.0f;
+        return mode.firstPerson() ? FIRST_PERSON_CAMERA_OFFSET : 0.0f;
     }
 
     /** The line-of-sight depth fraction for a hand mode; 1 leaves the quad at its anchor. */
     static float depthFraction(ItemDisplayContext mode) {
-        return mode.isFirstPerson() ? FIRST_PERSON_DEPTH_FRACTION : 1.0f;
+        return mode.firstPerson() ? FIRST_PERSON_DEPTH_FRACTION : 1.0f;
     }
 
     private static final Quaternionfc WORLD_FRAME = new Quaternionf();
@@ -139,7 +139,7 @@ public final class HeldItemFlame {
      * view tilts; along world up they swung around the head with the pitch.
      */
     static Quaternionfc riseFrame(ItemDisplayContext mode, Quaternionfc facing) {
-        return mode.isFirstPerson() ? facing : WORLD_FRAME;
+        return mode.firstPerson() ? facing : WORLD_FRAME;
     }
 
     /**

@@ -5,7 +5,7 @@
 package com.nvidia.rtxremix.minecraft.texture;
 
 import java.util.Map;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
 
 /**
  * PBR for every block without a resource pack: surface detail, a roughness

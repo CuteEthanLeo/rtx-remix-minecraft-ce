@@ -4,7 +4,6 @@
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
-import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,10 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import net.minecraft.resources.Identifier;
+
 class AutoPbrTest {
 
     private static AutoPbr.Surface surface(String name) {
-        return AutoPbr.surface(Identifier.ofVanilla("block/" + name));
+        return AutoPbr.surface(Identifier.withDefaultNamespace("block/" + name));
     }
 
     @Test

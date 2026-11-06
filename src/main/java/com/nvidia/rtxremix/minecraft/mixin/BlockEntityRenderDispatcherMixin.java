@@ -6,15 +6,15 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
-import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -31,23 +31,23 @@ import org.spongepowered.asm.mixin.Mixin;
  * <p>Since 1.21.9 the manager renders a {@link BlockEntityRenderState}; the block entity
  * itself is looked up from the client world at the state's position.
  */
-@Mixin(BlockEntityRenderManager.class)
+@Mixin(BlockEntityRenderDispatcher.class)
 public abstract class BlockEntityRenderDispatcherMixin {
 
     @WrapMethod(
-        method = "render(Lnet/minecraft/client/render/block/entity/state/BlockEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V"
+        method = "submit(Lnet/minecraft/client/renderer/blockentity/state/BlockEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"
     )
     private <S extends BlockEntityRenderState> void rtxremix$captureBlockEntityInPlace(
-            S state, MatrixStack matrices, OrderedRenderCommandQueue queue,
+            S state, PoseStack matrices, SubmitNodeCollector queue,
             CameraRenderState cameraState, Operation<Void> original) {
         RtxRemixMod mod = RtxRemixMod.getInstance();
         RemixRenderer renderer = mod == null ? null : mod.getRenderer();
-        MinecraftClient client = MinecraftClient.getInstance();
-        BlockEntity be = renderer == null || client.world == null
+        Minecraft client = Minecraft.getInstance();
+        BlockEntity be = renderer == null || client.level == null
                 ? null
-                : client.world.getBlockEntity(state.pos);
+                : client.level.getBlockEntity(state.blockPos);
         boolean captured = be != null
-                && be.hasWorld()
+                && be.hasLevel()
                 && renderer.renderBlockEntityInPlace(be,
                         (captureMatrices, captureQueue) ->
                                 original.call(state, captureMatrices, captureQueue, cameraState));

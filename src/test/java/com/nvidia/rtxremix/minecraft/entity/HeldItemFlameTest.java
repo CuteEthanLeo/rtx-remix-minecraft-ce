@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemDisplayContext;
 
 class HeldItemFlameTest {
 

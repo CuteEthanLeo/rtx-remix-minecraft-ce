@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.entity.EntityRenderManager;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
@@ -14,6 +14,6 @@ import org.spongepowered.asm.mixin.Mixin;
  * <p>TODO(1.21.11): the flag is gone; shadows are now {@code EntityRenderState.shadowPieces},
  * which the Remix passes clear on the state they render. This accessor is an empty shell.
  */
-@Mixin(EntityRenderManager.class)
+@Mixin(EntityRenderDispatcher.class)
 public interface EntityRenderDispatcherAccessor {
 }

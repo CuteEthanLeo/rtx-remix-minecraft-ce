@@ -6,13 +6,13 @@ package com.nvidia.rtxremix.minecraft.light;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.Bootstrap;
 import net.minecraft.SharedConstants;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -27,8 +27,8 @@ class GlowingBlockLightsTest {
 
     @BeforeAll
     static void bootstrap() {
-        SharedConstants.createGameVersion();
-        Bootstrap.initialize();
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
     }
 
     private static List<LightEntry> resolve(BlockState state, BlockPos pos,
@@ -45,7 +45,7 @@ class GlowingBlockLightsTest {
     @Test
     void aFreeGlowstoneBlockHasOneOutwardRectPerFaceAndEmitsLikeATorch() {
         List<LightEntry> lights = resolve(
-                Blocks.GLOWSTONE.getDefaultState(), POS, BlockLightRuleManager.fixedCentroid(new float[3]));
+                Blocks.GLOWSTONE.defaultBlockState(), POS, BlockLightRuleManager.fixedCentroid(new float[3]));
         assertEquals(6, lights.size());
         float power = 0.0f;
         for (LightEntry light : lights) {
@@ -79,7 +79,7 @@ class GlowingBlockLightsTest {
                 return face == Direction.UP;
             }
         };
-        List<LightEntry> lights = resolve(Blocks.SEA_LANTERN.getDefaultState(), POS, buried);
+        List<LightEntry> lights = resolve(Blocks.SEA_LANTERN.defaultBlockState(), POS, buried);
         assertEquals(1, lights.size());
         assertEquals(1.0f, lights.getFirst().directionY(), 0.0f);
     }
@@ -87,11 +87,11 @@ class GlowingBlockLightsTest {
     @Test
     void anUnlitLampHasNoLightAndAJackOLanternLightsOnlyThroughItsFace() {
         float[] centroid = {0.5f, 0.5f, 0.5f};
-        assertTrue(resolve(Blocks.REDSTONE_LAMP.getDefaultState(), POS,
+        assertTrue(resolve(Blocks.REDSTONE_LAMP.defaultBlockState(), POS,
                 BlockLightRuleManager.fixedCentroid(centroid)).isEmpty());
 
-        BlockState pumpkin = Blocks.JACK_O_LANTERN.getDefaultState()
-                .with(Properties.HORIZONTAL_FACING, Direction.EAST);
+        BlockState pumpkin = Blocks.JACK_O_LANTERN.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
         List<LightEntry> lights = resolve(pumpkin, POS,
                 BlockLightRuleManager.fixedCentroid(centroid));
         assertEquals(1, lights.size());
@@ -101,9 +101,9 @@ class GlowingBlockLightsTest {
     @Test
     void lanternsAndEndRodsNowCastLight() {
         float[] centroid = {0.5f, 0.5f, 0.5f};
-        assertEquals(1, resolve(Blocks.LANTERN.getDefaultState(), POS,
+        assertEquals(1, resolve(Blocks.LANTERN.defaultBlockState(), POS,
                 BlockLightRuleManager.fixedCentroid(centroid)).size());
-        assertEquals(1, resolve(Blocks.END_ROD.getDefaultState(), POS,
+        assertEquals(1, resolve(Blocks.END_ROD.defaultBlockState(), POS,
                 BlockLightRuleManager.fixedCentroid(centroid)).size());
     }
 }

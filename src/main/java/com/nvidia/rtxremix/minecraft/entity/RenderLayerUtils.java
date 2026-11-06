@@ -6,23 +6,23 @@ package com.nvidia.rtxremix.minecraft.entity;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.pipeline.DepthStencilState;
+import com.mojang.blaze3d.platform.CompareOp;
 import com.nvidia.rtxremix.minecraft.mixin.RenderLayerSetupAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTextureSpecAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTexturesAccessor;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderSetup;
-import net.minecraft.util.Identifier;
-
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.rendertype.RenderSetup;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.resources.Identifier;
 
 /**
- * Reads the layer-level facts the capture path needs from a {@link RenderLayer}.
+ * Reads the layer-level facts the capture path needs from a {@link RenderType}.
  *
  * <p>A renderer requests its {@code VertexConsumer} by layer,
  * {@code provider.getBuffer(RenderLayer.getEntityCutout(textureId))}, so the
@@ -63,7 +63,7 @@ final class RenderLayerUtils {
      * pools by one, so they share this.
      */
     static final Identifier UNTEXTURED_LAYER_ID =
-            Identifier.of("rtxremix", "untextured_entity_layer");
+            Identifier.fromNamespaceAndPath("rtxremix", "untextured_entity_layer");
 
     private RenderLayerUtils() {}
 
@@ -71,11 +71,11 @@ final class RenderLayerUtils {
      * Cache of RenderLayer -> capturable texture. Most RenderLayer instances are reused,
      * but weak keys avoid retaining dynamic layers created by mods or skin features.
      */
-    private static final Map<RenderLayer, Optional<Identifier>> capturableTextureCache =
+    private static final Map<RenderType, Optional<Identifier>> capturableTextureCache =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     /** Cache of RenderLayer -> streamed-per-frame verdict, weak-keyed like {@link #capturableTextureCache}. */
-    private static final Map<RenderLayer, Boolean> streamedPerFrameCache =
+    private static final Map<RenderType, Boolean> streamedPerFrameCache =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     /**
@@ -92,19 +92,20 @@ final class RenderLayerUtils {
      * @param layer the render layer (typically from an entity renderer)
      * @return the texture identifier to capture under, or empty to skip the layer
      */
-    static Optional<Identifier> capturableTexture(RenderLayer layer) {
+    static Optional<Identifier> capturableTexture(RenderType layer) {
         return capturableTextureCache.computeIfAbsent(layer, RenderLayerUtils::capturableTextureUncached);
     }
 
-    private static Optional<Identifier> capturableTextureUncached(RenderLayer layer) {
-        if (layer.getRenderPipeline().getDepthTestFunction() == DepthTestFunction.NO_DEPTH_TEST) {
+    private static Optional<Identifier> capturableTextureUncached(RenderType layer) {
+        DepthStencilState depth = layer.pipeline().getDepthStencilState();
+        if (depth == null || depth.depthTest() == CompareOp.ALWAYS_PASS) {
             return Optional.empty();
         }
         return extractTexture(layer);
     }
 
     /** The layer's base-colour texture: the one bound to {@code Sampler0}. */
-    private static Optional<Identifier> extractTexture(RenderLayer layer) {
+    private static Optional<Identifier> extractTexture(RenderType layer) {
         RenderSetup setup = ((RenderLayerSetupAccessor) (Object) layer).rtxremix$getRenderSetup();
         if (setup == null) {
             return Optional.empty();
@@ -121,8 +122,8 @@ final class RenderLayerUtils {
      * How to read the layer's vertices, or empty when it draws primitives that
      * do not become triangles, such as lines.
      */
-    static Optional<Topology> topology(RenderLayer layer) {
-        return switch (layer.getDrawMode()) {
+    static Optional<Topology> topology(RenderType layer) {
+        return switch (layer.primitiveTopology()) {
             case QUADS -> Optional.of(Topology.QUADS);
             case TRIANGLE_STRIP -> Optional.of(Topology.TRIANGLE_STRIP);
             default -> Optional.empty();
@@ -142,12 +143,12 @@ final class RenderLayerUtils {
      * furniture such as the nameplate background, which should not become
      * scene geometry that lights and casts shadows.
      */
-    static boolean isCapturableUntexturedLayer(RenderLayer layer) {
+    static boolean isCapturableUntexturedLayer(RenderType layer) {
         // Only layers with no texture at all qualify: a textured layer that
         // capturableTexture declined must not re-enter capture through here.
         return extractTexture(layer).isEmpty()
                 && topology(layer).filter(t -> t == Topology.TRIANGLE_STRIP).isPresent()
-                && layer.getVertexFormat().getElements().contains(VertexFormatElement.COLOR);
+                && layer.format().contains("Color");
     }
 
     /**
@@ -160,12 +161,12 @@ final class RenderLayerUtils {
      * coordinate scrolls with world time. Everything else it draws is rigid: a
      * model part or baked quad whose pose changes while its local vertices do not.
      */
-    static boolean isStreamedPerFrame(RenderLayer layer) {
+    static boolean isStreamedPerFrame(RenderType layer) {
         return streamedPerFrameCache.computeIfAbsent(layer, RenderLayerUtils::isStreamedPerFrameUncached);
     }
 
-    private static boolean isStreamedPerFrameUncached(RenderLayer layer) {
-        RenderPipeline pipeline = layer.getRenderPipeline();
+    private static boolean isStreamedPerFrameUncached(RenderType layer) {
+        RenderPipeline pipeline = layer.pipeline();
         boolean beaconBeamProgram = pipeline == RenderPipelines.BEACON_BEAM_OPAQUE
                 || pipeline == RenderPipelines.BEACON_BEAM_TRANSLUCENT;
         return classifyStreamedPerFrame(topology(layer).orElse(Topology.QUADS), beaconBeamProgram);
@@ -185,18 +186,19 @@ final class RenderLayerUtils {
      * transparent, so alpha blending them over the surface is the closest surface
      * behaviour and it is classified as translucent.
      */
-    static SurfaceMode surfaceMode(RenderLayer layer) {
-        RenderPipeline pipeline = layer.getRenderPipeline();
-        BlendFunction blend = pipeline.getBlendFunction().orElse(null);
+    static SurfaceMode surfaceMode(RenderType layer) {
+        RenderPipeline pipeline = layer.pipeline();
+        ColorTargetState colorTarget = pipeline.getColorTargetState();
+        BlendFunction blend = colorTarget == null ? null : colorTarget.blendFunction().orElse(null);
         return classifySurfaceMode(
-                pipeline == RenderPipelines.ENTITY_EYES
+                pipeline == RenderPipelines.EYES
                         || pipeline == RenderPipelines.ENTITY_TRANSLUCENT_EMISSIVE,
                 BlendFunction.ADDITIVE.equals(blend),
                 BlendFunction.TRANSLUCENT.equals(blend)
-                        || pipeline == RenderPipelines.RENDERTYPE_CRUMBLING,
+                        || pipeline == RenderPipelines.CRUMBLING,
                 pipeline == RenderPipelines.ENTITY_SOLID,
-                pipeline == RenderPipelines.RENDERTYPE_TEXT
-                        || pipeline == RenderPipelines.RENDERTYPE_TEXT_INTENSITY);
+                pipeline == RenderPipelines.TEXT
+                        || pipeline == RenderPipelines.TEXT_GRAYSCALE);
     }
 
     /**

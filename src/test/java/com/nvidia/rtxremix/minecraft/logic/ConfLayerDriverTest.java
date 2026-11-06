@@ -318,8 +318,8 @@ class ConfLayerDriverTest {
         // controller + 2 weather + 4 time profiles + the Community Edition
         // daylight look. Optional biome and zone
         // rows are discovered from disk.
-        assertEquals(65, ConfLayerDriver.vanillaBiomeNames().size(),
-                "vanilla 1.21.11 biome count (BiomeKeys, with pale_garden)");
+        assertEquals(66, ConfLayerDriver.vanillaBiomeNames().size(),
+                "vanilla 26.2 biome count (Biomes, with pale_garden and sulfur_caves)");
         assertEquals(10, ConfLayerDriver.STATIC_LAYER_TABLE.size());
         Set<String> names = new HashSet<>();
         Set<String> paths = new HashSet<>();
