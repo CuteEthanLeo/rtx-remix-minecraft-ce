@@ -7,8 +7,9 @@ package com.nvidia.rtxremix.minecraft.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.nvidia.rtxremix.minecraft.texture.GlyphPageMirror;
+import com.mojang.blaze3d.textures.GpuTexture;
 import net.minecraft.client.font.GlyphAtlasTexture;
-import net.minecraft.client.font.RenderableGlyph;
+import net.minecraft.client.font.UploadableGlyph;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -42,13 +43,17 @@ public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
     }
 
     @WrapOperation(
-        method = "getGlyphRenderer",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/RenderableGlyph;upload(II)V")
+        method = "bake",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/UploadableGlyph;upload(IILcom/mojang/blaze3d/textures/GpuTexture;)V")
     )
-    private void rtxremix$mirrorGlyphUpload(RenderableGlyph glyph, int x, int y, Operation<Void> original) {
+    private void rtxremix$mirrorGlyphUpload(UploadableGlyph glyph, int x, int y, GpuTexture texture,
+                                            Operation<Void> original) {
+        // TODO(1.21.11): glyph pixels now reach the GPU through GpuDevice/CommandEncoder rather than
+        // NativeImage.uploadInternal or GlStateManager._upload, so the mirror scope opens but
+        // nothing fills the page until a CommandEncoder.writeToTexture hook exists.
         GlyphPageMirror.beginUpload(rtxremix$glyphPageMirror());
         try {
-            original.call(glyph, x, y);
+            original.call(glyph, x, y, texture);
         } finally {
             GlyphPageMirror.endUpload();
         }

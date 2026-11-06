@@ -42,9 +42,9 @@ import java.util.List;
 @Mixin(ModelPart.class)
 public abstract class ModelPartMixin {
 
-    @Shadow public float pivotX;
-    @Shadow public float pivotY;
-    @Shadow public float pivotZ;
+    @Shadow public float originX;
+    @Shadow public float originY;
+    @Shadow public float originZ;
     @Shadow public float pitch;
     @Shadow public float yaw;
     @Shadow public float roll;
@@ -53,7 +53,7 @@ public abstract class ModelPartMixin {
     @Shadow public float zScale;
 
     @Inject(
-            method = "rotate(Lnet/minecraft/client/util/math/MatrixStack;)V",
+            method = "applyTransform(Lnet/minecraft/client/util/math/MatrixStack;)V",
             at = @At("HEAD"),
             cancellable = true)
     private void rtxremix$applyPooledRotation(MatrixStack matrices, CallbackInfo ci) {
@@ -62,7 +62,7 @@ public abstract class ModelPartMixin {
         }
 
         recyclingMatrices.applyModelPartTransform(
-                pivotX, pivotY, pivotZ,
+                originX, originY, originZ,
                 pitch, yaw, roll,
                 xScale, yScale, zScale);
         ci.cancel();

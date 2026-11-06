@@ -69,7 +69,7 @@ public final class RtxSettingsScreen extends Screen {
         this.layout.addFooter(footer);
 
         this.layout.forEachChild(this::addDrawableChild);
-        this.initTabNavigation();
+        this.refreshWidgetPositions();
     }
 
     private ButtonWidget openRemixMenuButton() {
@@ -85,7 +85,7 @@ public final class RtxSettingsScreen extends Screen {
     }
 
     @Override
-    protected void initTabNavigation() {
+    protected void refreshWidgetPositions() {
         this.layout.refreshPositions();
     }
 

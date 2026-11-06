@@ -150,9 +150,9 @@ $script:PRISM_PORTABLE_DIR   = Join-Path $env:LOCALAPPDATA 'RtxRemixMinecraft\Pr
 # later runs detect that Prism too.
 $script:PRISM_DATA_DIR_RECORD = Join-Path $env:LOCALAPPDATA 'RtxRemixMinecraft\prism-data-dir.txt'
 $script:MANAGED_JDK_DIR      = Join-Path $env:LOCALAPPDATA 'RtxRemixMinecraft\jdk-21'
-$script:FABRIC_API_VERSION   = '0.116.10+1.21.1'
-$script:FABRIC_LOADER_VER    = '0.16.5'
-$script:MC_VERSION           = '1.21.1'
+$script:FABRIC_API_VERSION   = '0.141.6+1.21.11'
+$script:FABRIC_LOADER_VER    = '0.20.1'
+$script:MC_VERSION           = '1.21.11'
 $script:FABRIC_INSTALLER_VER = '1.0.1'
 # Fabric installer 1.0.x writes launcher_profiles.json using an MC-only
 # profile key, but the underlying `versions/` directory name (and the

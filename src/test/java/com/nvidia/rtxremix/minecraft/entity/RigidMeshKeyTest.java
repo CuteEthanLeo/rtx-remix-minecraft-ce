@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+
 /**
  * Pins the identity semantics the rigid mesh keys depend on. Every case here is
  * a way the pool could hand back another part's geometry, or a mesh baked with

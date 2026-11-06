@@ -4,21 +4,12 @@
  */
 package com.nvidia.rtxremix.minecraft.weather;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
-import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
-import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -46,11 +37,6 @@ public final class RemixWeatherRenderer {
     private static final float FAR_PLANE = 1000.0f;
     private static final Identifier RAIN_TEXTURE =
             Identifier.ofVanilla("textures/environment/rain.png");
-    private static final Identifier RAIN_SHADER =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "rain_refraction");
-
-    private static ShaderProgram rainShader;
-
     private final List<DeferredDraw> draws = new ArrayList<>(2);
     private Matrix4f projection;
     private Matrix4f modelView;
@@ -61,11 +47,8 @@ public final class RemixWeatherRenderer {
     private int lastQuadCount;
 
     public static void registerShaders() {
-        CoreShaderRegistrationCallback.EVENT.register(context ->
-                context.register(
-                        RAIN_SHADER,
-                        VertexFormats.POSITION_TEXTURE_COLOR_LIGHT,
-                        shader -> rainShader = shader));
+        // TODO(1.21.11): Fabric removed CoreShaderRegistrationCallback; the rain_refraction core
+        // shader must become a RenderPipeline before rain can be drawn over the Remix image again.
     }
 
     public void beginCaptureFrame(LightmapTextureManager lightmapTextureManager) {
@@ -112,131 +95,18 @@ public final class RemixWeatherRenderer {
             throw new IllegalStateException("Weather camera state was not initialized");
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        client.getFramebuffer().beginWrite(true);
-        try {
-            if (depthSeeder == null) {
-                depthSeeder = new DepthSeeder();
-            }
-            depthSeeder.seed(
-                    depthTexture,
-                    client.getWindow().getFramebufferWidth(),
-                    client.getWindow().getFramebufferHeight());
-            lastDrawCount = draws.size();
-            lastQuadCount = capturedQuadCount;
-            renderDeferredDraws(finalColorTexture);
-        } catch (RuntimeException exception) {
-            closePendingDraws();
-            throw exception;
-        }
+        lastDrawCount = draws.size();
+        lastQuadCount = capturedQuadCount;
+        // TODO(1.21.11): depth seeding needs the main framebuffer bound, which Framebuffer.beginWrite
+        // no longer does; skipped together with the disabled weather draws.
+        renderDeferredDraws(finalColorTexture);
     }
 
     private void renderDeferredDraws(int finalColorTexture) {
-        Matrix4f savedProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
-        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
-        boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-        boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
-        boolean cull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
-        boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-        int[] scissorBox = readScissorBox();
-        boolean depthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-        int depthFunction = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
-        int blendSourceRgb = GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB);
-        int blendDestinationRgb = GL11.glGetInteger(GL14.GL_BLEND_DST_RGB);
-        int blendSourceAlpha = GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA);
-        int blendDestinationAlpha = GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA);
-        int blendEquationRgb = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_RGB);
-        int blendEquationAlpha = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_ALPHA);
-        boolean[] colorMask = readColorMask();
-        float[] shaderColor = RenderSystem.getShaderColor().clone();
-
-        RenderSystem.setProjectionMatrix(projection, VertexSorter.BY_Z);
-        modelViewStack.pushMatrix();
-        modelViewStack.set(modelView);
-        RenderSystem.applyModelViewMatrix();
-
-        try {
-            lightmap.enable();
-            GL11.glEnable(GL11.GL_BLEND);
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-            GL11.glDisable(GL11.GL_CULL_FACE);
-            GL11.glDisable(GL11.GL_SCISSOR_TEST);
-            GL11.glDepthFunc(GL11.GL_LEQUAL);
-            GL11.glDepthMask(false);
-            GL11.glColorMask(true, true, true, true);
-            GL14.glBlendFuncSeparate(
-                    GL11.GL_SRC_ALPHA,
-                    GL11.GL_ONE_MINUS_SRC_ALPHA,
-                    GL11.GL_ONE,
-                    GL11.GL_ZERO);
-            GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
-            RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            renderRain(finalColorTexture);
-            renderSnow();
-        } finally {
-            lightmap.disable();
-            closePendingDraws();
-            restoreCapability(GL11.GL_DEPTH_TEST, depthTest);
-            restoreCapability(GL11.GL_BLEND, blend);
-            restoreCapability(GL11.GL_CULL_FACE, cull);
-            restoreCapability(GL11.GL_SCISSOR_TEST, scissor);
-            GL11.glScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
-            GL11.glDepthFunc(depthFunction);
-            GL11.glDepthMask(depthMask);
-            GL11.glColorMask(
-                    colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
-            GL14.glBlendFuncSeparate(
-                    blendSourceRgb,
-                    blendDestinationRgb,
-                    blendSourceAlpha,
-                    blendDestinationAlpha);
-            GL20.glBlendEquationSeparate(blendEquationRgb, blendEquationAlpha);
-            modelViewStack.popMatrix();
-            RenderSystem.applyModelViewMatrix();
-            RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
-            RenderSystem.setShaderColor(
-                    shaderColor[0], shaderColor[1], shaderColor[2], shaderColor[3]);
-        }
-    }
-
-    private void renderRain(int finalColorTexture) {
-        if (rainShader == null && hasRainDraw()) {
-            throw new IllegalStateException("Rain refraction shader was not loaded");
-        }
-        RenderSystem.setShaderTexture(1, finalColorTexture);
-        renderDraws(true, rainShader);
-    }
-
-    private boolean hasRainDraw() {
-        for (DeferredDraw draw : draws) {
-            if (draw != null && draw.rain()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void renderSnow() {
-        renderDraws(false, GameRenderer.getParticleProgram());
-    }
-
-    private void renderDraws(boolean rain, ShaderProgram shader) {
-        if (shader == null) {
-            return;
-        }
-        RenderSystem.setShader(() -> shader);
-        for (int i = 0; i < draws.size(); i++) {
-            DeferredDraw draw = draws.get(i);
-            if (draw == null || draw.rain() != rain) {
-                continue;
-            }
-            RenderSystem.setShaderTexture(0, draw.texture());
-            try {
-                BufferRenderer.drawWithGlobalProgram(draw.buffer());
-            } finally {
-                draws.set(i, null);
-            }
-        }
+        // TODO(1.21.11): the immediate-mode path (RenderSystem.setShader, applyModelViewMatrix,
+        // BufferRenderer.drawWithGlobalProgram, ShaderProgram) is gone since 1.21.5. Rain and snow
+        // over the Remix image are disabled until they are ported to RenderPipeline/RenderPass.
+        closePendingDraws();
     }
 
     private static void restoreCapability(int capability, boolean enabled) {

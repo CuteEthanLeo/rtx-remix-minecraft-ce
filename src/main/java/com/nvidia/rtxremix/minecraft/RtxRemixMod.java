@@ -72,8 +72,8 @@ import it.unimi.dsi.fastutil.longs.LongSets;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.AbstractWorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -337,6 +337,10 @@ public class RtxRemixMod implements ClientModInitializer {
         return false;
     }
 
+    /** 1.21.11 key categories are registered objects; label key {@code key.category.<mod id>.main}. */
+    private static final KeyBinding.Category KEY_CATEGORY =
+            KeyBinding.Category.create(Identifier.of(RtxRemixCommonMod.MOD_ID, "main"));
+
     @Override
     public void onInitializeClient() {
         instance = this;
@@ -377,7 +381,7 @@ public class RtxRemixMod implements ClientModInitializer {
                 "key.rtxremix.toggleHeldLights",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_G,
-                "category.rtxremix"
+                KEY_CATEGORY
             )
         );
         // F8 is unbound in vanilla 1.21.1 and sits away from the movement keys: a
@@ -388,7 +392,7 @@ public class RtxRemixMod implements ClientModInitializer {
                 "key.rtxremix.toggleRtx",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_F8,
-                "category.rtxremix"
+                KEY_CATEGORY
             )
         );
 
@@ -590,7 +594,10 @@ public class RtxRemixMod implements ClientModInitializer {
         // Applies pending world and resource changes and preloads the large
         // block-entity atlases before vanilla's world render, where block entities
         // are captured in place by BlockEntityRenderDispatcherMixin.
-        WorldRenderEvents.START.register(context -> {
+        // 1.21.11: Fabric split world rendering into extraction and drawing events. START maps to
+        // END_EXTRACTION (the first event still before vanilla draws anything), and END moved to
+        // WorldRendererMixin's render() tail, which calls onWorldRenderEnd().
+        WorldRenderEvents.END_EXTRACTION.register(context -> {
             if (renderer != null && renderer.isInitialized()) {
                 renderer.beginBlockOutlineFrame();
             }
@@ -604,42 +611,28 @@ public class RtxRemixMod implements ClientModInitializer {
             }
         });
 
-        WorldRenderEvents.AFTER_SETUP.register(context ->
+        WorldRenderEvents.START_MAIN.register(context ->
             transitionWorldRenderPhase("WorldRender.vanilla.terrainOpaque"));
         WorldRenderEvents.BEFORE_ENTITIES.register(context ->
             transitionWorldRenderPhase("WorldRender.vanilla.entities"));
         WorldRenderEvents.AFTER_ENTITIES.register(context ->
             transitionWorldRenderPhase("WorldRender.vanilla.blockEntities"));
-        WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, hitResult) -> {
+        WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, outlineRenderState) -> {
             transitionWorldRenderPhase("WorldRender.vanilla.blockOutline");
-            return true;
-        });
-        WorldRenderEvents.BLOCK_OUTLINE.register((context, outlineContext) -> {
             if (renderer != null
                     && renderer.isInitialized()
                     && isRtxEnabled()) {
-                renderer.captureBlockOutline(context, outlineContext);
+                renderer.captureBlockOutline(context, outlineRenderState);
             }
             return true;
         });
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
             transitionWorldRenderPhase("WorldRender.vanilla.debugAndTranslucent"));
-        WorldRenderEvents.AFTER_TRANSLUCENT.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.weatherClouds"));
-        WorldRenderEvents.LAST.register(context -> {
+        WorldRenderEvents.BEFORE_TRANSLUCENT.register(context ->
+            transitionWorldRenderPhase("WorldRender.vanilla.translucent"));
+        WorldRenderEvents.END_MAIN.register(context -> {
             transitionWorldRenderPhase("WorldRender.vanilla.last");
             closeWorldRendererProfilerPhase(context);
-        });
-
-        // WorldRenderer returns to GameRenderer before Minecraft draws the
-        // first-person arms/items. Mark the scene ready here, then submit it
-        // from GameRendererMixin after that model has been captured and before
-        // Minecraft draws its screen overlays.
-        WorldRenderEvents.END.register(context -> {
-            closeWorldRendererProfilerPhase(context);
-            closeWorldRenderPhaseScope();
-            ProfileScope.markWorldRenderEnd();
-            remixFrameReadyToSubmit = renderer != null && renderer.isInitialized();
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -652,6 +645,22 @@ public class RtxRemixMod implements ClientModInitializer {
         });
 
         LOGGER.info("RTX Remix Renderer initialized successfully!");
+    }
+
+    /**
+     * The world-render tail, formerly Fabric's {@code WorldRenderEvents.END}. WorldRenderer
+     * returns to GameRenderer before Minecraft draws the first-person arms/items: mark the
+     * scene ready here, then submit it from GameRendererMixin after that model has been
+     * captured and before Minecraft draws its screen overlays.
+     */
+    public static void onWorldRenderEnd() {
+        RtxRemixMod mod = instance;
+        if (mod == null) {
+            return;
+        }
+        mod.closeWorldRenderPhaseScope();
+        ProfileScope.markWorldRenderEnd();
+        mod.remixFrameReadyToSubmit = renderer != null && renderer.isInitialized();
     }
 
     /**
@@ -745,7 +754,7 @@ public class RtxRemixMod implements ClientModInitializer {
         }
     }
 
-    private static void closeWorldRendererProfilerPhase(WorldRenderContext context) {
+    private static void closeWorldRendererProfilerPhase(AbstractWorldRenderContext context) {
         if (context != null && context.worldRenderer() instanceof WorldRendererProfilingAccess access) {
             access.rtxremix$closeProfilerPhaseForFabricEvent();
         }

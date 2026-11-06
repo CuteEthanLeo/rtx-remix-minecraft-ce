@@ -8,19 +8,20 @@ import com.nvidia.rtxremix.minecraft.light.HeldLightState;
 import com.nvidia.rtxremix.minecraft.particle.ParticleTint;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.mixin.ParticleManagerAccessor;
+import com.nvidia.rtxremix.minecraft.mixin.ParticleSpriteManagerAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.model.BakedModel;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleType;
 import net.minecraft.particle.ParticleTypes;
@@ -54,7 +55,7 @@ import org.joml.Vector3fc;
 public final class HeldItemEffectsRenderer {
 
     private static final RenderLayer EFFECT_LAYER =
-            RenderLayer.getEntityTranslucentEmissive(SpriteAtlasTexture.PARTICLE_ATLAS_TEXTURE);
+            RenderLayers.entityTranslucentEmissive(SpriteAtlasTexture.PARTICLE_ATLAS_TEXTURE);
     private static final float TICKS_PER_SECOND = 20.0f;
     private static final int OPAQUE = 255;
     private static final int WHITE = 255;
@@ -79,12 +80,13 @@ public final class HeldItemEffectsRenderer {
      *
      * @param matrices  the item renderer's stack, with the item's block-space
      *                  pose on top; left as found
-     * @param model     the item's baked model, whose display transform for
-     *                  {@code mode} is part of that pose
+     * @param displayScale the X scale of the item model's display transform for
+     *                  {@code mode}, which is part of that pose (1.21.4 moved display
+     *                  transforms from the baked model to the item model)
      */
-    public static void render(ItemStack stack, ModelTransformationMode mode,
+    public static void render(ItemStack stack, ItemDisplayContext mode,
                               MatrixStack matrices, VertexConsumerProvider consumers,
-                              BakedModel model) {
+                              float displayScale) {
         EntityRenderContext context = EntityRenderContext.get();
         if (!context.isRemixPass() || !HeldItemFlame.isHandMode(mode)) return;
         SimpleParticleType flameParticle = HeldItemFlame.particleFor(stack);
@@ -103,7 +105,7 @@ public final class HeldItemEffectsRenderer {
 
         Quaternionfc facing = client.gameRenderer.getCamera().getRotation();
         Quaternionfc frame = HeldItemFlame.riseFrame(mode, facing);
-        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickDelta(false);
+        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickProgress(false);
         float phase = mode.ordinal();
         float cameraOffset = HeldItemFlame.cameraOffset(mode);
         // Null when the capture does not know where the eye is; the poses then stay at depth 1.
@@ -113,7 +115,6 @@ public final class HeldItemEffectsRenderer {
         // A hand draws its item scaled down (item/generated: 0.68 in first person,
         // 0.55 in third). The flame and smoke are world-sized, so the poses divide
         // that scale back out.
-        float displayScale = model.getTransformation().getTransformation(mode).scale.x;
         VertexConsumer buffer = consumers.getBuffer(EFFECT_LAYER);
 
         matrices.push();
@@ -144,7 +145,8 @@ public final class HeldItemEffectsRenderer {
     }
 
     private static SpriteProvider spriteProvider(MinecraftClient client, ParticleType<?> particle) {
-        Object provider = ((ParticleManagerAccessor) client.particleManager)
+        Object provider = ((ParticleSpriteManagerAccessor)
+                ((ParticleManagerAccessor) client.particleManager).rtxremix$getSpriteManager())
                 .getSpriteAwareFactories()
                 .get(Registries.PARTICLE_TYPE.getId(particle));
         return provider instanceof SpriteProvider spriteProvider ? spriteProvider : null;

@@ -33,7 +33,7 @@ final class FirstPersonShadowModelPlacement {
 
     Vec3d resolve(ClientWorld world, Camera camera, Entity player,
                   List<LightConstraint> lights, float dtSeconds) {
-        Vec3d headCenter = camera.getPos();
+        Vec3d headCenter = camera.getCameraPos();
         Vec3d target = lights.isEmpty()
                 ? Vec3d.ZERO
                 : chooseTargetOffset(world, camera, player, headCenter, lights, offset);

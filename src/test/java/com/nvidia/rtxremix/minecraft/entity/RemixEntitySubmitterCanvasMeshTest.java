@@ -7,11 +7,11 @@ package com.nvidia.rtxremix.minecraft.entity;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.math.Direction;
-import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 import static com.nvidia.rtxremix.minecraft.entity.RemixEntitySubmitter.SHELL_OFFSET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
 
 /**
  * Pins how a canvas's pattern stack is baked into one mesh. Remix composites the
@@ -65,9 +65,9 @@ class RemixEntitySubmitterCanvasMeshTest {
         for (int layer = 0; layer < PATTERN_COUNT; layer++) {
             Sprite sprite = patternSprites[layer];
             for (ModelPart.Quad quad : flag) {
-                for (ModelPart.Vertex vertex : quad.vertices) {
-                    assertEquals(sprite.getFrameU(vertex.u), tu[i], EPSILON, "u of vertex " + i);
-                    assertEquals(sprite.getFrameV(vertex.v), tv[i], EPSILON, "v of vertex " + i);
+                for (ModelPart.Vertex vertex : quad.vertices()) {
+                    assertEquals(sprite.getFrameU(vertex.u()), tu[i], EPSILON, "u of vertex " + i);
+                    assertEquals(sprite.getFrameV(vertex.v()), tv[i], EPSILON, "v of vertex " + i);
                     i++;
                 }
             }
@@ -86,10 +86,10 @@ class RemixEntitySubmitterCanvasMeshTest {
         for (int layer = 0; layer < PATTERN_COUNT; layer++) {
             float shell = (LAYER + layer + 1) * SHELL_OFFSET;
             for (ModelPart.Quad quad : flag) {
-                for (ModelPart.Vertex vertex : quad.vertices) {
-                    assertEquals(vertex.pos.x / 16f + quad.direction.x() * shell, px[i], EPSILON, "x of vertex " + i);
-                    assertEquals(vertex.pos.y / 16f + quad.direction.y() * shell, py[i], EPSILON, "y of vertex " + i);
-                    assertEquals(vertex.pos.z / 16f + quad.direction.z() * shell, pz[i], EPSILON, "z of vertex " + i);
+                for (ModelPart.Vertex vertex : quad.vertices()) {
+                    assertEquals(vertex.x() / 16f + quad.direction().x() * shell, px[i], EPSILON, "x of vertex " + i);
+                    assertEquals(vertex.y() / 16f + quad.direction().y() * shell, py[i], EPSILON, "y of vertex " + i);
+                    assertEquals(vertex.z() / 16f + quad.direction().z() * shell, pz[i], EPSILON, "z of vertex " + i);
                     i++;
                 }
             }
@@ -119,7 +119,7 @@ class RemixEntitySubmitterCanvasMeshTest {
         for (int q = 0; q < sides.length; q++) {
             ModelPart.Vertex[] vertices = new ModelPart.Vertex[4];
             for (int v = 0; v < 4; v++) {
-                vertices[v] = new ModelPart.Vertex(new Vector3f(q + v, q * 2, v), 0f, 0f);
+                vertices[v] = new ModelPart.Vertex(q + v, q * 2, v, 0f, 0f);
             }
             sides[q] = new ModelPart.Quad(vertices, 1, 1, 21, 41, 64, 64, false, directions[q]);
         }

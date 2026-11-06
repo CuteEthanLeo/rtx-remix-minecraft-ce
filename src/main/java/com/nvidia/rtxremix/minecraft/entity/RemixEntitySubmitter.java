@@ -848,7 +848,7 @@ public class RemixEntitySubmitter {
         RenderLayerUtils.SurfaceMode layerMode = RenderLayerUtils.surfaceMode(renderLayer);
         RenderLayerUtils.SurfaceMode surfaceMode = playerSkinSurfaceMode(layerMode,
                 result.owner() instanceof PlayerEntity
-                        && renderLayer == RenderLayer.getEntityTranslucent(texId));
+                        && renderLayer == net.minecraft.client.render.RenderLayers.entityTranslucent(texId));
 
         RemixCapturingConsumer consumer = layer.consumer();
         // Guard on parts, not vertices: a cuboid part carries no captured
@@ -2713,7 +2713,8 @@ public class RemixEntitySubmitter {
         byte[] out = new byte[w * h * 4];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = image.getColor(x, y);
+                int argb = image.getColorArgb(x, y);
+                int abgr = (argb & 0xFF00FF00) | ((argb >> 16) & 0xFF) | ((argb & 0xFF) << 16);
                 int idx = (y * w + x) * 4;
                 out[idx]     = (byte) (abgr & 0xFF);
                 out[idx + 1] = (byte) ((abgr >> 8) & 0xFF);

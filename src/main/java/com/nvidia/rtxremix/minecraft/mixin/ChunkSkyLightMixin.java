@@ -30,8 +30,7 @@ public abstract class ChunkSkyLightMixin implements SkyLightSurfaceAccess {
     }
 
     @Shadow
-    private static boolean faceBlocksLight(BlockView blockView, BlockPos upperPos, BlockState upperState,
-                                           BlockPos lowerPos, BlockState lowerState) {
+    private static boolean faceBlocksLight(BlockState upperState, BlockState lowerState) {
         throw new AssertionError();
     }
 
@@ -45,7 +44,7 @@ public abstract class ChunkSkyLightMixin implements SkyLightSurfaceAccess {
         SeededSurfaceScan.refreshSurfaceY(chunk, chunk.getHighestNonEmptySection(), worldSurface::get,
                 Blocks.AIR.getDefaultState(), new ChunkSections(chunk),
                 (upperPos, upperState, lowerPos, lowerState) ->
-                        faceBlocksLight(chunk, upperPos, upperState, lowerPos, lowerState),
+                        faceBlocksLight(upperState, lowerState),
                 (localX, localZ, surfaceY) -> set(getPackedIndex(localX, localZ), surfaceY));
     }
 }

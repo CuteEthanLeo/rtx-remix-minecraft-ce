@@ -113,23 +113,25 @@ public class SectionBuilderMixin {
         rtxremix$tracyBlockLoop.set(ProfileScope.begin("block loop"));
     }
 
-    // isOpaqueFullCube: capture opacity / face masks / lights / quads
+    // getBlockState: capture opacity / face masks / lights / quads. 1.21.11's
+    // isOpaqueFullCube() no longer receives the world and position, so the capture hooks the
+    // per-block state read that precedes it instead.
     @Redirect(method = "build",
               at = @At(value = "INVOKE",
-                       target = "Lnet/minecraft/block/BlockState;isOpaqueFullCube(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)Z"))
-    private boolean rtxremix$captureBlock(BlockState state, BlockView world, BlockPos pos) {
-        boolean opaque = state.isOpaqueFullCube(world, pos);
+                       target = "Lnet/minecraft/client/render/chunk/ChunkRendererRegion;getBlockState(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/BlockState;"))
+    private BlockState rtxremix$captureBlock(ChunkRendererRegion world, BlockPos pos) {
+        BlockState state = world.getBlockState(pos);
         BlockQuadEmitter emitter = BlockQuadEmitter.current();
         if (emitter != null && emitter.isActive()) {
+            boolean opaque = state.isOpaqueFullCube();
             emitter.processBlock(state, world, pos, opaque);
             // Vanilla hands only MODEL blocks to renderBlock; ENTITYBLOCK_ANIMATED blocks
             // belong to their block-entity renderer.
             if (BlockQuadEmitter.getRenderTypeCached(state) == BlockRenderType.MODEL) {
-                // build() only ever passes its ChunkRendererRegion here.
-                emitter.emitBlock(state, pos, (BlockRenderView) world);
+                emitter.emitBlock(state, pos, world);
             }
         }
-        return opaque;
+        return state;
     }
 
     // While capturing, the block's quads were already emitted above, so vanilla's raster

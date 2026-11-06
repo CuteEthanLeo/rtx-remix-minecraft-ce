@@ -33,7 +33,7 @@ public class CuboidMixin {
 
     @Shadow
     @Final
-    private ModelPart.Quad[] sides;
+    public ModelPart.Quad[] sides;
 
     @Inject(method = "renderCuboid", at = @At("HEAD"), cancellable = true)
     private void rtxremix$onRenderCuboid(MatrixStack.Entry entry, VertexConsumer vertexConsumer,

@@ -59,7 +59,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     private static final String DYE_KEY = "dye";
 
     public static final BlockEntityType<CopperBeaconBlockEntity> TYPE =
-            BlockEntityType.Builder.create(
+            net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder.create(
                     CopperBeaconBlockEntity::new, CopperBeaconBlock.INSTANCE).build();
 
     private float intensityMultiplier = DEFAULT_INTENSITY_MULTIPLIER;
@@ -372,7 +372,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     @Override
     public boolean canPlayerUse(PlayerEntity player) {
         return !isRemoved()
-                && world == player.getWorld()
+                && world == player.getEntityWorld()
                 && world.getBlockEntity(pos) == this
                 && player.squaredDistanceTo(
                         pos.getX() + 0.5,
@@ -394,48 +394,58 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.writeNbt(nbt, registryLookup);
-        nbt.putFloat(INTENSITY_KEY, intensityMultiplier);
-        nbt.putFloat(CONE_ANGLE_KEY, coneAngle);
-        nbt.putFloat(SATURATION_KEY, saturation);
-        nbt.putBoolean(REDSTONE_CONTROLLED_KEY, redstoneControlled);
-        nbt.putLong(FROZEN_TICK_KEY, frozenTick);
+    protected void writeData(net.minecraft.storage.WriteView view) {
+        super.writeData(view);
         NbtCompound yawNbt = new NbtCompound();
         yaw.writeNbt(yawNbt);
-        nbt.put(YAW_KEY, yawNbt);
         NbtCompound pitchNbt = new NbtCompound();
         pitch.writeNbt(pitchNbt);
-        nbt.put(PITCH_KEY, pitchNbt);
+        view.putFloat(INTENSITY_KEY, intensityMultiplier);
+        view.putFloat(CONE_ANGLE_KEY, coneAngle);
+        view.putFloat(SATURATION_KEY, saturation);
+        view.putBoolean(REDSTONE_CONTROLLED_KEY, redstoneControlled);
+        view.putLong(FROZEN_TICK_KEY, frozenTick);
+        view.put(YAW_KEY, NbtCompound.CODEC, yawNbt);
+        view.put(PITCH_KEY, NbtCompound.CODEC, pitchNbt);
         if (!dye.isEmpty()) {
-            nbt.put(DYE_KEY, dye.encode(registryLookup));
+            view.put(DYE_KEY, ItemStack.CODEC, dye);
         }
     }
 
     @Override
-    protected void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.readNbt(nbt, registryLookup);
+    protected void readData(net.minecraft.storage.ReadView view) {
+        super.readData(view);
+        // 1.21.11: rebuild a compound for the NBT-based helpers below.
+        NbtCompound nbt = new NbtCompound();
+        for (String key : new String[] {INTENSITY_KEY, CONE_ANGLE_KEY, SATURATION_KEY, "azimuth", "zenith"}) {
+            view.read(key, com.mojang.serialization.Codec.FLOAT).ifPresent(v -> nbt.putFloat(key, v));
+        }
+        nbt.putBoolean(REDSTONE_CONTROLLED_KEY, view.getBoolean(REDSTONE_CONTROLLED_KEY, false));
+        nbt.putLong(FROZEN_TICK_KEY, view.getLong(FROZEN_TICK_KEY, 0L));
+        for (String key : new String[] {YAW_KEY, PITCH_KEY}) {
+            view.read(key, NbtCompound.CODEC).ifPresent(v -> nbt.put(key, v));
+        }
         intensityMultiplier = finiteClamped(
                 nbt.contains(INTENSITY_KEY)
-                        ? nbt.getFloat(INTENSITY_KEY)
+                        ? nbt.getFloat(INTENSITY_KEY, 0.0f)
                         : DEFAULT_INTENSITY_MULTIPLIER,
                 MIN_INTENSITY_MULTIPLIER,
                 MAX_INTENSITY_MULTIPLIER,
                 DEFAULT_INTENSITY_MULTIPLIER);
         coneAngle = finiteClamped(
-                nbt.contains(CONE_ANGLE_KEY) ? nbt.getFloat(CONE_ANGLE_KEY) : DEFAULT_CONE_ANGLE,
+                nbt.contains(CONE_ANGLE_KEY) ? nbt.getFloat(CONE_ANGLE_KEY, 0.0f) : DEFAULT_CONE_ANGLE,
                 MIN_CONE_ANGLE,
                 MAX_CONE_ANGLE,
                 DEFAULT_CONE_ANGLE);
         saturation = finiteClamped(
-                nbt.contains(SATURATION_KEY) ? nbt.getFloat(SATURATION_KEY) : DEFAULT_SATURATION,
+                nbt.contains(SATURATION_KEY) ? nbt.getFloat(SATURATION_KEY, 0.0f) : DEFAULT_SATURATION,
                 MIN_SATURATION,
                 MAX_SATURATION,
                 DEFAULT_SATURATION);
-        redstoneControlled = nbt.getBoolean(REDSTONE_CONTROLLED_KEY);
-        frozenTick = nbt.getLong(FROZEN_TICK_KEY);
+        redstoneControlled = nbt.getBoolean(REDSTONE_CONTROLLED_KEY, false);
+        frozenTick = nbt.getLong(FROZEN_TICK_KEY, 0L);
         if (nbt.contains(YAW_KEY)) {
-            yaw = CopperBeaconAxisState.readNbt(nbt.getCompound(YAW_KEY));
+            yaw = CopperBeaconAxisState.readNbt(nbt.getCompoundOrEmpty(YAW_KEY));
         } else {
             CopperBeaconState.Angles angles = CopperBeaconState.readAngles(nbt);
             yaw = new CopperBeaconAxisState(
@@ -447,7 +457,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
                     0L);
         }
         if (nbt.contains(PITCH_KEY)) {
-            pitch = CopperBeaconAxisState.readNbt(nbt.getCompound(PITCH_KEY));
+            pitch = CopperBeaconAxisState.readNbt(nbt.getCompoundOrEmpty(PITCH_KEY));
         } else {
             CopperBeaconState.Angles angles = CopperBeaconState.readAngles(nbt);
             pitch = new CopperBeaconAxisState(
@@ -458,9 +468,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
                     CopperBeaconAxisState.DEFAULT_PATROL_SECONDS,
                     0L);
         }
-        dye = nbt.get(DYE_KEY) != null
-                ? ItemStack.fromNbt(registryLookup, nbt.getCompound(DYE_KEY)).orElse(ItemStack.EMPTY)
-                : ItemStack.EMPTY;
+        dye = view.read(DYE_KEY, ItemStack.CODEC).orElse(ItemStack.EMPTY);
     }
 
     @Override

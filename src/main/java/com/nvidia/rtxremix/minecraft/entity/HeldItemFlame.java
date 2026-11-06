@@ -8,8 +8,8 @@ import com.nvidia.rtxremix.minecraft.mixin.TorchBlockAccessor;
 import net.minecraft.block.Block;
 import net.minecraft.block.RedstoneTorchBlock;
 import net.minecraft.block.TorchBlock;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.SimpleParticleType;
 import org.joml.Matrix4f;
@@ -113,19 +113,19 @@ public final class HeldItemFlame {
     }
 
     /** Whether an item render mode is a hand, in first or third person. */
-    public static boolean isHandMode(ModelTransformationMode mode) {
+    public static boolean isHandMode(ItemDisplayContext mode) {
         return mode.isFirstPerson()
-                || mode == ModelTransformationMode.THIRD_PERSON_LEFT_HAND
-                || mode == ModelTransformationMode.THIRD_PERSON_RIGHT_HAND;
+                || mode == ItemDisplayContext.THIRD_PERSON_LEFT_HAND
+                || mode == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND;
     }
 
     /** The toward-camera placement offset for a hand mode, in block space. */
-    static float cameraOffset(ModelTransformationMode mode) {
+    static float cameraOffset(ItemDisplayContext mode) {
         return mode.isFirstPerson() ? FIRST_PERSON_CAMERA_OFFSET : 0.0f;
     }
 
     /** The line-of-sight depth fraction for a hand mode; 1 leaves the quad at its anchor. */
-    static float depthFraction(ModelTransformationMode mode) {
+    static float depthFraction(ItemDisplayContext mode) {
         return mode.isFirstPerson() ? FIRST_PERSON_DEPTH_FRACTION : 1.0f;
     }
 
@@ -138,7 +138,7 @@ public final class HeldItemFlame {
      * its effects rise along the camera's up and keep their place on the card as the
      * view tilts; along world up they swung around the head with the pitch.
      */
-    static Quaternionfc riseFrame(ModelTransformationMode mode, Quaternionfc facing) {
+    static Quaternionfc riseFrame(ItemDisplayContext mode, Quaternionfc facing) {
         return mode.isFirstPerson() ? facing : WORLD_FRAME;
     }
 

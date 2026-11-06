@@ -7,15 +7,17 @@ package com.nvidia.rtxremix.minecraft.texture;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.TextureManager;
-import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
+import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+
+import sun.misc.Unsafe;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,27 +96,26 @@ class DynamicTextureCacheTest {
     @Test
     void clearDropsAClosedImageTextureEvenWhileTheManagerKeepsItRegistered() {
         Identifier id = Identifier.of("minecraft", "dynamic/closed-map");
-        TextureManager manager = new TextureManager(null);
-        NativeImageBackedTexture texture = new NativeImageBackedTexture(new NativeImage(1, 1, true));
-        manager.registerTexture(id, texture);
+        // Still strongly reachable, as the texture manager's registration would keep it.
+        NativeImageBackedTexture texture = imageTexture(new NativeImage(1, 1, true));
         DynamicTextureCache.onRegisterTexture(id, texture, texture.getImage());
         assertNotNull(DynamicTextureCache.get(id));
 
         texture.close();
         assertNull(texture.getImage());
-        assertSame(texture, manager.getTexture(id));
         DynamicTextureCache.clear();
 
         assertNull(DynamicTextureCache.get(id));
+        Reference.reachabilityFence(texture);
     }
 
     @Test
     void clearKeepsALiveImageTextureWhenAClosedTextureSharesItsId() {
         Identifier id = Identifier.of("minecraft", "dynamic/replaced-map");
-        NativeImageBackedTexture closed = new NativeImageBackedTexture(new NativeImage(1, 1, true));
+        NativeImageBackedTexture closed = imageTexture(new NativeImage(1, 1, true));
         DynamicTextureCache.onRegisterTexture(id, closed, closed.getImage());
         closed.close();
-        try (NativeImageBackedTexture live = new NativeImageBackedTexture(new NativeImage(1, 1, true))) {
+        try (NativeImageBackedTexture live = imageTexture(new NativeImage(1, 1, true))) {
             DynamicTextureCache.onRegisterTexture(id, live, live.getImage());
             DynamicTextureCache.Pixels captured = DynamicTextureCache.get(id);
 
@@ -127,7 +128,7 @@ class DynamicTextureCacheTest {
     @Test
     void capacityPruningDropsClosedImageTexturesWithoutWaitingForCollection() {
         Identifier closedId = Identifier.of("minecraft", "dynamic/pruned-map");
-        NativeImageBackedTexture closed = new NativeImageBackedTexture(new NativeImage(1, 1, true));
+        NativeImageBackedTexture closed = imageTexture(new NativeImage(1, 1, true));
         DynamicTextureCache.onRegisterTexture(closedId, closed, closed.getImage());
         closed.close();
         List<AbstractTexture> live = new ArrayList<>();
@@ -209,9 +210,26 @@ class DynamicTextureCacheTest {
     }
 
     private static AbstractTexture newTexture() {
-        return new AbstractTexture() {
-            @Override
-            public void load(ResourceManager manager) {}
-        };
+        return new AbstractTexture() {};
+    }
+
+    /**
+     * An image-backed texture holding {@code image}. Its constructors now create a GPU
+     * texture through {@code RenderSystem.getDevice()}, which a JVM test does not have, so
+     * the object is allocated without running them and given its image through the public
+     * setter. The cache reads nothing but {@link NativeImageBackedTexture#getImage()}, and
+     * {@code close()} still releases the image and nulls it.
+     */
+    private static NativeImageBackedTexture imageTexture(NativeImage image) {
+        try {
+            Field field = Unsafe.class.getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            NativeImageBackedTexture texture = (NativeImageBackedTexture)
+                    ((Unsafe) field.get(null)).allocateInstance(NativeImageBackedTexture.class);
+            texture.setImage(image);
+            return texture;
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 }

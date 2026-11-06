@@ -7,6 +7,7 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
+import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
 import com.nvidia.rtxremix.HardcodedVertex;
 import com.nvidia.rtxremix.InstanceCategoryBit;
 import com.nvidia.rtxremix.InstanceInfoBlendEXT;
@@ -48,7 +49,7 @@ import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.DimensionEffects;
+import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.Identifier;
@@ -285,7 +286,7 @@ public class SkyRenderer {
         }
 
         RemixAPI api = renderer.getRemixApi();
-        float[] fixedRadiance = fixedSkyRadiance(world.getDimensionEffects().getSkyType());
+        float[] fixedRadiance = fixedSkyRadiance(WorldSky.skybox(world));
         if (fixedRadiance == null) {
             renderAtmosphericSky(api, world, cameraPos, tickDelta);
         } else {
@@ -298,9 +299,9 @@ public class SkyRenderer {
      *
      * @return the constant, or null for a NORMAL sky, whose dome is the time-driven atmosphere
      */
-    static float[] fixedSkyRadiance(DimensionEffects.SkyType skyType) {
+    static float[] fixedSkyRadiance(DimensionType.Skybox skyType) {
         return switch (skyType) {
-            case NORMAL -> null;
+            case OVERWORLD -> null;
             case END -> END_SKY_RADIANCE;
             case NONE -> SKYLESS_SKY_RADIANCE;
         };
@@ -316,7 +317,7 @@ public class SkyRenderer {
         float[] sunDirection;
         WeatherDomeState weather;
         try (ProfileScope ignored = ProfileScope.begin("Sky.Prepare")) {
-            skyAngle = world.getSkyAngle(tickDelta);
+            skyAngle = WorldSky.skyAngle(world, tickDelta);
             ConfLayerDriver confLayers = renderer.getConfLayerDriver();
             ConfLayerDriver.WeatherStrengths weatherStrengths =
                     confLayers != null && confLayers.isActive()
@@ -770,7 +771,7 @@ public class SkyRenderer {
 
         float weatherVisibility = Math.max(
                 minimumCelestialWeatherVisibility, 1.0f - clamp01(weatherOpacity));
-        float starBrightness = world.getStarBrightness(tickDelta);
+        float starBrightness = WorldSky.starBrightness(world, tickDelta);
         if (!drawStarryNight(api, world, cameraPos, skyAngle, starBrightness, weatherVisibility)) {
             float starsOpacity = starOpacity(starBrightness) * weatherVisibility;
             if (starsOpacity > 0.0f) {
@@ -804,7 +805,7 @@ public class SkyRenderer {
         }
 
         if (moonOpacity > 0.0f) {
-            int moonPhase = world.getMoonPhase() & 7;
+            int moonPhase = WorldSky.moonPhase(world, tickDelta) & 7;
             updateCelestialTransform(
                     moonTransform,
                     cameraPos,
@@ -863,7 +864,7 @@ public class SkyRenderer {
         }
         updateStarTransform(starTransform, cameraPos, skyAngle);
         boolean drawn = nightSky.draw(api, starTransform, celestialBlendPNext, stars,
-                NightSkyRenderer.bandOpacity(stars, world.getMoonSize()));
+                NightSkyRenderer.bandOpacity(stars, WorldSky.moonSize(world, 1.0f)));
         if (drawn) {
             nightSky.drawMeteors(api, cameraPos.x, cameraPos.y, cameraPos.z, celestialBlendPNext,
                     stars, world.getTimeOfDay() / 24000L);
@@ -955,7 +956,7 @@ public class SkyRenderer {
             pixels = new byte[width * height * 4];
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
-                    int abgr = image.getColor(x, y);
+                    int abgr = NativeImagePixels.abgr(image, x, y);
                     int index = (y * width + x) * 4;
                     pixels[index] = (byte) (abgr & 0xFF);
                     pixels[index + 1] = (byte) ((abgr >>> 8) & 0xFF);

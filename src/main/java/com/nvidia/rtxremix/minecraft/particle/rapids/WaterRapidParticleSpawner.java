@@ -267,8 +267,8 @@ public final class WaterRapidParticleSpawner {
     }
 
     private static void tint(Particle particle, float[] color) {
-        if (particle != null) {
-            particle.setColor(color[0], color[1], color[2]);
+        if (particle instanceof net.minecraft.client.particle.BillboardParticle billboard) {
+            billboard.setColor(color[0], color[1], color[2]);
         }
     }
 

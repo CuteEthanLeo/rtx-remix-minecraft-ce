@@ -9,44 +9,50 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.block.entity.BlockEntityRenderDispatcher;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
  * Captures block entities where vanilla renders them, instead of rendering them twice.
  *
- * <p>Vanilla evaluates the block-entity renderer here and writes it to OpenGL. Each
- * dispatch is offered to {@code RemixRenderer.renderBlockEntityInPlace}, which runs the
- * same renderer against the Remix capture stack and provider and submits the result;
- * the OpenGL write never happens. Vanilla's own matrix stack and provider are
- * deliberately not forwarded: the stack is camera-relative, and the capture supplies an
- * identity one so the geometry stays block-local. When Remix declines, vanilla renders
- * as usual.
+ * <p>Vanilla evaluates the block-entity renderer here and submits its commands to the
+ * world's queue. Each dispatch is offered to {@code RemixRenderer.renderBlockEntityInPlace},
+ * which runs the same renderer against the Remix capture stack and a private queue and
+ * submits the result; the world-queue submit never happens. Vanilla's own matrix stack and
+ * queue are deliberately not forwarded: the stack is camera-relative, and the capture
+ * supplies an identity one so the geometry stays block-local. When Remix declines,
+ * vanilla renders as usual.
  *
- * <p>{@code renderEntity}, which held items reach through {@code BuiltinModelItemRenderer},
- * is not wrapped: a block entity rendered inside an entity capture arrives through that
- * entity's provider and becomes that entity's parts.
+ * <p>Since 1.21.9 the manager renders a {@link BlockEntityRenderState}; the block entity
+ * itself is looked up from the client world at the state's position.
  */
-@Mixin(BlockEntityRenderDispatcher.class)
+@Mixin(BlockEntityRenderManager.class)
 public abstract class BlockEntityRenderDispatcherMixin {
 
     @WrapMethod(
-        method = "render(Lnet/minecraft/block/entity/BlockEntity;FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;)V"
+        method = "render(Lnet/minecraft/client/render/block/entity/state/BlockEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V"
     )
-    private <E extends BlockEntity> void rtxremix$captureBlockEntityInPlace(
-            E be, float tickDelta, MatrixStack matrices,
-            VertexConsumerProvider provider, Operation<Void> original) {
+    private <S extends BlockEntityRenderState> void rtxremix$captureBlockEntityInPlace(
+            S state, MatrixStack matrices, OrderedRenderCommandQueue queue,
+            CameraRenderState cameraState, Operation<Void> original) {
         RtxRemixMod mod = RtxRemixMod.getInstance();
         RemixRenderer renderer = mod == null ? null : mod.getRenderer();
-        boolean captured = renderer != null
+        MinecraftClient client = MinecraftClient.getInstance();
+        BlockEntity be = renderer == null || client.world == null
+                ? null
+                : client.world.getBlockEntity(state.pos);
+        boolean captured = be != null
                 && be.hasWorld()
                 && renderer.renderBlockEntityInPlace(be,
-                        (captureMatrices, captureProvider) ->
-                                original.call(be, tickDelta, captureMatrices, captureProvider));
+                        (captureMatrices, captureQueue) ->
+                                original.call(state, captureMatrices, captureQueue, cameraState));
         if (!captured) {
-            original.call(be, tickDelta, matrices, provider);
+            original.call(state, matrices, queue, cameraState);
         }
     }
 }

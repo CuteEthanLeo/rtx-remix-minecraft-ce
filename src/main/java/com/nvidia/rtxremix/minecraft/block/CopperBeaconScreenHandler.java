@@ -156,10 +156,10 @@ public final class CopperBeaconScreenHandler extends ScreenHandler {
 
     @Override
     public boolean canUse(PlayerEntity player) {
-        if (beacon == null || beacon.isRemoved() || beacon.getWorld() != player.getWorld()) {
+        if (beacon == null || beacon.isRemoved() || beacon.getWorld() != player.getEntityWorld()) {
             return false;
         }
-        if (player.getWorld().getBlockEntity(pos) != beacon) {
+        if (player.getEntityWorld().getBlockEntity(pos) != beacon) {
             return false;
         }
         return player.squaredDistanceTo(
@@ -207,7 +207,7 @@ public final class CopperBeaconScreenHandler extends ScreenHandler {
 
     private static CopperBeaconBlockEntity clientBeacon(
             PlayerInventory inventory, BlockPos pos) {
-        return inventory.player.getWorld().getBlockEntity(pos)
+        return inventory.player.getEntityWorld().getBlockEntity(pos)
                         instanceof CopperBeaconBlockEntity beacon
                 ? beacon
                 : null;

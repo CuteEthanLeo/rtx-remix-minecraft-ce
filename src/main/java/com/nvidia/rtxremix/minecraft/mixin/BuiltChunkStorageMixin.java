@@ -44,29 +44,8 @@ public abstract class BuiltChunkStorageMixin
 
     private ChunkStorageTorus.Workspace rtxremix$torusWorkspace;
 
-    @Inject(method = "updateCameraPosition(DD)V", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$updateCameraPosition(double cameraX, double cameraZ, CallbackInfo ci) {
-        if (!RtxRemixMod.isRtxEnabled()) {
-            return;
-        }
-        if (rtxremix$torusWorkspace == null) {
-            rtxremix$torusWorkspace = new ChunkStorageTorus.Workspace();
-        }
-
-        try (ProfileScope scope = ProfileScope.begin("ChunkStorage.updateCameraPosition")) {
-            int movedSlots = ChunkStorageTorus.reposition(
-                    this,
-                    rtxremix$torusWorkspace,
-                    sizeX,
-                    sizeY,
-                    sizeZ,
-                    world.getBottomY(),
-                    cameraX,
-                    cameraZ);
-            scope.captureCount(movedSlots).scannedChunkCount(sizeX + sizeZ);
-        }
-        ci.cancel();
-    }
+    // TODO(1.21.11): vanilla's updateCameraPosition now takes a ChunkSectionPos and re-origins slots in
+    // section space; the torus reposition (ChunkStorageTorus) is not ported, so vanilla's loop runs as is.
 
     @Override
     public int rtxremix$getOriginX(int slotIndex) {
@@ -80,7 +59,7 @@ public abstract class BuiltChunkStorageMixin
 
     @Override
     public void rtxremix$setOrigin(int slotIndex, int x, int y, int z) {
-        chunks[slotIndex].setOrigin(x, y, z);
+        chunks[slotIndex].setSectionPos(net.minecraft.util.math.ChunkSectionPos.asLong(x >> 4, y >> 4, z >> 4));
     }
 
     /** The slot vanilla aliases the section onto, or null unless that slot currently holds the section. */

@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.nvidia.rtxremix.minecraft.GameRendererFovAccess;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
@@ -11,11 +12,12 @@ import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -28,19 +30,29 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * the Remix menus at the start of each frame.
  */
 @Mixin(GameRenderer.class)
-public abstract class GameRendererMixin {
+public abstract class GameRendererMixin implements GameRendererFovAccess {
+
+    @Shadow
+    private float getFov(Camera camera, float tickProgress, boolean changingFov) {
+        throw new AssertionError();
+    }
+
+    @Override
+    public float rtxremix$getFov(Camera camera, float tickDelta, boolean changingFov) {
+        return getFov(camera, tickDelta, changingFov);
+    }
 
     @Redirect(
             method = "renderHand",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;Lnet/minecraft/client/network/ClientPlayerEntity;I)V"
+                    target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/network/ClientPlayerEntity;I)V"
             ))
     private void rtxremix$captureFirstPersonModel(
             HeldItemRenderer heldItemRenderer,
             float tickDelta,
             MatrixStack matrices,
-            VertexConsumerProvider.Immediate vertexConsumers,
+            OrderedRenderCommandQueue vertexConsumers,
             ClientPlayerEntity player,
             int light) {
         RemixRenderer renderer = RtxRemixMod.renderer;
@@ -52,17 +64,16 @@ public abstract class GameRendererMixin {
         renderer.captureFirstPersonModel(heldItemRenderer, tickDelta, matrices, player, light);
     }
 
+    // 1.21.11: the screen overlays moved from renderHand into renderWorld.
     @Inject(
-            method = "renderHand",
+            method = "renderWorld",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/hud/InGameOverlayRenderer;renderOverlays(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/util/math/MatrixStack;)V",
+                    target = "Lnet/minecraft/client/gui/hud/InGameOverlayRenderer;renderOverlays(ZFLnet/minecraft/client/render/command/OrderedRenderCommandQueue;)V",
                     shift = At.Shift.BEFORE
             ))
     private void rtxremix$submitBeforeScreenOverlays(
-            Camera camera,
-            float tickDelta,
-            Matrix4f positionMatrix,
+            RenderTickCounter tickCounter,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }

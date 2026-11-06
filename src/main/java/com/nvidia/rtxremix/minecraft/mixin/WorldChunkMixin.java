@@ -35,9 +35,9 @@ public abstract class WorldChunkMixin {
             WorldChunk self,
             Operation<Void> original,
             PacketByteBuf buf,
-            NbtCompound nbt,
+            java.util.Map<Heightmap.Type, long[]> heightmaps,
             Consumer<ChunkData.BlockEntityVisitor> consumer) {
-        boolean worldSurfaceInPacket = nbt.contains(Heightmap.Type.WORLD_SURFACE.getName(), NbtElement.LONG_ARRAY_TYPE);
+        boolean worldSurfaceInPacket = heightmaps.containsKey(Heightmap.Type.WORLD_SURFACE);
         if (!SkyLightSurfaceScanPolicy.seedFromHeightmap(SkyLightSurfaceScanPolicy.SEED_ALLOWED, worldSurfaceInPacket)) {
             if (SkyLightSurfaceScanPolicy.SEED_ALLOWED) {
                 SkyLightSurfaceScanPolicy.noteMissingHeightmap();

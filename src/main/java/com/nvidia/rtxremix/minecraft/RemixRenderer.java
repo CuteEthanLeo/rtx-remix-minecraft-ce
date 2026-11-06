@@ -53,7 +53,8 @@ import com.nvidia.rtxremix.minecraft.entity.RemixEntitySubmitter;
 import com.nvidia.rtxremix.minecraft.entity.RemixFirstPersonPass;
 import com.nvidia.rtxremix.minecraft.cloud.CloudRenderer;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
+import net.minecraft.client.render.state.OutlineRenderState;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.enums.CameraSubmersionType;
@@ -61,7 +62,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.entity.EntityRenderManager;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
@@ -674,7 +675,7 @@ public class RemixRenderer {
             return false;
         }
         MinecraftClient client = MinecraftClient.getInstance();
-        EntityRenderDispatcher dispatcher = client == null ? null : client.getEntityRenderDispatcher();
+        EntityRenderManager dispatcher = client == null ? null : client.getEntityRenderDispatcher();
         if (dispatcher == null) {
             return false;
         }
@@ -709,7 +710,7 @@ public class RemixRenderer {
             return false;
         }
         MinecraftClient client = MinecraftClient.getInstance();
-        EntityRenderDispatcher dispatcher = client == null ? null : client.getEntityRenderDispatcher();
+        EntityRenderManager dispatcher = client == null ? null : client.getEntityRenderDispatcher();
         if (dispatcher == null) {
             return false;
         }
@@ -807,7 +808,7 @@ public class RemixRenderer {
             }
 
             Camera camera = client.gameRenderer.getCamera();
-            float tickDelta = client.getRenderTickCounter().getTickDelta(true);
+            float tickDelta = client.getRenderTickCounter().getTickProgress(true);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());
             
             perfTimer.begin(perfCamera);
@@ -817,7 +818,7 @@ public class RemixRenderer {
                 perfTimer.end(perfCamera);
             }
             
-            Vec3d cameraPos = camera.getPos();
+            Vec3d cameraPos = camera.getCameraPos();
 
             perfTimer.begin(perfLights);
             try (ProfileScope lightsScope = ProfileScope.begin("Lights")) {
@@ -1221,7 +1222,7 @@ public class RemixRenderer {
      */
     private void updateCamera(Camera camera, float tickDelta) {
         try {
-            Vec3d pos = camera.getPos();
+            Vec3d pos = camera.getCameraPos();
             float pitch = camera.getPitch();
             float yaw = camera.getYaw();
     
@@ -1241,7 +1242,7 @@ public class RemixRenderer {
             float upZ = rightX * forwardY - rightY * forwardX;
     
             MinecraftClient client = MinecraftClient.getInstance();
-            float worldFov = (float) client.gameRenderer.getFov(camera, tickDelta, true);
+            float worldFov = ((GameRendererFovAccess) client.gameRenderer).rtxremix$getFov(camera, tickDelta, true);
             int width = client.getWindow().getFramebufferWidth();
             int height = client.getWindow().getFramebufferHeight();
             float aspect = (float) width / (float) height;
@@ -1476,7 +1477,7 @@ public class RemixRenderer {
      */
     public void captureBlockOutline(
             WorldRenderContext context,
-            WorldRenderContext.BlockOutlineContext outline) {
+            OutlineRenderState outline) {
         if (blockOutlinePass != null) {
             blockOutlinePass.captureBlockOutline(context, outline);
         }
@@ -1720,7 +1721,7 @@ public class RemixRenderer {
             return 0.0f;
         }
         BlockPos pos = BlockPos.ofFloored(cameraPos);
-        Biome.Precipitation precipitation = world.getBiome(pos).value().getPrecipitation(pos);
+        Biome.Precipitation precipitation = world.getBiome(pos).value().getPrecipitation(pos, world.getSeaLevel());
         return precipitation == Biome.Precipitation.RAIN ? world.getRainGradient(tickDelta) : 0.0f;
     }
 

@@ -152,9 +152,8 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
                         : CopperBeaconUpdatePayload.Field.PITCH_POSITION);
 
         addDrawableChild(CyclingButtonWidget
-                .<CopperBeaconAnimationMode>builder(CopperBeaconScreen::modeText)
+                .<CopperBeaconAnimationMode>builder(CopperBeaconScreen::modeText, state.mode())
                 .values(CopperBeaconAnimationMode.values())
-                .initially(state.mode())
                 .build(
                         panelX,
                         panelY + 29,
@@ -298,9 +297,10 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
     @Override
     protected void drawBackground(
             DrawContext context, float delta, int mouseX, int mouseY) {
-        context.drawBorder(x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
+        context.drawStrokedRectangle(x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
         for (var slot : handler.slots) {
             context.drawGuiTexture(
+                    net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
                     SLOT_TEXTURE,
                     x + slot.x - 1,
                     y + slot.y - 1,
@@ -460,8 +460,8 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
         }
 
         @Override
-        public boolean mouseReleased(double mouseX, double mouseY, int button) {
-            boolean released = super.mouseReleased(mouseX, mouseY, button);
+        public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+            boolean released = super.mouseReleased(click);
             release.run();
             return released;
         }

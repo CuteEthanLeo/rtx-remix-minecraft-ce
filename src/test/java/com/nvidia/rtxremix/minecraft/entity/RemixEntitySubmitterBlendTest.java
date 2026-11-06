@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+
 /**
  * Pins the instance blend state a tinted cuboid receives. Cuboid meshes are baked
  * white, so these extensions are the only place a dyed banner base, a pattern

@@ -55,7 +55,7 @@ public abstract class BiomeMixin {
 
     @Inject(method = "getGrassColorAt", at = @At("RETURN"))
     private void rtxremix$rememberGrassColor(double x, double z, CallbackInfoReturnable<Integer> cir) {
-        if (effects.getGrassColorModifier() == BiomeEffects.GrassColorModifier.NONE) {
+        if (effects.grassColorModifier() == BiomeEffects.GrassColorModifier.NONE) {
             rtxremix$grass = new BiomeColorGeneration.Cached(BiomeColorGeneration.current(), cir.getReturnValue());
         }
     }

@@ -2,6 +2,7 @@
   "key.rtxremix.toggleHeldLights": "切换手持光源",
   "key.rtxremix.toggleRtx": "切换 RTX 渲染",
   "category.rtxremix": "RTX Remix",
+  "key.category.rtx-remix-renderer.main": "RTX Remix",
   "block.rtx-remix-renderer.copper_beacon": "铜信标",
   "container.rtx-remix-renderer.copper_beacon": "铜信标控制",
   "container.rtx-remix-renderer.copper_beacon.dye": "染料",

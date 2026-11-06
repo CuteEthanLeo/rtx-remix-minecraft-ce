@@ -227,7 +227,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/Framebuffer;draw(II)V",
+            target = "Lnet/minecraft/client/gl/Framebuffer;blitToScreen(II)V",
             shift = At.Shift.AFTER
         ),
         require = 0

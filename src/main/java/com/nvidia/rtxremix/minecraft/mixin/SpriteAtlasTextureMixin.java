@@ -31,7 +31,7 @@ public abstract class SpriteAtlasTextureMixin {
         AtlasAnimationForwarder.endAtlasUpload();
     }
 
-    @Inject(method = "upload", at = @At("RETURN"))
+    @Inject(method = "create", at = @At("RETURN"))
     private void rtxremix$onAtlasUploaded(SpriteLoader.StitchResult stitchResult, CallbackInfo ci) {
         RemixEntitySubmitter.onMinecraftAtlasUploaded(id);
     }

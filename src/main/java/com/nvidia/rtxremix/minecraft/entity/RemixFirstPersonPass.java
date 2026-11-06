@@ -10,6 +10,7 @@ package com.nvidia.rtxremix.minecraft.entity;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.nvidia.rtxremix.InstanceCategoryBit;
 import com.nvidia.rtxremix.Transform;
+import com.nvidia.rtxremix.minecraft.mixin.GameRendererFovInvoker;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -18,7 +19,6 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.util.Hand;
@@ -28,7 +28,6 @@ import org.joml.Vector3f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -58,7 +57,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
     public static final float VIEW_MODEL_SCALE = 0.1f;
 
     private final RemixVertexConsumerProvider provider = new RemixVertexConsumerProvider();
-    private final CapturingImmediate immediate = new CapturingImmediate(provider);
+    private final RemixCommandCapture commandCapture = new RemixCommandCapture(provider);
     private final Transform cameraToWorld = new Transform();
     private final Transform heldLightTransform = new Transform();
     private final Matrix4f correctedBone = new Matrix4f();
@@ -101,7 +100,15 @@ public final class RemixFirstPersonPass implements AutoCloseable {
             modelView.invert(inverseModelView).transformPosition(eye.set(0.0f, 0.0f, 0.0f));
             context.setEye(eye.x, eye.y, eye.z);
 
-            heldItemRenderer.renderItem(tickDelta, matrices, immediate, player, light);
+            // 1.21.9+: the hand renderer submits commands; flushing the private queue
+            // inside the open capture boundary is what writes the vertices.
+            try {
+                heldItemRenderer.renderItem(tickDelta, matrices, commandCapture.queue(), player, light);
+                commandCapture.flush();
+            } catch (RuntimeException | Error e) {
+                commandCapture.discard();
+                throw e;
+            }
 
             List<RemixVertexConsumerProvider.CapturedLayer> layers = provider.endEntity();
             if (layers.isEmpty()) {
@@ -265,8 +272,9 @@ public final class RemixFirstPersonPass implements AutoCloseable {
     }
 
     private static float calculateFovScale(MinecraftClient client, Camera camera, float tickDelta) {
-        double worldFov = client.gameRenderer.getFov(camera, tickDelta, true);
-        double handFov = client.gameRenderer.getFov(camera, tickDelta, false);
+        GameRendererFovInvoker fov = (GameRendererFovInvoker) client.gameRenderer;
+        double worldFov = fov.rtxremix$invokeGetFov(camera, tickDelta, true);
+        double handFov = fov.rtxremix$invokeGetFov(camera, tickDelta, false);
         double worldTangent = Math.tan(Math.toRadians(worldFov) * 0.5);
         double handTangent = Math.tan(Math.toRadians(handFov) * 0.5);
         if (!Double.isFinite(worldTangent) || !Double.isFinite(handTangent)
@@ -290,7 +298,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
      * camera space: +X right, +Y up, and -Z forward.
      */
     private static void setCameraToWorld(Camera camera, Transform transform) {
-        Vec3d pos = camera.getPos();
+        Vec3d pos = camera.getCameraPos();
         float yawRad = (float) Math.toRadians(-camera.getYaw());
         float pitchRad = (float) Math.toRadians(camera.getPitch());
 
@@ -323,50 +331,6 @@ public final class RemixFirstPersonPass implements AutoCloseable {
     @Override
     public void close() {
         clearPending();
-        immediate.close();
-    }
-
-    /**
-     * HeldItemRenderer requires an Immediate provider because it flushes it at
-     * the end of the hand render. This adapter exposes the Remix capture
-     * provider while making those raster flushes no-ops.
-     */
-    private static final class CapturingImmediate extends VertexConsumerProvider.Immediate
-            implements AutoCloseable {
-        private final BufferAllocator ownedAllocator;
-        private final RemixVertexConsumerProvider captureProvider;
-
-        private CapturingImmediate(RemixVertexConsumerProvider captureProvider) {
-            this(new BufferAllocator(256), captureProvider);
-        }
-
-        private CapturingImmediate(BufferAllocator allocator,
-                                   RemixVertexConsumerProvider captureProvider) {
-            super(allocator, new LinkedHashMap<>());
-            this.ownedAllocator = allocator;
-            this.captureProvider = captureProvider;
-        }
-
-        @Override
-        public VertexConsumer getBuffer(RenderLayer layer) {
-            return captureProvider.getBuffer(layer);
-        }
-
-        @Override
-        public void drawCurrentLayer() {
-        }
-
-        @Override
-        public void draw() {
-        }
-
-        @Override
-        public void draw(RenderLayer layer) {
-        }
-
-        @Override
-        public void close() {
-            ownedAllocator.close();
-        }
+        commandCapture.close();
     }
 }

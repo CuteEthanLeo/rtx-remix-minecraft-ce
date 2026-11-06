@@ -16,14 +16,23 @@ import net.minecraft.client.model.ModelPartData;
 import net.minecraft.client.model.ModelTransform;
 import net.minecraft.client.model.TexturedModelData;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.math.Vec3d;
+import org.jspecify.annotations.Nullable;
 import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.render.entity.model.EntityModelLayer;
 import net.minecraft.client.util.SpriteIdentifier;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.screen.PlayerScreenHandler;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.client.texture.SpriteHolder;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
@@ -31,29 +40,41 @@ import org.joml.Quaternionf;
 
 /** Renders the independently rotating yoke and lamp head above the static mount. */
 public final class CopperBeaconBlockEntityRenderer
-        implements BlockEntityRenderer<CopperBeaconBlockEntity> {
+        implements BlockEntityRenderer<CopperBeaconBlockEntity, CopperBeaconBlockEntityRenderer.State> {
+
+    /** Everything {@link #render} needs, extracted on the render thread since 1.21.9. */
+    public static final class State extends BlockEntityRenderState {
+        Direction up = Direction.UP;
+        Direction forward = Direction.NORTH;
+        float yawAngle;
+        float pitchAngle;
+        boolean active;
+        float intensityMultiplier;
+        int lensTint = -1;
+    }
 
     public static final EntityModelLayer BODY_MODEL_LAYER = new EntityModelLayer(
             Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "body");
     public static final EntityModelLayer LENS_MODEL_LAYER = new EntityModelLayer(
             Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "lens");
     private static final SpriteIdentifier COPPER_TEXTURE = new SpriteIdentifier(
-            PlayerScreenHandler.BLOCK_ATLAS_TEXTURE,
+            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
             Identifier.ofVanilla("block/copper_block"));
     static final Identifier LENS_SPRITE_ID =
             Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens");
     static final Identifier UNLIT_LENS_SPRITE_ID =
             Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens_unlit");
     private static final SpriteIdentifier LENS_TEXTURE = new SpriteIdentifier(
-            PlayerScreenHandler.BLOCK_ATLAS_TEXTURE,
+            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
             LENS_SPRITE_ID);
     private static final SpriteIdentifier UNLIT_LENS_TEXTURE = new SpriteIdentifier(
-            PlayerScreenHandler.BLOCK_ATLAS_TEXTURE,
+            SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
             UNLIT_LENS_SPRITE_ID);
 
     private final ModelPart yoke;
     private final ModelPart head;
     private final ModelPart lens;
+    private final SpriteHolder spriteHolder;
     private final CopperBeaconPose.Pose pose = new CopperBeaconPose.Pose();
     private final VerticalUvStripConsumer copperUvConsumer = new VerticalUvStripConsumer();
 
@@ -62,6 +83,7 @@ public final class CopperBeaconBlockEntityRenderer
         yoke = bodyRoot.getChild("yoke");
         head = yoke.getChild("head");
         lens = context.getLayerModelPart(LENS_MODEL_LAYER).getChild("lens");
+        spriteHolder = context.spriteHolder();
     }
 
     public static TexturedModelData getBodyTexturedModelData() {
@@ -74,7 +96,7 @@ public final class CopperBeaconBlockEntityRenderer
                         .uv(0, 0).cuboid(0.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
                         .uv(0, 0).cuboid(-5.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f)
                         .uv(0, 0).cuboid(3.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f),
-                ModelTransform.pivot(8.0f, 10.0f, 8.0f));
+                ModelTransform.origin(8.0f, 10.0f, 8.0f));
         yokeData.addChild(
                 "head",
                 ModelPartBuilder.create()
@@ -107,46 +129,91 @@ public final class CopperBeaconBlockEntityRenderer
                 "lens",
                 ModelPartBuilder.create()
                         .uv(0, 0).cuboid(-3.0f, -3.0f, -4.01f, 6.0f, 6.0f, 0.0f),
-                ModelTransform.pivot(8.0f, 10.0f, 8.0f));
+                ModelTransform.origin(8.0f, 10.0f, 8.0f));
         return TexturedModelData.of(modelData, 6, 6);
     }
 
     @Override
-    public void render(
+    public State createRenderState() {
+        return new State();
+    }
+
+    @Override
+    public void updateRenderState(
             CopperBeaconBlockEntity beacon,
+            State state,
             float tickDelta,
+            Vec3d cameraPos,
+            ModelCommandRenderer.@Nullable CrumblingOverlayCommand crumblingOverlay) {
+        BlockEntityRenderer.super.updateRenderState(beacon, state, tickDelta, cameraPos, crumblingOverlay);
+        BlockState blockState = beacon.getCachedState();
+        state.up = blockState.get(CopperBeaconBlock.MOUNT);
+        state.forward = blockState.get(Properties.FACING);
+        double animationTick = CopperBeaconAnimationClock.sample(beacon.getWorld(), tickDelta);
+        state.yawAngle = beacon.yawAngleAt(animationTick);
+        state.pitchAngle = beacon.pitchAngleAt(animationTick);
+        state.active = beacon.isActive();
+        state.intensityMultiplier = beacon.getIntensityMultiplier();
+        state.lensTint = beacon.getLensTint();
+    }
+
+    @Override
+    public void render(
+            State state,
             MatrixStack matrices,
-            VertexConsumerProvider vertexConsumers,
-            int light,
-            int overlay) {
-        BlockState state = beacon.getCachedState();
-        Direction up = state.get(CopperBeaconBlock.MOUNT);
-        Direction forward = state.get(Properties.FACING);
-        double animationTick = CopperBeaconAnimationClock.sample(
-                beacon.getWorld(), tickDelta);
+            OrderedRenderCommandQueue queue,
+            CameraRenderState cameraState) {
+        int light = state.lightmapCoordinates;
+        int overlay = OverlayTexture.DEFAULT_UV;
 
         matrices.push();
         matrices.translate(0.5, 0.5, 0.5);
         CopperBeaconPose.evaluate(
-                up,
-                forward,
-                beacon.yawAngleAt(animationTick),
-                beacon.pitchAngleAt(animationTick),
+                state.up,
+                state.forward,
+                state.yawAngle,
+                state.pitchAngle,
                 pose);
         matrices.multiply(pose.mountingRotation());
         matrices.translate(-0.5, -0.5, -0.5);
 
-        applyArticulation(yoke, head, lens, pose);
-
-        VertexConsumer copperVertices = copperUvConsumer.wrap(
-                COPPER_TEXTURE.getVertexConsumer(vertexConsumers, RenderLayer::getEntitySolid));
-        yoke.render(matrices, copperVertices, light, overlay);
-        SpriteIdentifier lensTexture =
-                lensTexture(beacon.isActive(), beacon.getIntensityMultiplier());
-        VertexConsumer lensVertices =
-                lensTexture.getVertexConsumer(vertexConsumers, RenderLayer::getEntitySolid);
-        lens.render(matrices, lensVertices, light, overlay, beacon.getLensTint());
+        // 1.21.9+: geometry is submitted as commands and replayed later, after every
+        // beacon has been submitted, so the shared parts are posed inside each command
+        // from values captured now rather than once here.
+        float yawRadians = pose.modelYawRadians();
+        float pitchRadians = pose.modelPitchRadians();
+        Sprite copperSprite = spriteHolder.getSprite(COPPER_TEXTURE);
+        RenderLayer copperLayer = COPPER_TEXTURE.getRenderLayer(RenderLayers::entitySolid);
+        queue.submitCustom(matrices, copperLayer, (entry, buffer) -> {
+            poseParts(yawRadians, pitchRadians);
+            VertexConsumer copperVertices = copperUvConsumer.wrap(
+                    copperSprite.getTextureSpecificVertexConsumer(buffer));
+            yoke.render(stackAt(entry), copperVertices, light, overlay);
+        });
+        SpriteIdentifier lensTexture = lensTexture(state.active, state.intensityMultiplier);
+        Sprite lensSprite = spriteHolder.getSprite(lensTexture);
+        int lensTint = state.lensTint;
+        queue.submitCustom(matrices, lensTexture.getRenderLayer(RenderLayers::entitySolid), (entry, buffer) -> {
+            poseParts(yawRadians, pitchRadians);
+            lens.render(stackAt(entry), lensSprite.getTextureSpecificVertexConsumer(buffer),
+                    light, overlay, lensTint);
+        });
         matrices.pop();
+    }
+
+    private void poseParts(float yawRadians, float pitchRadians) {
+        yoke.yaw = yawRadians;
+        yoke.pitch = 0.0f;
+        head.yaw = 0.0f;
+        head.pitch = pitchRadians;
+        lens.yaw = yawRadians;
+        lens.pitch = pitchRadians;
+    }
+
+    private static MatrixStack stackAt(MatrixStack.Entry entry) {
+        MatrixStack stack = new MatrixStack();
+        stack.peek().copy(entry);
+        return stack;
     }
 
     static Quaternionf mountingRotation(Direction upDirection, Direction forwardDirection) {
@@ -196,6 +263,12 @@ public final class CopperBeaconBlockEntityRenderer
         }
 
         @Override
+        public VertexConsumer color(int argb) {
+            delegate.color(argb);
+            return this;
+        }
+
+        @Override
         public VertexConsumer color(int red, int green, int blue, int alpha) {
             delegate.color(red, green, blue, alpha);
             return this;
@@ -216,6 +289,12 @@ public final class CopperBeaconBlockEntityRenderer
         @Override
         public VertexConsumer light(int u, int v) {
             delegate.light(u, v);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer lineWidth(float width) {
+            delegate.lineWidth(width);
             return this;
         }
 

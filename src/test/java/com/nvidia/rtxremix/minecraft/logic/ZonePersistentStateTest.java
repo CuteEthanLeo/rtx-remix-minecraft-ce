@@ -6,13 +6,16 @@ package com.nvidia.rtxremix.minecraft.logic;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtSizeTracker;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.world.PersistentStateManager;
+import net.minecraft.world.PersistentStateType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
 
 class ZonePersistentStateTest {
 
@@ -90,7 +94,7 @@ class ZonePersistentStateTest {
         malformed.putString("name", "broken");
         malformed.putString("channel", "mc.zone.broken");
         malformed.putString("shape", "sphere");
-        nbt.getList("zones", NbtElement.COMPOUND_TYPE).add(malformed);
+        nbt.getListOrEmpty("zones").add(malformed);
 
         ZonePersistentState loaded = ZonePersistentState.fromNbt(nbt, null);
 
@@ -159,11 +163,16 @@ class ZonePersistentStateTest {
         Path file = tempDir.resolve("rtx_remix_zones.dat");
 
         ensureGameVersionForPersistentStateSave();
-        state.save(file.toFile(), null);
+        // Saving goes through the world's state manager and the state's registered type;
+        // the save never reads the data fixer.
+        PersistentStateManager manager =
+                new PersistentStateManager(tempDir, null, DynamicRegistryManager.EMPTY);
+        manager.set(persistentStateType(), state);
+        manager.save();
 
         assertFalse(state.isDirty());
         NbtCompound root = NbtIo.readCompressed(file, NbtSizeTracker.ofUnlimitedBytes());
-        ZonePersistentState loaded = ZonePersistentState.fromNbt(root.getCompound("data"), null);
+        ZonePersistentState loaded = ZonePersistentState.fromNbt(root.getCompound("data").orElseThrow(), null);
         assertEquals(List.of(zone), new ArrayList<>(loaded.snapshot()));
     }
 
@@ -178,9 +187,17 @@ class ZonePersistentStateTest {
         ZonePersistentState state = new ZonePersistentState();
         state.put(zone);
         return state.writeNbt(new NbtCompound(), null)
-                .getList("zones", NbtElement.COMPOUND_TYPE)
-                .getCompound(0)
+                .getListOrEmpty("zones")
+                .getCompoundOrEmpty(0)
                 .copy();
+    }
+
+    /** The private type the server registers the state under, so the save uses its codec. */
+    @SuppressWarnings("unchecked")
+    private static PersistentStateType<ZonePersistentState> persistentStateType() throws ReflectiveOperationException {
+        Field field = ZonePersistentState.class.getDeclaredField("TYPE");
+        field.setAccessible(true);
+        return (PersistentStateType<ZonePersistentState>) field.get(null);
     }
 
     private static void ensureGameVersionForPersistentStateSave() {

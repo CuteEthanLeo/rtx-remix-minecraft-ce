@@ -4,50 +4,19 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import com.nvidia.rtxremix.minecraft.entity.EntityRenderContext;
-import com.nvidia.rtxremix.minecraft.entity.RemixVertexConsumerProvider;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
+import net.minecraft.client.render.entity.EntityRenderManager;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Brackets each entity render with a capture boundary on the thread-local
- * {@link EntityRenderContext}.
+ * Formerly bracketed each {@code EntityRenderDispatcher.render()} with a capture boundary
+ * on the thread-local {@code EntityRenderContext}.
  *
- * <p>{@code EntityRenderDispatcher.render()} opens the boundary at HEAD with the
- * remix-pass flag and closes it at RETURN. Nesting is the context's concern: an
- * entity rendered from inside another render appends to the enclosing capture
- * instead of starting its own.
+ * <p>Since 1.21.9 the dispatcher only submits commands to an
+ * {@code OrderedRenderCommandQueue}; vertices are written later, when the queue is
+ * flushed. {@code RemixEntityPass} therefore opens the boundary itself around both the
+ * render and the flush of its private queue, and this mixin is an empty shell.
+ * TODO(1.21.11): drop it from the mixin config once nothing needs the target.
  */
-@Mixin(EntityRenderDispatcher.class)
+@Mixin(EntityRenderManager.class)
 public abstract class EntityRenderDispatcherMixin {
-
-    @Inject(
-        method = "render(Lnet/minecraft/entity/Entity;DDDFFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
-        at = @At("HEAD")
-    )
-    private <E extends Entity> void rtxremix$onRenderStart(
-            E entity, double x, double y, double z,
-            float yaw, float tickDelta,
-            MatrixStack matrices, VertexConsumerProvider vertexConsumers,
-            int light, CallbackInfo ci) {
-        EntityRenderContext.get().begin(vertexConsumers instanceof RemixVertexConsumerProvider);
-    }
-
-    @Inject(
-        method = "render(Lnet/minecraft/entity/Entity;DDDFFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
-        at = @At("RETURN")
-    )
-    private <E extends Entity> void rtxremix$onRenderEnd(
-            E entity, double x, double y, double z,
-            float yaw, float tickDelta,
-            MatrixStack matrices, VertexConsumerProvider vertexConsumers,
-            int light, CallbackInfo ci) {
-        EntityRenderContext.get().end();
-    }
 }

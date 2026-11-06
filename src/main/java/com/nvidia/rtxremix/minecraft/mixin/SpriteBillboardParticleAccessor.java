@@ -4,12 +4,13 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.particle.SpriteBillboardParticle;
+import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.texture.Sprite;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(SpriteBillboardParticle.class)
+/** 1.21.9 folded SpriteBillboardParticle into {@link BillboardParticle}; the sprite lives there. */
+@Mixin(BillboardParticle.class)
 public interface SpriteBillboardParticleAccessor {
     @Accessor("sprite")
     Sprite getSprite();

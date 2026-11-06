@@ -6,7 +6,7 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.JoinBurstHold;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
-import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
+import net.minecraft.client.gui.screen.world.LevelLoadingScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * cancelled while {@link JoinBurstHold#keepScreen(long)} says so; vanilla retries every
  * tick, so the screen closes on the first tick after the hold ends.
  */
-@Mixin(DownloadingTerrainScreen.class)
+@Mixin(LevelLoadingScreen.class)
 public abstract class DownloadingTerrainScreenMixin {
 
     private boolean rtxremix$holdBegun;

@@ -9,7 +9,8 @@ import com.nvidia.rtxremix.minecraft.input.RemixInputGate;
 import com.nvidia.rtxremix.minecraft.input.RemixKeyboardAccess;
 import net.minecraft.client.Keyboard;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.CharInput;
+import net.minecraft.client.input.KeyInput;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -41,14 +42,16 @@ public class KeyboardMixin implements RemixKeyboardAccess {
     private boolean switchF3State;
 
     @Inject(method = "onKey", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$onKey(long window, int key, int scancode, int action, int mods, CallbackInfo ci) {
+    private void rtxremix$onKey(long window, int action, KeyInput input, CallbackInfo ci) {
+        int key = input.key();
+        int mods = input.modifiers();
         MinecraftClient client = MinecraftClient.getInstance();
         boolean altDown = action == GLFW.GLFW_PRESS
                 && key == GLFW.GLFW_KEY_X
-                && ((mods & GLFW.GLFW_MOD_ALT) != 0 || Screen.hasAltDown());
+                && ((mods & GLFW.GLFW_MOD_ALT) != 0 || client.isAltPressed());
         boolean controlDown = action == GLFW.GLFW_PRESS
                 && key == GLFW.GLFW_KEY_X
-                && ((mods & GLFW.GLFW_MOD_CONTROL) != 0 || Screen.hasControlDown());
+                && ((mods & GLFW.GLFW_MOD_CONTROL) != 0 || client.isCtrlPressed());
         RemixInputGate.KeyDecision decision = RtxRemixMod.getRemixInputGate().onKey(
                 key, action, altDown, controlDown);
 
@@ -77,7 +80,7 @@ public class KeyboardMixin implements RemixKeyboardAccess {
     }
 
     @Inject(method = "onChar", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$onChar(long window, int codePoint, int mods, CallbackInfo ci) {
+    private void rtxremix$onChar(long window, CharInput input, CallbackInfo ci) {
         if (RtxRemixMod.getRemixInputGate().isCaptureSessionOpen()) {
             ci.cancel();
         }

@@ -7,6 +7,8 @@
  */
 package com.nvidia.rtxremix.minecraft.cloud;
 
+import com.nvidia.rtxremix.minecraft.sky.WorldSky;
+import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
@@ -166,7 +168,7 @@ public final class CloudRenderer {
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
-        float cloudHeight = world.getDimensionEffects().getCloudsHeight();
+        float cloudHeight = WorldSky.cloudHeight(world, tickDelta);
         if (client.options.getCloudRenderModeValue() == CloudRenderMode.OFF
                 || Float.isNaN(cloudHeight)) {
             releaseResources();
@@ -180,7 +182,7 @@ public final class CloudRenderer {
         if (!shouldSuppressVanillaClouds()) {
             return;
         }
-        updateCloudColor(world.getCloudsColor(tickDelta), world.getRainGradient(tickDelta));
+        updateCloudColor(WorldSky.cloudColor(world, tickDelta), world.getRainGradient(tickDelta));
 
         if (!proceduralClouds) {
             completedPaletteMeshes.clear();
@@ -252,7 +254,7 @@ public final class CloudRenderer {
         }
         float base = cloudHeight + cloudsHeight + CloudField.BASE_ABOVE_VANILLA;
         // Sun height: 1 at noon, -1 at midnight. Night fades in from dusk to full dark.
-        float sunHeight = (float) Math.cos(world.getSkyAngle(tickDelta) * 2.0 * Math.PI);
+        float sunHeight = (float) Math.cos(WorldSky.skyAngle(world, tickDelta) * 2.0 * Math.PI);
         float night = Math.max(0.0f, Math.min(1.0f, (0.1f - sunHeight) / 0.3f));
         CloudField.Params params = CloudField.Params.of(
                 base, VolumetricClouds.getCoverage(), rain, thunder, night).quantized();
@@ -600,7 +602,7 @@ public final class CloudRenderer {
                 for (int y = 0; y < vanillaTextureHeight; y++) {
                     for (int x = 0; x < vanillaTextureWidth; x++) {
                         vanillaOccupancy[y * vanillaTextureWidth + x] =
-                                ((image.getColor(x, y) >>> 24) & 0xff) >= 128;
+                                ((NativeImagePixels.abgr(image, x, y) >>> 24) & 0xff) >= 128;
                     }
                 }
             }

@@ -37,7 +37,6 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.DimensionEffects;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
@@ -219,7 +218,7 @@ public class LightManager {
         lightOwnerIds.clear();
         float frameDtSeconds = entityLightFrameDtSeconds();
         boolean localFirstPersonRigUpdated = false;
-        LightningFlash.advance(world.getLightningTicksLeft(), frameDtSeconds);
+        LightningFlash.advance(((LightningTicksAccess) world).rtxremix$getLightningTicksLeft(), frameDtSeconds);
 
         for (Entity entity : world.getEntities()) {
             if (entity instanceof ItemEntity itemEntity) {
@@ -243,7 +242,7 @@ public class LightManager {
                 ensureDisplayBeaconLight(display, tickDelta);
             } else if (entity instanceof LightningEntity bolt) {
                 Vec3d strike = bolt.getLerpedPos(tickDelta);
-                LightningFlash.observeStrike(strike.x, strike.z, camera.getPos().x, camera.getPos().z);
+                LightningFlash.observeStrike(strike.x, strike.z, camera.getCameraPos().x, camera.getCameraPos().z);
                 submitLightningLights(bolt, tickDelta);
             }
         }
@@ -464,7 +463,7 @@ public class LightManager {
 
         firstPersonShadowModelOffset = shadowModelPlacement.resolve(
                 world, camera, player, constraints, frameDtSeconds);
-        Vec3d displacedHeadCenter = camera.getPos().add(firstPersonShadowModelOffset);
+        Vec3d displacedHeadCenter = camera.getCameraPos().add(firstPersonShadowModelOffset);
 
         // The rig lights surfaces but never the air. A first-person emitter is
         // locked to the camera, and the volumetric grid reuses the previous
@@ -676,11 +675,11 @@ public class LightManager {
 
         AffineTransformation transform =
                 renderState.transformation().interpolate(display.getLerpProgress(tickDelta));
-        Matrix4f matrix = transform.getMatrix();
+        Matrix4f matrix = new Matrix4f(transform.getMatrix());
 
         // Matches DisplayEntityRenderer.getBillboardRotation for BillboardMode.FIXED.
-        float yaw = MathHelper.lerpAngleDegrees(tickDelta, display.prevYaw, display.getYaw());
-        float pitch = MathHelper.lerp(tickDelta, display.prevPitch, display.getPitch());
+        float yaw = MathHelper.lerpAngleDegrees(tickDelta, display.lastYaw, display.getYaw());
+        float pitch = MathHelper.lerp(tickDelta, display.lastPitch, display.getPitch());
         Quaternionf billboard = scratchBillboard.rotationYXZ(
                 -MathHelper.RADIANS_PER_DEGREE * yaw,
                 MathHelper.RADIANS_PER_DEGREE * pitch,
@@ -854,7 +853,7 @@ public class LightManager {
                 lensOffsetDirection.multiply(BeaconBeam.HELD_LENS_OFFSET));
         float coneAngle = BeaconBeam.CONE_ANGLE_DEGREES;
         if (localFirstPerson && collisionWorld != null && collisionCamera != null) {
-            Vec3d collisionOrigin = collisionCamera.getPos();
+            Vec3d collisionOrigin = collisionCamera.getCameraPos();
             Vec3d preferredOffset = pos.subtract(collisionOrigin);
             double preferredDistance = preferredOffset.length();
             if (preferredDistance > 1.0e-6) {
@@ -914,13 +913,13 @@ public class LightManager {
             double rightX = forwardZ;
             double rightZ = -forwardX;
             double sideSign = handSideSign(living, lightSlot);
-            return entity.getPos().add(
+            return entity.getEntityPos().add(
                     forwardX * HELD_LIGHT_FORWARD_OFFSET + rightX * sideSign * HELD_LIGHT_SIDE_OFFSET,
                     HELD_LIGHT_HEIGHT_OFFSET,
                     forwardZ * HELD_LIGHT_FORWARD_OFFSET + rightZ * sideSign * HELD_LIGHT_SIDE_OFFSET);
         }
 
-        return entity.getPos().add(0, entity.getHeight() * 0.75, 0);
+        return entity.getEntityPos().add(0, entity.getHeight() * 0.75, 0);
     }
 
     private static boolean isLocalFirstPersonPlayer(LivingEntity holder) {
@@ -1104,12 +1103,16 @@ public class LightManager {
         // evaluating them would light a permanent noon or midnight that vanilla never draws.
         float rain = world.getRainGradient(0.0f);
         float thunder = world.getThunderGradient(0.0f);
-        skyLightState = world.getDimensionEffects().getSkyType() == DimensionEffects.SkyType.NORMAL
+        skyLightState = world.getDimension().skybox() == net.minecraft.world.dimension.DimensionType.Skybox.OVERWORLD
                 ? evaluateSkyLightState(
-                        world.getSkyAngle(0f),
+                        // 1.21.11: the sky angle is an environment attribute in degrees.
+                        world.getEnvironmentAttributes().getAttributeValue(
+                                net.minecraft.world.attribute.EnvironmentAttributes.SUN_ANGLE_VISUAL) / 360.0f,
                         rain,
                         thunder,
-                        NightLight.moonPhaseScale(world.getMoonSize()))
+                        NightLight.moonPhaseScale(net.minecraft.world.dimension.DimensionType.MOON_SIZES[
+                                world.getEnvironmentAttributes().getAttributeValue(
+                                        net.minecraft.world.attribute.EnvironmentAttributes.MOON_PHASE_VISUAL).getIndex()]))
                 : SkyLightState.empty();
         float sunVolumetricScale = SunShafts.sunVolumetricScale(
                 skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));

@@ -7,6 +7,7 @@
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
+import com.nvidia.rtxremix.minecraft.util.NativeImagePixels;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.resource.Resource;
@@ -87,7 +88,7 @@ public final class LabPBRConverter {
     public static void blitNormal(byte[] dst, int atlasW, NativeImage n, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                int abgr = n.getColor(x % n.getWidth(), y % n.getHeight());
+                int abgr = NativeImagePixels.abgr(n, x % n.getWidth(), y % n.getHeight());
                 int nr = abgr & 0xFF;
                 int ng = (abgr >> 8) & 0xFF;
                 double nx = (nr / 255.0) * 2.0 - 1.0;
@@ -112,7 +113,7 @@ public final class LabPBRConverter {
     public static void applyAO(byte[] albedoRGBA, int atlasW, NativeImage n, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = n.getColor(x % n.getWidth(), y % n.getHeight());
+                int abgr = NativeImagePixels.abgr(n, x % n.getWidth(), y % n.getHeight());
                 int ao = (abgr >> 16) & 0xFF;
                 if (ao == 255) continue;
                 float occlusion = ao / 255.0f;
@@ -130,7 +131,7 @@ public final class LabPBRConverter {
     public static void applyAOToData(byte[] dataRGBA, int atlasW, NativeImage n, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = n.getColor(x % n.getWidth(), y % n.getHeight());
+                int abgr = NativeImagePixels.abgr(n, x % n.getWidth(), y % n.getHeight());
                 int ao = (abgr >> 16) & 0xFF;
                 int idx = ((oy + y) * atlasW + (ox + x)) * 4;
                 for (int c = 0; c < 3; c++) {
@@ -166,7 +167,7 @@ public final class LabPBRConverter {
     public static void blitRoughness(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = s.getColor(x % s.getWidth(), y % s.getHeight());
+                int abgr = NativeImagePixels.abgr(s, x % s.getWidth(), y % s.getHeight());
                 dst[(oy + y) * atlasW + (ox + x)] = (byte) smoothnessToRoughness(abgr & 0xFF);
             }
     }
@@ -176,7 +177,7 @@ public final class LabPBRConverter {
     public static void blitPorosity(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = s.getColor(x % s.getWidth(), y % s.getHeight());
+                int abgr = NativeImagePixels.abgr(s, x % s.getWidth(), y % s.getHeight());
                 dst[(oy + y) * atlasW + (ox + x)] =
                         (byte) WetSurfaces.porosityFromSpecularBlue((abgr >> 16) & 0xFF);
             }
@@ -185,7 +186,7 @@ public final class LabPBRConverter {
     public static void blitMetallic(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = s.getColor(x % s.getWidth(), y % s.getHeight());
+                int abgr = NativeImagePixels.abgr(s, x % s.getWidth(), y % s.getHeight());
                 dst[(oy + y) * atlasW + (ox + x)] = (byte) f0ToMetallic((abgr >> 8) & 0xFF);
             }
     }
@@ -198,7 +199,7 @@ public final class LabPBRConverter {
     public static void blitSSS(byte[] dst, int atlasW, NativeImage s, int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = s.getColor(x % s.getWidth(), y % s.getHeight());
+                int abgr = NativeImagePixels.abgr(s, x % s.getWidth(), y % s.getHeight());
                 byte val = (byte) sssIntensity((abgr >> 16) & 0xFF);
                 int idx = ((oy + y) * atlasW + (ox + x)) * 4;
                 dst[idx] = val; dst[idx + 1] = val; dst[idx + 2] = val;
@@ -211,7 +212,7 @@ public final class LabPBRConverter {
                                                   int ox, int oy, int w, int h) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = sss.getColor(x % sss.getWidth(), y % sss.getHeight());
+                int abgr = NativeImagePixels.abgr(sss, x % sss.getWidth(), y % sss.getHeight());
                 int idx = ((oy + y) * atlasW + (ox + x)) * 4;
                 dst[idx]     = (byte) scaleSingleScatteringAlbedo(abgr & 0xFF);
                 dst[idx + 1] = (byte) scaleSingleScatteringAlbedo((abgr >> 8) & 0xFF);
@@ -379,7 +380,7 @@ public final class LabPBRConverter {
             for (int x = 0; x < w; x++) {
                 float factor;
                 if (s != null) {
-                    int alpha = (s.getColor(x % s.getWidth(), y % s.getHeight()) >> 24) & 0xFF;
+                    int alpha = (NativeImagePixels.abgr(s, x % s.getWidth(), y % s.getHeight()) >> 24) & 0xFF;
                     factor = (alpha < 255) ? Math.min(1.0f, alpha / 254.0f * gain) : fallbackFactor;
                 } else {
                     factor = fallbackFactor;
@@ -554,7 +555,7 @@ public final class LabPBRConverter {
         byte[] table = new byte[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                table[y * w + x] = (byte) ((n.getColor(x, y) >> 16) & 0xFF);
+                table[y * w + x] = (byte) ((NativeImagePixels.abgr(n, x, y) >> 16) & 0xFF);
         return table;
     }
 
@@ -567,7 +568,7 @@ public final class LabPBRConverter {
         byte[] table = new byte[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                table[y * w + x] = (byte) ((s.getColor(x, y) >> 24) & 0xFF);
+                table[y * w + x] = (byte) ((NativeImagePixels.abgr(s, x, y) >> 24) & 0xFF);
         return table;
     }
 
@@ -631,7 +632,7 @@ public final class LabPBRConverter {
         byte[] table = new byte[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                table[y * w + x] = (byte) smoothnessToRoughness(s.getColor(x, y) & 0xFF);
+                table[y * w + x] = (byte) smoothnessToRoughness(NativeImagePixels.abgr(s, x, y) & 0xFF);
         return table;
     }
 
@@ -640,7 +641,7 @@ public final class LabPBRConverter {
         byte[] table = new byte[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                table[y * w + x] = (byte) f0ToMetallic((s.getColor(x, y) >> 8) & 0xFF);
+                table[y * w + x] = (byte) f0ToMetallic((NativeImagePixels.abgr(s, x, y) >> 8) & 0xFF);
         return table;
     }
 
@@ -649,7 +650,7 @@ public final class LabPBRConverter {
         byte[] table = new byte[w * h];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                table[y * w + x] = (byte) sssIntensity((s.getColor(x, y) >> 16) & 0xFF);
+                table[y * w + x] = (byte) sssIntensity((NativeImagePixels.abgr(s, x, y) >> 16) & 0xFF);
         return table;
     }
 
@@ -761,7 +762,7 @@ public final class LabPBRConverter {
     public static boolean hasSSSData(NativeImage s) {
         for (int y = 0; y < s.getHeight(); y++)
             for (int x = 0; x < s.getWidth(); x++)
-                if (((s.getColor(x, y) >> 16) & 0xFF) >= 65) return true;
+                if (((NativeImagePixels.abgr(s, x, y) >> 16) & 0xFF) >= 65) return true;
         return false;
     }
 
@@ -772,7 +773,7 @@ public final class LabPBRConverter {
     public static boolean hasEmissiveData(NativeImage s) {
         for (int y = 0; y < s.getHeight(); y++)
             for (int x = 0; x < s.getWidth(); x++)
-                if (((s.getColor(x, y) >> 24) & 0xFF) < 255) return true;
+                if (((NativeImagePixels.abgr(s, x, y) >> 24) & 0xFF) < 255) return true;
         return false;
     }
 
@@ -782,7 +783,7 @@ public final class LabPBRConverter {
                                int ox, int oy, int w, int h, int shift) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int abgr = img.getColor(x % img.getWidth(), y % img.getHeight());
+                int abgr = NativeImagePixels.abgr(img, x % img.getWidth(), y % img.getHeight());
                 dst[(oy + y) * atlasW + (ox + x)] = (byte) ((abgr >> shift) & 0xFF);
             }
     }

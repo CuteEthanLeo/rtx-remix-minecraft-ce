@@ -4,17 +4,16 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.entity.EntityRenderManager;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.gen.Accessor;
 
 /**
- * Vanilla exposes only {@code setRenderShadows}. Remix suppresses blob shadows
- * around its own renders and must restore the player's actual setting rather
- * than assume it was on, so the read side needs an accessor.
+ * Formerly read the dispatcher's {@code renderShadows} flag so Remix could suppress blob
+ * shadows around its own renders and restore the player's setting.
+ *
+ * <p>TODO(1.21.11): the flag is gone; shadows are now {@code EntityRenderState.shadowPieces},
+ * which the Remix passes clear on the state they render. This accessor is an empty shell.
  */
-@Mixin(EntityRenderDispatcher.class)
+@Mixin(EntityRenderManager.class)
 public interface EntityRenderDispatcherAccessor {
-    @Accessor("renderShadows")
-    boolean rtxremix$getRenderShadows();
 }

@@ -4,16 +4,13 @@
  */
 package com.nvidia.rtxremix.minecraft.gl;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
+import com.mojang.blaze3d.textures.GpuTexture;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
-import org.joml.Matrix4f;
+import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.texture.GlTexture;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL45;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,9 +19,10 @@ import org.slf4j.LoggerFactory;
  * Minecraft's main framebuffer, after the world and first-person model have
  * been submitted and before the screen overlays and HUD.
  *
- * <p>Render thread only. It goes through {@code RenderSystem} and
- * {@code Tessellator} rather than raw GL so the surrounding vanilla render
- * state stays valid.
+ * <p>Render thread only. Minecraft 1.21.5+ removed the immediate-mode
+ * {@code RenderSystem}/{@code BufferRenderer} path this used to draw through,
+ * so the overlay is now a direct-state-access framebuffer blit, which leaves
+ * every binding vanilla's GL state cache tracks untouched.
  */
 public class TextureOverlay {
     
@@ -58,62 +56,64 @@ public class TextureOverlay {
         }
     }
     
+    private int sourceFbo;
+    private int sourceTexture;
+    private int destinationFbo;
+    private int destinationTexture;
+
     private void renderTextureOverlay(int texId) {
-        int width = client.getWindow().getScaledWidth();
-        int height = client.getWindow().getScaledHeight();
-
-        if (client.getFramebuffer() != null) {
-            client.getFramebuffer().beginWrite(true);
+        Framebuffer framebuffer = client.getFramebuffer();
+        if (framebuffer == null) {
+            return;
         }
-
-        Matrix4f savedProjection = RenderSystem.getProjectionMatrix();
-
-        // Opaque: the Remix image replaces vanilla's output rather than blending
-        // with it, and it neither tests nor writes depth.
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.disableBlend();
-
-        Matrix4f projMatrix = new Matrix4f().setOrtho(
-            0.0f, (float) width, (float) height, 0.0f, -1000.0f, 1000.0f
-        );
-        RenderSystem.setProjectionMatrix(projMatrix, VertexSorter.BY_Z);
-
-        RenderSystem.getModelViewStack().pushMatrix();
-        RenderSystem.getModelViewStack().identity();
-        RenderSystem.applyModelViewMatrix();
-
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
-        RenderSystem.setShaderTexture(0, texId);
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-        // Standard GL UVs, with (0,0) at the top left: the interop blit already
-        // corrects the Vulkan image's orientation.
-        Matrix4f identity = new Matrix4f();
-        BufferBuilder bufferBuilder = Tessellator.getInstance()
-            .begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-
-        bufferBuilder.vertex(identity, 0,     0,      0).texture(0.0f, 0.0f);
-        bufferBuilder.vertex(identity, 0,     height, 0).texture(0.0f, 1.0f);
-        bufferBuilder.vertex(identity, width, height, 0).texture(1.0f, 1.0f);
-        bufferBuilder.vertex(identity, width, 0,      0).texture(1.0f, 0.0f);
-
-        BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
-
-        RenderSystem.getModelViewStack().popMatrix();
-        RenderSystem.applyModelViewMatrix();
-        RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
-
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        // Blend is left disabled; the HUD enables it when it needs it.
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+        GpuTexture color = framebuffer.getColorAttachment();
+        if (!(color instanceof GlTexture glColor)) {
+            return;
+        }
+        int dstTex = glColor.getGlId();
+        if (sourceFbo == 0) {
+            sourceFbo = GL45.glCreateFramebuffers();
+        }
+        if (sourceTexture != texId) {
+            GL45.glNamedFramebufferTexture(sourceFbo, GL30.GL_COLOR_ATTACHMENT0, texId, 0);
+            sourceTexture = texId;
+        }
+        if (destinationFbo == 0) {
+            destinationFbo = GL45.glCreateFramebuffers();
+        }
+        if (destinationTexture != dstTex) {
+            GL45.glNamedFramebufferTexture(destinationFbo, GL30.GL_COLOR_ATTACHMENT0, dstTex, 0);
+            destinationTexture = dstTex;
+        }
+        int srcWidth = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_WIDTH);
+        int srcHeight = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_HEIGHT);
+        int dstWidth = framebuffer.textureWidth;
+        int dstHeight = framebuffer.textureHeight;
+        if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
+            return;
+        }
+        // Opaque replace. Texture row 0 lands at the top of the screen, matching the
+        // old top-left (0,0) UV quad: the interop blit already corrects orientation.
+        GL45.glBlitNamedFramebuffer(sourceFbo, destinationFbo,
+            0, 0, srcWidth, srcHeight,
+            0, dstHeight, dstWidth, 0,
+            GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
     }
-    
+
     /**
      * Cleans up resources.
      */
     public void shutdown() {
+        if (sourceFbo != 0) {
+            GL30.glDeleteFramebuffers(sourceFbo);
+            sourceFbo = 0;
+        }
+        if (destinationFbo != 0) {
+            GL30.glDeleteFramebuffers(destinationFbo);
+            destinationFbo = 0;
+        }
+        sourceTexture = 0;
+        destinationTexture = 0;
         LOGGER.info("TextureOverlay shutdown");
     }
 }

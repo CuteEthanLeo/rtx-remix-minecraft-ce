@@ -4,33 +4,62 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RenderRegionStoragePool;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSnapshotRelease;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.collection.PackedIntegerArray;
 import net.minecraft.world.chunk.PalettedContainer;
+import net.minecraft.world.chunk.WorldChunk;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A chunk snapshot for a render region whose block-state copies draw their storage from
- * {@link RenderRegionStoragePool} and give it back when the last region holding the snapshot
+ * A section snapshot for a render region whose block-state copy draws its storage from
+ * {@link RenderRegionStoragePool} and gives it back when the last region holding the snapshot
  * has been consumed. Snapshots are shared between the regions one frame's rebuild scheduling
- * builds, hence the count. The pool flag is set around the constructor by
- * {@link ClientChunkMixin}; vanilla's own snapshot code is untouched.
+ * builds, hence the count. The constructor sets the pool flag around its block-state copy
+ * and takes the builder's reference on the new snapshot; vanilla's own snapshot code is
+ * untouched.
+ *
+ * <p>1.21.11 snapshots one section per {@code RenderedChunk} rather than a column, and the
+ * builder caches them itself, so the former {@code ClientChunkMixin} hook lives here.
  */
 @Mixin(targets = "net.minecraft.client.render.chunk.RenderedChunk")
 public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
 
     @Shadow
     @Final
-    private List<PalettedContainer<BlockState>> blockStateContainers;
+    @Mutable
+    private PalettedContainer<BlockState> blockPalette;
 
     private final AtomicInteger rtxremix$regions = new AtomicInteger();
+
+    @WrapOperation(
+            method = "<init>",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/PalettedContainer;copy()Lnet/minecraft/world/chunk/PalettedContainer;"))
+    private PalettedContainer<BlockState> rtxremix$pooledCopy(
+            PalettedContainer<BlockState> container, Operation<PalettedContainer<BlockState>> original) {
+        RenderRegionStoragePool.beginCopying();
+        try {
+            return original.call(container);
+        } finally {
+            RenderRegionStoragePool.endCopying();
+        }
+    }
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void rtxremix$builderReference(WorldChunk chunk, int sectionIndex, CallbackInfo ci) {
+        rtxremix$retain();
+    }
 
     @Override
     public void rtxremix$retain() {
@@ -39,16 +68,14 @@ public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
 
     @Override
     public void rtxremix$release() {
-        if (rtxremix$regions.decrementAndGet() != 0 || blockStateContainers == null) {
+        if (rtxremix$regions.decrementAndGet() != 0 || blockPalette == null) {
             return;
         }
-        for (PalettedContainer<BlockState> container : blockStateContainers) {
-            if (container != null && container.data.storage() instanceof PackedIntegerArray packed) {
-                RenderRegionStoragePool.release(packed.getData());
-            }
+        if (blockPalette.data.storage() instanceof PackedIntegerArray packed) {
+            RenderRegionStoragePool.release(packed.getData());
         }
-        // Nothing may read the snapshot after its last release; make a stale read fail loudly
-        // instead of returning whatever the recycled arrays hold next.
-        blockStateContainers.clear();
+        // Nothing may read the snapshot after its last release; a stale read sees air
+        // instead of whatever the recycled arrays hold next.
+        blockPalette = null;
     }
 }

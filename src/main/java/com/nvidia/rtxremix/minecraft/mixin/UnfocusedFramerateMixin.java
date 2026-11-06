@@ -26,12 +26,12 @@ import org.spongepowered.asm.mixin.injection.At;
  * {@code rtx.conf} enables {@code rtx.enableInputQueuePing}, which keeps the
  * window responsive at every setting.
  */
-@Mixin(MinecraftClient.class)
+@Mixin(net.minecraft.client.option.InactivityFpsLimiter.class)
 public abstract class UnfocusedFramerateMixin {
 
-    @ModifyReturnValue(method = "getFramerateLimit()I", at = @At("RETURN"))
+    @ModifyReturnValue(method = "update()I", at = @At("RETURN"))
     private int rtxremix$capWhileUnfocused(int limit) {
-        if (((MinecraftClient) (Object) this).isWindowFocused()) {
+        if (MinecraftClient.getInstance().isWindowFocused()) {
             return limit;
         }
         // A benchmark measures renderer throughput and must not be throttled

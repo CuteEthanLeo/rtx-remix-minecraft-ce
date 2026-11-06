@@ -19,7 +19,18 @@ import java.util.function.BooleanSupplier;
  * to Remix frame cost.
  */
 @Mixin(ClientWorld.class)
-public abstract class ClientWorldMixin {
+public abstract class ClientWorldMixin implements com.nvidia.rtxremix.minecraft.light.LightningTicksAccess {
+
+    @org.spongepowered.asm.mixin.Shadow
+    private int getLightningTicksLeft() {
+        throw new AssertionError();
+    }
+
+    @Override
+    public int rtxremix$getLightningTicksLeft() {
+        return getLightningTicksLeft();
+    }
+
     
     private static final ThreadLocal<ProfileScope> rtxremix$worldTickScope = new ThreadLocal<>();
     private static final ThreadLocal<ProfileScope> rtxremix$entityTickScope = new ThreadLocal<>();

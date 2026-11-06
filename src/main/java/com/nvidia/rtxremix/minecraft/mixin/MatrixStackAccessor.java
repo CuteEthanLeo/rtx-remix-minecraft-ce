@@ -8,12 +8,12 @@ import net.minecraft.client.util.math.MatrixStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import java.util.Deque;
+import java.util.List;
 
 /** Exposes the backing deque so the Remix capture stack can recycle entries. */
 @Mixin(MatrixStack.class)
 public interface MatrixStackAccessor {
 
     @Accessor("stack")
-    Deque<MatrixStack.Entry> rtxremix$getStack();
+    List<MatrixStack.Entry> rtxremix$getStack();
 }

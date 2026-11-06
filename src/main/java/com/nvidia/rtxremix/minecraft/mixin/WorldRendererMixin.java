@@ -30,36 +30,22 @@ import net.minecraft.world.BlockRenderView;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
-import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.particle.ParticleManager;
-import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.BuiltChunkStorage;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexFormatElement;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.chunk.ChunkRenderData;
 import net.minecraft.client.render.chunk.ChunkRendererRegionBuilder;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.BlockBreakingInfo;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -68,15 +54,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Set;
 import java.util.SortedSet;
 
 /**
@@ -122,12 +104,6 @@ public abstract class WorldRendererMixin
     public ClientWorld world;
 
     @Shadow
-    private int regularEntityCount;
-
-    @Shadow
-    private int blockEntityCount;
-
-    @Shadow
     private int ticks;
 
     @Shadow
@@ -136,14 +112,7 @@ public abstract class WorldRendererMixin
 
     @Shadow
     @Final
-    private Set<BlockEntity> noCullingBlockEntities;
-
-    @Shadow
-    @Final
     private Long2ObjectMap<SortedSet<BlockBreakingInfo>> blockBreakingProgressions;
-
-    @Shadow
-    protected abstract boolean canDrawEntityOutlines();
 
     private ProfileScope rtxremix$profilerPhaseScope;
     private String rtxremix$profilerPhaseName;
@@ -157,8 +126,6 @@ public abstract class WorldRendererMixin
             new ChunkBuilder.BuiltChunk[rtxremix$BLOCK_ENTITY_CHUNK_LIST_INITIAL_CAPACITY];
     private int rtxremix$blockEntityChunkBufferUsed;
     private final BuiltChunkArrayIterator rtxremix$blockEntityChunkIterator = new BuiltChunkArrayIterator();
-    private RemixWeatherRenderer rtxremix$weatherRenderer;
-    private Identifier rtxremix$weatherTexture;
     private float[] rtxremix$starVertices = new float[0];
 
     @Override
@@ -166,31 +133,9 @@ public abstract class WorldRendererMixin
         return ticks;
     }
 
-    @Inject(method = "buildStarsBuffer", at = @At("RETURN"))
-    private void rtxremix$captureStarVertices(
-            Tessellator tessellator,
-            CallbackInfoReturnable<BuiltBuffer> cir) {
-        BuiltBuffer builtBuffer = cir.getReturnValue();
-        BuiltBuffer.DrawParameters parameters = builtBuffer.getDrawParameters();
-        int positionOffset = parameters.format().getOffset(VertexFormatElement.POSITION);
-        if (positionOffset < 0) {
-            rtxremix$starVertices = new float[0];
-            return;
-        }
-
-        int vertexCount = parameters.vertexCount();
-        int stride = parameters.format().getVertexSizeByte();
-        ByteBuffer vertices = builtBuffer.getBuffer().duplicate().order(ByteOrder.nativeOrder());
-        float[] positions = new float[vertexCount * 3];
-        for (int vertex = 0; vertex < vertexCount; vertex++) {
-            int source = vertex * stride + positionOffset;
-            int destination = vertex * 3;
-            positions[destination] = vertices.getFloat(source);
-            positions[destination + 1] = vertices.getFloat(source + Float.BYTES);
-            positions[destination + 2] = vertices.getFloat(source + 2 * Float.BYTES);
-        }
-        rtxremix$starVertices = positions;
-    }
+    // TODO(1.21.11): vanilla's star buffer moved from WorldRenderer.buildStarsBuffer into
+    // SkyRendering and is built straight into a GpuBuffer; the Remix star field gets no
+    // vanilla star vertices until that is hooked (copyStarVertices returns an empty array).
 
     @Override
     public float[] rtxremix$copyStarVertices() {
@@ -220,7 +165,7 @@ public abstract class WorldRendererMixin
         for (int sectionZ = minSectionZ; sectionZ <= maxSectionZ; sectionZ++) {
             for (int sectionX = minSectionX; sectionX <= maxSectionX; sectionX++) {
                 for (int sectionY = minSectionY; sectionY <= maxSectionY; sectionY++) {
-                    renderer.scheduleBlockRender(sectionX, sectionY, sectionZ);
+                    renderer.scheduleChunkRender(sectionX, sectionY, sectionZ);
                 }
             }
         }
@@ -235,7 +180,7 @@ public abstract class WorldRendererMixin
      * wholesale because the rule must tell the loading column from its neighbours, which a
      * redirect of the inner per-section call cannot.
      */
-    @Inject(method = "scheduleBlockRenders(III)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "scheduleChunkRenders3x3x3(III)V", at = @At("HEAD"), cancellable = true)
     private void rtxremix$filterChunkLoadReflags(int cx, int sy, int cz, CallbackInfo ci) {
         if (!RtxRemixMod.isRtxEnabled() || !NeighbourReflagFilter.ENABLED || chunks == null) {
             return;
@@ -258,7 +203,7 @@ public abstract class WorldRendererMixin
             return built;
         }
         for (ChunkBuilder.BuiltChunk builtChunk : chunks.chunks) {
-            if (builtChunk.getData() == ChunkBuilder.ChunkData.EMPTY) {
+            if (builtChunk.getCurrentRenderData() == ChunkRenderData.HIDDEN) {
                 continue;
             }
             BlockPos origin = builtChunk.getOrigin();
@@ -291,8 +236,9 @@ public abstract class WorldRendererMixin
                 continue;
             }
             WorldChunk worldChunk = world.getChunkManager().getWorldChunk(cx, cz, false);
-            if (worldChunk != null && !worldChunk.isSectionEmpty(sy)
-                    && lightingProvider.isLightingEnabled(ChunkSectionPos.from(cx, sy, cz))) {
+            if (worldChunk != null
+                    && !worldChunk.getSection(worldChunk.sectionCoordToIndex(sy)).isEmpty()
+                    && lightingProvider.isLightingEnabled(ChunkSectionPos.asLong(cx, sy, cz))) {
                 loadedSections.add(builtChunk);
             }
         }
@@ -300,9 +246,9 @@ public abstract class WorldRendererMixin
         // ChunkBuilder's normal task queue is FIFO. Queue nearby sections first
         // so visible holes close promptly while the Remix scene repopulates.
         Camera camera = MinecraftClient.getInstance().gameRenderer.getCamera();
-        double cameraX = camera.getPos().x;
-        double cameraY = camera.getPos().y;
-        double cameraZ = camera.getPos().z;
+        double cameraX = camera.getCameraPos().x;
+        double cameraY = camera.getCameraPos().y;
+        double cameraZ = camera.getCameraPos().z;
         loadedSections.sort(Comparator.comparingDouble(builtChunk -> {
             BlockPos origin = builtChunk.getOrigin();
             double dx = origin.getX() + 8.0 - cameraX;
@@ -315,7 +261,7 @@ public abstract class WorldRendererMixin
         LongOpenHashSet queued = new LongOpenHashSet(loadedSections.size());
         try {
             for (ChunkBuilder.BuiltChunk builtChunk : loadedSections) {
-                builtChunk.scheduleRebuild(chunkBuilder, regionBuilder);
+                builtChunk.scheduleRebuild(regionBuilder);
                 // Prevent WorldRenderer.updateChunks from queueing this same slot a
                 // second time when it next walks vanilla's visible section list.
                 builtChunk.cancelRebuild();
@@ -336,68 +282,9 @@ public abstract class WorldRendererMixin
         ((BuiltChunkStorageSectionAccess) chunks).rtxremix$scheduleRebuildIfResident(cx, sy, cz);
     }
 
-    /**
-     * Captures entities where vanilla renders them, instead of rendering them twice.
-     *
-     * <p>Vanilla evaluates the entity model here and writes it to OpenGL. Replacing
-     * this call keeps Minecraft in charge of animation, feature layers and modded
-     * entity support, but sends the geometry to the Remix capture provider instead,
-     * so the model is evaluated once for both renderers.
-     *
-     * <p>This traversal is frustum culled, so entities the camera cannot see are
-     * picked up afterwards by the Remix pass, which needs them for shadows and
-     * reflections.
-     */
-    @WrapOperation(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/WorldRenderer;renderEntity("
-                            + "Lnet/minecraft/entity/Entity;DDDF"
-                            + "Lnet/minecraft/client/util/math/MatrixStack;"
-                            + "Lnet/minecraft/client/render/VertexConsumerProvider;)V"
-            ))
-    private void rtxremix$captureEntityInPlace(
-            WorldRenderer worldRenderer,
-            Entity entity,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            float tickDelta,
-            MatrixStack matrices,
-            VertexConsumerProvider vertexConsumers,
-            Operation<Void> original) {
-        RtxRemixMod mod = RtxRemixMod.getInstance();
-        boolean captured = mod != null
-                && mod.getRenderer() != null
-                && mod.getRenderer().renderEntityInPlace(entity, tickDelta);
-        if (!captured) {
-            // Remix is not drawing this entity, so vanilla's frame is what the user
-            // sees and it keeps its blob shadow.
-            original.call(worldRenderer, entity, cameraX, cameraY, cameraZ,
-                    tickDelta, matrices, vertexConsumers);
-            return;
-        }
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (!canDrawEntityOutlines() || !client.hasOutline(entity)) {
-            return;
-        }
-        // Vanilla hands an entity the outline provider only when the outline post-processor
-        // is usable and the entity is outlined (glowing, or a player under the spectator
-        // outlines key). That pass writes the framebuffer the outline shader reads, which
-        // capturing for Remix does not feed, so vanilla still has to run for it. Its blob
-        // shadow must not: the GL frame is composited wholesale over the traced scene, and
-        // Remix already traces the real shadow, so the blob would double it.
-        EntityRenderDispatcher dispatcher = client.getEntityRenderDispatcher();
-        boolean hadShadows = ((EntityRenderDispatcherAccessor) dispatcher).rtxremix$getRenderShadows();
-        dispatcher.setRenderShadows(false);
-        try {
-            original.call(worldRenderer, entity, cameraX, cameraY, cameraZ,
-                    tickDelta, matrices, vertexConsumers);
-        } finally {
-            dispatcher.setRenderShadows(hadShadows);
-        }
-    }
+    // TODO(1.21.11): WorldRenderer.render no longer calls renderEntity(...); entities are
+    // extracted into render states and submitted through OrderedRenderCommandQueue. In-place
+    // entity capture (with its outline-only vanilla fallback) is disabled here.
 
     /**
      * Captures the block-breaking crack where vanilla renders it, instead of letting it
@@ -409,15 +296,10 @@ public abstract class WorldRendererMixin
      * stays block-local. When Remix declines, vanilla renders as usual.
      */
     @WrapOperation(
-            method = "render",
+            method = "renderBlockDamage",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/block/BlockRenderManager;renderDamage("
-                            + "Lnet/minecraft/block/BlockState;"
-                            + "Lnet/minecraft/util/math/BlockPos;"
-                            + "Lnet/minecraft/world/BlockRenderView;"
-                            + "Lnet/minecraft/client/util/math/MatrixStack;"
-                            + "Lnet/minecraft/client/render/VertexConsumer;)V"
+                    target = "Lnet/minecraft/client/render/block/BlockRenderManager;renderDamage(Lnet/minecraft/block/BlockState;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/BlockRenderView;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumer;)V"
             ))
     private void rtxremix$captureBlockDamageInPlace(
             BlockRenderManager blockRenderManager,
@@ -450,15 +332,7 @@ public abstract class WorldRendererMixin
     }
 
     @Inject(method = "render", at = @At("HEAD"))
-    private void rtxremix$renderHead(
-            RenderTickCounter tickCounter,
-            boolean renderBlockOutline,
-            Camera camera,
-            GameRenderer gameRenderer,
-            LightmapTextureManager lightmapTextureManager,
-            Matrix4f positionMatrix,
-            Matrix4f projectionMatrix,
-            CallbackInfo ci) {
+    private void rtxremix$renderHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$renderScope,
                 "WorldRenderer.render",
@@ -475,17 +349,11 @@ public abstract class WorldRendererMixin
     }
 
     @Inject(method = "render", at = @At("RETURN"))
-    private void rtxremix$renderReturn(
-            RenderTickCounter tickCounter,
-            boolean renderBlockOutline,
-            Camera camera,
-            GameRenderer gameRenderer,
-            LightmapTextureManager lightmapTextureManager,
-            Matrix4f positionMatrix,
-            Matrix4f projectionMatrix,
-            CallbackInfo ci) {
+    private void rtxremix$renderReturn(CallbackInfo ci) {
         rtxremix$closeProfilerPhase();
         rtxremix$close(rtxremix$renderScope);
+        // 1.21.11: Fabric's WorldRenderEvents.END is gone; the world-render tail lives here.
+        RtxRemixMod.onWorldRenderEnd();
     }
 
     @WrapOperation(
@@ -502,48 +370,19 @@ public abstract class WorldRendererMixin
         rtxremix$transitionProfilerPhase(name);
     }
 
-    @Inject(method = "renderLayer", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$skipVanillaTerrainLayer(
-            RenderLayer renderLayer,
-            double x,
-            double y,
-            double z,
-            Matrix4f matrix4f,
-            Matrix4f positionMatrix,
-            CallbackInfo ci) {
-        rtxremix$renderLayerCalls++;
-        if (RtxRemixMod.isRemixWorldRendering() && rtxremix$isVanillaTerrainLayer(renderLayer)) {
-            rtxremix$renderLayerSkips++;
+    // TODO(1.21.11): WorldRenderer.renderLayer was replaced by renderBlockLayers, which returns
+    // a SectionRenderState drawn later by the frame graph; vanilla terrain layers are no longer
+    // skipped while Remix renders the world.
+
+    @Inject(method = "renderParticles", at = @At("HEAD"), cancellable = true)
+    private void rtxremix$skipVanillaParticleDraw(CallbackInfo ci) {
+        if (RtxRemixMod.isRemixWorldRendering()) {
             ci.cancel();
         }
     }
 
-    @Redirect(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/client/render/LightmapTextureManager;Lnet/minecraft/client/render/Camera;F)V"
-            ))
-    private void rtxremix$skipVanillaParticleDraw(
-            ParticleManager particleManager,
-            LightmapTextureManager lightmapTextureManager,
-            Camera camera,
-            float tickDelta) {
-        if (!RtxRemixMod.isRemixWorldRendering()) {
-            particleManager.renderParticles(lightmapTextureManager, camera, tickDelta);
-        }
-    }
-
     @Inject(method = "renderClouds", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$skipVanillaCloudDraw(
-            MatrixStack matrices,
-            Matrix4f positionMatrix,
-            Matrix4f projectionMatrix,
-            float tickDelta,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            CallbackInfo ci) {
+    private void rtxremix$skipVanillaCloudDraw(CallbackInfo ci) {
         if (RtxRemixMod.isRemixWorldRendering()
                 && RtxRemixMod.getInstance()
                         .getRenderer()
@@ -553,68 +392,9 @@ public abstract class WorldRendererMixin
         }
     }
 
-    @Inject(method = "renderWeather", at = @At("HEAD"))
-    private void rtxremix$beginWeatherCapture(
-            LightmapTextureManager lightmapTextureManager,
-            float tickDelta,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            CallbackInfo ci) {
-        rtxremix$weatherRenderer = rtxremix$getWeatherRenderer();
-        rtxremix$weatherTexture = null;
-        if (rtxremix$weatherRenderer != null) {
-            rtxremix$weatherRenderer.beginCaptureFrame(lightmapTextureManager);
-        }
-    }
-
-    @WrapOperation(
-            method = "renderWeather",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lcom/mojang/blaze3d/systems/RenderSystem;setShaderTexture(ILnet/minecraft/util/Identifier;)V"
-            ))
-    private void rtxremix$captureWeatherTexture(
-            int textureUnit,
-            Identifier texture,
-            Operation<Void> original) {
-        if (rtxremix$weatherRenderer != null && textureUnit == 0) {
-            rtxremix$weatherTexture = texture;
-            return;
-        }
-        original.call(textureUnit, texture);
-    }
-
-    @WrapOperation(
-            method = "renderWeather",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/BufferRenderer;drawWithGlobalProgram(Lnet/minecraft/client/render/BuiltBuffer;)V"
-            ))
-    private void rtxremix$captureWeatherDraw(
-            BuiltBuffer buffer,
-            Operation<Void> original) {
-        if (rtxremix$weatherRenderer == null) {
-            original.call(buffer);
-            return;
-        }
-
-        rtxremix$weatherRenderer.capture(
-                buffer,
-                rtxremix$weatherTexture);
-    }
-
-    @Inject(method = "renderWeather", at = @At("RETURN"))
-    private void rtxremix$endWeatherCapture(
-            LightmapTextureManager lightmapTextureManager,
-            float tickDelta,
-            double cameraX,
-            double cameraY,
-            double cameraZ,
-            CallbackInfo ci) {
-        rtxremix$weatherRenderer = null;
-        rtxremix$weatherTexture = null;
-    }
+    // TODO(1.21.11): renderWeather now hands WeatherRendering a frame-graph pass with
+    // RenderPipelines; the old setShaderTexture/drawWithGlobalProgram capture points are gone, so
+    // rain and snow are not captured for RemixWeatherRenderer.
 
     @Redirect(
             method = "render",
@@ -657,26 +437,17 @@ public abstract class WorldRendererMixin
         return rtxremix$blockEntityChunkIterator.reset(rtxremix$blockEntityChunks, blockEntityChunks);
     }
 
-    @Inject(method = "setupTerrain", at = @At("HEAD"))
-    private void rtxremix$setupTerrainHead(
-            Camera camera,
-            Frustum frustum,
-            boolean hasForcedFrustum,
-            boolean spectator,
-            CallbackInfo ci) {
+    // 1.21.11: setupTerrain became updateCamera(Camera, Frustum, boolean).
+    @Inject(method = "updateCamera", at = @At("HEAD"))
+    private void rtxremix$setupTerrainHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$setupTerrainScope,
                 "WorldRenderer.setupTerrain",
                 "Java.WorldRenderer.setupTerrain.ms");
     }
 
-    @Inject(method = "setupTerrain", at = @At("RETURN"))
-    private void rtxremix$setupTerrainReturn(
-            Camera camera,
-            Frustum frustum,
-            boolean hasForcedFrustum,
-            boolean spectator,
-            CallbackInfo ci) {
+    @Inject(method = "updateCamera", at = @At("RETURN"))
+    private void rtxremix$setupTerrainReturn(CallbackInfo ci) {
         rtxremix$close(rtxremix$setupTerrainScope);
     }
 
@@ -782,7 +553,7 @@ public abstract class WorldRendererMixin
     }
 
     private int rtxremix$chunksToBatch() {
-        return chunkBuilder == null ? -1 : chunkBuilder.getToBatchCount();
+        return chunkBuilder == null ? -1 : chunkBuilder.getScheduledTaskCount();
     }
 
     private void rtxremix$transitionProfilerPhase(String vanillaPhaseName) {
@@ -819,25 +590,18 @@ public abstract class WorldRendererMixin
             scope.visibleChunkCount(visibleChunks);
             scope.captureCount(visibleChunks);
         }
-        scope.entityCount(regularEntityCount);
-        scope.blockEntityCount(blockEntityCount);
-        scope.blockCount(blockEntityCount);
-        scope.noCullBlockEntityCount(rtxremix$noCullBlockEntityCount());
+        // TODO(1.21.11): regularEntityCount, blockEntityCount and noCullingBlockEntities were
+        // removed from WorldRenderer; those counters report -1.
+        scope.entityCount(-1);
+        scope.blockEntityCount(-1);
+        scope.blockCount(-1);
+        scope.noCullBlockEntityCount(-1);
         scope.blockBreakingCount(blockBreakingProgressions == null ? -1 : blockBreakingProgressions.size());
         scope.renderLayerCalls(rtxremix$renderLayerCalls - rtxremix$phaseRenderLayerCallsStart);
         scope.renderLayerSkips(rtxremix$renderLayerSkips - rtxremix$phaseRenderLayerSkipsStart);
         if ("WorldRenderer.phase.blockentities".equals(rtxremix$profilerPhaseName)) {
             scope.scannedChunkCount(rtxremix$blockEntityChunkScanCount);
             scope.blockEntityChunkCount(rtxremix$blockEntityChunkCount);
-        }
-    }
-
-    private int rtxremix$noCullBlockEntityCount() {
-        if (noCullingBlockEntities == null) {
-            return -1;
-        }
-        synchronized (noCullingBlockEntities) {
-            return noCullingBlockEntities.size();
         }
     }
 
@@ -901,14 +665,6 @@ public abstract class WorldRendererMixin
         } else if (stack != null) {
             holder.remove();
         }
-    }
-
-    private static boolean rtxremix$isVanillaTerrainLayer(RenderLayer renderLayer) {
-        return renderLayer == RenderLayer.getSolid()
-                || renderLayer == RenderLayer.getCutoutMipped()
-                || renderLayer == RenderLayer.getCutout()
-                || renderLayer == RenderLayer.getTranslucent()
-                || renderLayer == RenderLayer.getTripwire();
     }
 
     private static RemixWeatherRenderer rtxremix$getWeatherRenderer() {

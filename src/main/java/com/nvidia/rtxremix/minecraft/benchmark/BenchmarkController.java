@@ -1160,6 +1160,7 @@ public class BenchmarkController {
                 benchmarkDir.toFile(),
                 shot.name() + ".png",
                 client.getFramebuffer(),
+                1,
                 text -> {
                     // Runs on the IO worker after the encode; the file is the
                     // verdict, not the message text.
@@ -1334,6 +1335,7 @@ public class BenchmarkController {
                 benchmarkDir.toFile(),
                 filename,
                 client.getFramebuffer(),
+                1,
                 text -> LOGGER.info("Screenshot: {}", text.getString())
         );
     }
@@ -1407,7 +1409,7 @@ public class BenchmarkController {
         metadata.addProperty("renderDistance", mc.options.getViewDistance().getValue());
         metadata.addProperty("simulationDistance", mc.options.getSimulationDistance().getValue());
         metadata.addProperty("fov", mc.options.getFov().getValue());
-        metadata.addProperty("graphicsMode", mc.options.getGraphicsMode().getValue().toString());
+        metadata.addProperty("graphicsMode", mc.options.getPreset().getValue().toString());
         metadata.addProperty("entityDistanceScaling", mc.options.getEntityDistanceScaling().getValue());
         root.add("metadata", metadata);
 

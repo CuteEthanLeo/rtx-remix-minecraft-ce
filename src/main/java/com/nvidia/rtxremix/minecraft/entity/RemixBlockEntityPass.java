@@ -5,11 +5,10 @@
 package com.nvidia.rtxremix.minecraft.entity;
 
 import com.nvidia.rtxremix.InstanceCategoryBit;
-import com.nvidia.rtxremix.minecraft.mixin.EntityRenderDispatcherAccessor;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.entity.EntityRenderManager;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.math.Vec3d;
@@ -62,7 +61,11 @@ public final class RemixBlockEntityPass {
      */
     @FunctionalInterface
     public interface BlockEntityRenderCall {
-        void render(MatrixStack matrices, VertexConsumerProvider provider);
+        /**
+         * Since 1.21.9 vanilla's renderer submits to a command queue; the pass flushes
+         * that queue into its capture provider once the call returns.
+         */
+        void render(MatrixStack matrices, OrderedRenderCommandQueue queue);
     }
 
     /**
@@ -76,6 +79,7 @@ public final class RemixBlockEntityPass {
 
     private final RecyclingMatrixStack matrices = new RecyclingMatrixStack();
     private final RemixVertexConsumerProvider provider = new RemixVertexConsumerProvider();
+    private final RemixCommandCapture commandCapture = new RemixCommandCapture(provider);
     private final IdentityHashMap<BlockEntityType<?>, String> typeKeyCache = new IdentityHashMap<>();
     private final FailureLogThrottle failures = new FailureLogThrottle(LOGGER, "Block entity");
     // One buffer suffices: the submit consumes the bones before the next capture
@@ -95,28 +99,29 @@ public final class RemixBlockEntityPass {
      * spawner's display entity casts only the shadow Remix traces.
      */
     public void capture(BlockEntity be, BlockEntityRenderCall call,
-                        EntityRenderDispatcher dispatcher, RemixEntitySubmitter submitter) {
+                        EntityRenderManager dispatcher, RemixEntitySubmitter submitter) {
         long captureStart = System.nanoTime();
         EntityRenderContext ctx = EntityRenderContext.get();
-        boolean hadShadows = ((EntityRenderDispatcherAccessor) dispatcher).rtxremix$getRenderShadows();
-        dispatcher.setRenderShadows(false);
+        // TODO(1.21.11): blob shadows of display entities (spawner) are no longer
+        // suppressed here; the dispatcher's renderShadows flag is gone.
         provider.beginEntity();
         matrices.push();
         ctx.begin(true);
         List<RemixVertexConsumerProvider.CapturedLayer> layers;
         try {
-            call.render(matrices, provider);
+            call.render(matrices, commandCapture.queue());
+            commandCapture.flush();
             layers = provider.endEntity();
         } catch (Exception e) {
+            commandCapture.discard();
             failures.noteFailure("capturing", "block entity " + typeKey(be), be.getPos(), e);
             return;
         } finally {
-            // All three restore even if the renderer threw mid-traversal: the identity
-            // root returns every pooled entry, the player's shadow setting comes back,
-            // and a capture left open would make the next one look nested. The bone
+            // Both restore even if the renderer threw mid-traversal: the identity
+            // root returns every pooled entry, and a capture left open would make
+            // the next one look nested. The bone
             // count stays readable for the snapshot below.
             matrices.reset();
-            dispatcher.setRenderShadows(hadShadows);
             ctx.reset();
         }
         frameCaptureNanos += System.nanoTime() - captureStart;

@@ -7,8 +7,8 @@ package com.nvidia.rtxremix.minecraft.terrain.capture;
 import com.nvidia.rtxremix.minecraft.light.BlockLightRuleManager;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.BlockView;
 import net.minecraft.util.math.Direction;
@@ -47,7 +47,7 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
     private final BlockPos.Mutable origin = new BlockPos.Mutable();
     private final BlockPos.Mutable neighbor = new BlockPos.Mutable();
 
-    private BakedModel model;
+    private BlockStateModel model;
     private boolean modelResolved;
 
     private float[] vertices = new float[3 * 256];
@@ -86,7 +86,7 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         }
         neighbor.set(origin, face);
         BlockState other = world.getBlockState(neighbor);
-        return !other.isOpaqueFullCube(world, neighbor);
+        return !other.isOpaqueFullCube();
     }
 
     @Override
@@ -126,20 +126,21 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         }
         if (model == null) return;
 
+        // 1.21.11: models resolve their parts once from the seeded random, as the emitter does.
+        random.setSeed(seed);
+        java.util.List<net.minecraft.client.render.model.BlockModelPart> parts = model.getParts(random);
         for (Direction dir : DIRECTIONS) {
-            // Re-seed per direction exactly as the emission loop does, so a
-            // multi-variant model resolves to the same variant here as on screen.
-            random.setSeed(seed);
-            for (BakedQuad quad : model.getQuads(state, dir, random)) {
-                int[] vd = quad.getVertexData();
-                ensureCapacity(vertexCount + 4);
-                for (int v = 0; v < 4; v++) {
-                    int off = v * 8;
-                    int w = vertexCount * 3;
-                    vertices[w] = Float.intBitsToFloat(vd[off]);
-                    vertices[w + 1] = Float.intBitsToFloat(vd[off + 1]);
-                    vertices[w + 2] = Float.intBitsToFloat(vd[off + 2]);
-                    vertexCount++;
+            for (net.minecraft.client.render.model.BlockModelPart part : parts) {
+                for (BakedQuad quad : part.getQuads(dir)) {
+                    ensureCapacity(vertexCount + 4);
+                    for (int v = 0; v < 4; v++) {
+                        org.joml.Vector3fc position = quad.getPosition(v);
+                        int w = vertexCount * 3;
+                        vertices[w] = position.x();
+                        vertices[w + 1] = position.y();
+                        vertices[w + 2] = position.z();
+                        vertexCount++;
+                    }
                 }
             }
         }

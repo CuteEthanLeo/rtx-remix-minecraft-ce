@@ -8,19 +8,18 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.client.particle.SpriteBillboardParticle;
+import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.util.math.random.Random;
 
 @Environment(EnvType.CLIENT)
-public class RapidMistParticle extends SpriteBillboardParticle {
+public class RapidMistParticle extends BillboardParticle {
     private RapidMistParticle(ClientWorld world, double x, double y, double z,
                               double velocityX, double velocityY, double velocityZ,
                               SpriteProvider spriteProvider) {
-        super(world, x, y, z);
-        this.setSprite(spriteProvider);
+        super(world, x, y, z, spriteProvider.getSprite(world.random));
         this.setBoundingBoxSpacing(0.05f, 0.05f);
         this.scale *= this.random.nextFloat() * 0.42f + 0.32f;
         this.maxAge = 18 + this.random.nextInt(19);
@@ -35,8 +34,8 @@ public class RapidMistParticle extends SpriteBillboardParticle {
     }
 
     @Override
-    public ParticleTextureSheet getType() {
-        return ParticleTextureSheet.PARTICLE_SHEET_TRANSLUCENT;
+    protected BillboardParticle.RenderType getRenderType() {
+        return BillboardParticle.RenderType.PARTICLE_ATLAS_TRANSLUCENT;
     }
 
     @Override
@@ -60,7 +59,8 @@ public class RapidMistParticle extends SpriteBillboardParticle {
         @Override
         public Particle createParticle(SimpleParticleType type, ClientWorld world,
                                        double x, double y, double z,
-                                       double velocityX, double velocityY, double velocityZ) {
+                                       double velocityX, double velocityY, double velocityZ,
+                                       Random random) {
             return new RapidMistParticle(world, x, y, z, velocityX, velocityY, velocityZ, spriteProvider);
         }
     }

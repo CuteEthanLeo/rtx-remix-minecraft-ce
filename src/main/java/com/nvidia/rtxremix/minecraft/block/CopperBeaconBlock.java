@@ -20,7 +20,7 @@ import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.state.StateManager;
-import net.minecraft.state.property.DirectionProperty;
+import net.minecraft.state.property.EnumProperty;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
@@ -49,7 +49,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
 
     /** Registry path, also used for the block item, models, and translation key. */
     public static final String ID = "copper_beacon";
-    public static final DirectionProperty MOUNT = DirectionProperty.of("mount");
+    public static final EnumProperty<Direction> MOUNT = EnumProperty.of("mount", Direction.class);
     public static final BooleanProperty POWERED = Properties.POWERED;
     public static final BooleanProperty WATERLOGGED = Properties.WATERLOGGED;
 
@@ -122,7 +122,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
             BlockPos pos,
             PlayerEntity player,
             BlockHitResult hit) {
-        if (world.isClient) {
+        if (world.isClient()) {
             return ActionResult.SUCCESS;
         }
         if (world.getBlockEntity(pos) instanceof CopperBeaconBlockEntity beacon) {
@@ -138,9 +138,9 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
             World world,
             BlockPos pos,
             Block sourceBlock,
-            BlockPos sourcePos,
+            @Nullable net.minecraft.world.block.WireOrientation wireOrientation,
             boolean notify) {
-        if (world.isClient) {
+        if (world.isClient()) {
             return;
         }
         boolean powered = world.isReceivingRedstonePower(pos);
@@ -154,33 +154,22 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
         world.setBlockState(pos, state.with(POWERED, powered), Block.NOTIFY_LISTENERS);
     }
 
-    @Override
-    protected void onStateReplaced(
-            BlockState state,
-            World world,
-            BlockPos pos,
-            BlockState newState,
-            boolean moved) {
-        if (!state.isOf(newState.getBlock())) {
-            if (world.getBlockEntity(pos) instanceof CopperBeaconBlockEntity beacon) {
-                ItemScatterer.spawn(world, pos, beacon);
-            }
-        }
-        super.onStateReplaced(state, world, pos, newState, moved);
-    }
+    // 1.21.11: BlockEntity.onBlockReplaced scatters the inventory, so no onStateReplaced override.
 
     @Override
     protected BlockState getStateForNeighborUpdate(
             BlockState state,
-            Direction direction,
-            BlockState neighborState,
-            WorldAccess world,
+            net.minecraft.world.WorldView world,
+            net.minecraft.world.tick.ScheduledTickView tickView,
             BlockPos pos,
-            BlockPos neighborPos) {
+            Direction direction,
+            BlockPos neighborPos,
+            BlockState neighborState,
+            net.minecraft.util.math.random.Random random) {
         if (state.get(WATERLOGGED)) {
-            world.scheduleFluidTick(pos, Fluids.WATER, Fluids.WATER.getTickRate(world));
+            tickView.scheduleFluidTick(pos, Fluids.WATER, Fluids.WATER.getTickRate(world));
         }
-        return super.getStateForNeighborUpdate(state, direction, neighborState, world, pos, neighborPos);
+        return super.getStateForNeighborUpdate(state, world, tickView, pos, direction, neighborPos, neighborState, random);
     }
 
     @Override

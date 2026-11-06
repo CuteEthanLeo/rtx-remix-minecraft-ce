@@ -27,13 +27,13 @@ public abstract class ChunkRendererRegionMixin implements RegionSnapshotRelease 
 
     @Shadow
     @Final
-    protected RenderedChunk[] chunks;
+    private RenderedChunk[] renderedChunks;
 
     private final AtomicBoolean rtxremix$released = new AtomicBoolean();
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void rtxremix$retainSnapshots(World world, int chunkX, int chunkZ, RenderedChunk[] renderedChunks, CallbackInfo ci) {
-        for (RenderedChunk snapshot : chunks) {
+    private void rtxremix$retainSnapshots(World world, int baseX, int baseY, int baseZ, RenderedChunk[] snapshots, CallbackInfo ci) {
+        for (RenderedChunk snapshot : renderedChunks) {
             ((RegionSnapshotRelease) snapshot).rtxremix$retain();
         }
     }
@@ -48,7 +48,7 @@ public abstract class ChunkRendererRegionMixin implements RegionSnapshotRelease 
         if (!rtxremix$released.compareAndSet(false, true)) {
             return;
         }
-        for (RenderedChunk snapshot : chunks) {
+        for (RenderedChunk snapshot : renderedChunks) {
             ((RegionSnapshotRelease) snapshot).rtxremix$release();
         }
     }

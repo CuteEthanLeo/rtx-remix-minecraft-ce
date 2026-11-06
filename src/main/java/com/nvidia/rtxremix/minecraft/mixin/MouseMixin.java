@@ -8,6 +8,7 @@ import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.input.RemixMouseAccess;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
+import net.minecraft.client.input.MouseInput;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -30,27 +31,27 @@ public abstract class MouseMixin implements RemixMouseAccess {
     private MinecraftClient client;
 
     @Shadow
-    private int activeButton;
+    private MouseInput activeButton;
 
     @Shadow
-    private int field_1796;
+    private int touchHoldTime;
 
     @Shadow
-    private void onMouseButton(long window, int button, int action, int mods) { }
+    private void onMouseButton(long window, MouseInput input, int action) { }
 
     private boolean rtxremix$releasingActiveButton;
 
     @Override
     public void rtxremix$releaseActiveButton() {
-        if (activeButton == -1) {
+        if (activeButton == null) {
             return;
         }
 
         // Touchscreen mode counts outstanding presses and suppresses intermediate releases.
-        field_1796 = client.options.getTouchscreen().getValue() ? 1 : 0;
+        touchHoldTime = client.options.getTouchscreen().getValue() ? 1 : 0;
         rtxremix$releasingActiveButton = true;
         try {
-            onMouseButton(client.getWindow().getHandle(), activeButton, GLFW.GLFW_RELEASE, 0);
+            onMouseButton(client.getWindow().getHandle(), activeButton, GLFW.GLFW_RELEASE);
         } finally {
             rtxremix$releasingActiveButton = false;
         }
@@ -99,10 +100,10 @@ public abstract class MouseMixin implements RemixMouseAccess {
     }
 
     @Inject(method = "onMouseButton", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$blockClickWhileMenuOpen(long window, int button, int action, int mods, CallbackInfo ci) {
+    private void rtxremix$blockClickWhileMenuOpen(long window, MouseInput input, int action, CallbackInfo ci) {
         boolean syntheticRelease = rtxremix$releasingActiveButton
                 && action == GLFW.GLFW_RELEASE
-                && button == activeButton;
+                && input == activeButton;
         if (RtxRemixMod.getRemixInputGate().isCaptureSessionOpen() && !syntheticRelease) {
             ci.cancel();
         }

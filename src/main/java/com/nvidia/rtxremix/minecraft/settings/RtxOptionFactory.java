@@ -76,7 +76,8 @@ final class RtxOptionFactory {
                                 new SimpleOption.ValidatingIntSliderCallbacks(
                                         sliderMin, sliderMax, true).withModifier(
                                                 value -> intValueFromSlider(s, value),
-                                                value -> sliderValueFromInt(s, value)),
+                                                value -> sliderValueFromInt(s, value),
+                                                true),
                                 s.applySliderValueImmediately());
                 return new SimpleOption<>(
                         setting.labelKey(),

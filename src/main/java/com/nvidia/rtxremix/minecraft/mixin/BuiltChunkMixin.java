@@ -48,20 +48,28 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
     BlockPos.Mutable origin;
 
     @Shadow
-    protected abstract double getSquaredCameraDistance();
+    private boolean isChunkNonEmpty(long sectionPos) {
+        throw new AssertionError();
+    }
 
     @Shadow
-    protected abstract boolean isChunkNonEmpty(BlockPos pos);
+    public abstract net.minecraft.client.render.chunk.AbstractChunkRenderData getCurrentRenderData();
 
-    @Shadow
-    public abstract ChunkBuilder.ChunkData getData();
+    /** 1.21.11 dropped BuiltChunk.getSquaredCameraDistance; same centre-to-camera measure. */
+    private double rtxremix$squaredCameraDistance() {
+        net.minecraft.util.math.Vec3d camera = net.minecraft.client.MinecraftClient.getInstance()
+                .gameRenderer.getCamera().getCameraPos();
+        double dx = origin.getX() + 8.0 - camera.x;
+        double dy = origin.getY() + 8.0 - camera.y;
+        double dz = origin.getZ() + 8.0 - camera.z;
+        return dx * dx + dy * dy + dz * dz;
+    }
 
     /**
      * Shared by every slot: createRebuildTask runs only on the render thread
      * (updateChunks, ChunkBuilder.rebuild, the Remix recapture queue), so one
      * scratch position serves all of them.
      */
-    private static final BlockPos.Mutable rtxremix$neighbourProbe = new BlockPos.Mutable();
 
     private boolean rtxremix$hasBlockEntities;
 
@@ -83,14 +91,14 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
         rtxremix$snapshotMask &= ~bit;
     }
 
-    @Inject(method = "setOrigin(III)V", at = @At("HEAD"))
-    private void rtxremix$onSetOrigin(int x, int y, int z, CallbackInfo ci) {
+    @Inject(method = "setSectionPos(J)V", at = @At("HEAD"))
+    private void rtxremix$onSetOrigin(long sectionPos, CallbackInfo ci) {
         rtxremix$hasBlockEntities = false;
         rtxremix$snapshotMask = 0;
     }
 
-    @Inject(method = "setOrigin(III)V", at = @At("RETURN"))
-    private void rtxremix$afterSetOrigin(int x, int y, int z, CallbackInfo ci) {
+    @Inject(method = "setSectionPos(J)V", at = @At("RETURN"))
+    private void rtxremix$afterSetOrigin(long sectionPos, CallbackInfo ci) {
         ChunkSlotMoveLog.RENDER_THREAD.record(index);
     }
 
@@ -102,34 +110,32 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
      * has no geometry that a neighbour could make wrong.
      */
     @Inject(
-            method = "createRebuildTask(Lnet/minecraft/client/render/chunk/ChunkRendererRegionBuilder;)"
-                    + "Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk$Task;",
+            method = "createRebuildTask(Lnet/minecraft/client/render/chunk/ChunkRendererRegionBuilder;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk$Task;",
             at = @At("RETURN"))
     private void rtxremix$recordSnapshotNeighbourhood(
             ChunkRendererRegionBuilder regionBuilder, CallbackInfoReturnable<?> cir) {
         // RETURN precedes the synchronous task.run in BuiltChunk.rebuild, so a first build still reads EMPTY here.
-        boolean firstBuild = getData() == ChunkBuilder.ChunkData.EMPTY;
+        boolean firstBuild = getCurrentRenderData() == net.minecraft.client.render.chunk.ChunkRenderData.HIDDEN;
         int mask = 0;
         for (int k = 0; k < NeighbourReflagFilter.NEIGHBOUR_COUNT; k++) {
-            rtxremix$neighbourProbe.set(
-                    origin.getX() + NeighbourReflagFilter.DX[k] * 16,
-                    origin.getY(),
-                    origin.getZ() + NeighbourReflagFilter.DZ[k] * 16);
-            if (isChunkNonEmpty(rtxremix$neighbourProbe)) {
+            if (isChunkNonEmpty(net.minecraft.util.math.ChunkSectionPos.asLong(
+                    (origin.getX() >> 4) + NeighbourReflagFilter.DX[k],
+                    origin.getY() >> 4,
+                    (origin.getZ() >> 4) + NeighbourReflagFilter.DZ[k]))) {
                 mask |= NeighbourReflagFilter.bit(k);
             }
         }
         rtxremix$snapshotMask = mask;
-        if (NeighbourReflagFilter.isIncompleteFirstBuild(firstBuild, getSquaredCameraDistance(), mask)) {
+        if (NeighbourReflagFilter.isIncompleteFirstBuild(firstBuild, rtxremix$squaredCameraDistance(), mask)) {
             NeighbourReflagFilter.recordIncompleteFirstBuild();
         }
     }
 
-    @Inject(method = "method_60908(Lnet/minecraft/client/render/chunk/ChunkBuilder$ChunkData;)V", at = @At("HEAD"))
-    private void rtxremix$onChunkDataSet(ChunkBuilder.ChunkData chunkData, CallbackInfo ci) {
+    @Inject(method = "setCurrentRenderData(Lnet/minecraft/client/render/chunk/AbstractChunkRenderData;)V", at = @At("HEAD"))
+    private void rtxremix$onChunkDataSet(net.minecraft.client.render.chunk.AbstractChunkRenderData chunkData, CallbackInfo ci) {
         rtxremix$hasBlockEntities = !chunkData.getBlockEntities().isEmpty();
 
-        if (!chunkData.isEmpty()) {
+        if (chunkData.hasData()) {
             return;
         }
         int x = origin.getX();

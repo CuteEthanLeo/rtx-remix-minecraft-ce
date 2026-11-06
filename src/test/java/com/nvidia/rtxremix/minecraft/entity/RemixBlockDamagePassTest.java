@@ -188,6 +188,12 @@ class RemixBlockDamagePassTest {
         }
 
         @Override
+        public VertexConsumer color(int argb) {
+            color = argb;
+            return this;
+        }
+
+        @Override
         public VertexConsumer texture(float u, float v) {
             this.u = u; this.v = v;
             return this;
@@ -195,6 +201,7 @@ class RemixBlockDamagePassTest {
 
         @Override public VertexConsumer overlay(int u, int v) { return this; }
         @Override public VertexConsumer light(int u, int v) { return this; }
+        @Override public VertexConsumer lineWidth(float width) { return this; }
 
         @Override
         public VertexConsumer normal(float x, float y, float z) {

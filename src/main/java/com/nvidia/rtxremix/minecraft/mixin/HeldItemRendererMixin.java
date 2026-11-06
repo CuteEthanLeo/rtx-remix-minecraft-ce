@@ -6,11 +6,11 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.entity.EntityRenderContext;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,28 +25,34 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>Every hand-held render, first person and every entity's hands alike, passes
  * through {@code renderItem(LivingEntity, ...)}, so the holder recorded here is
  * what lets the item renderer's hook decide whether a held torch is burning.
+ *
+ * <p>TODO(1.21.11): these hooks now run while the hand only submits commands; the
+ * capture replays them after the hooks have returned, so the holder and hand are no
+ * longer in scope when the item's vertices reach the capture. Per-hand held-light
+ * placement and the held-flame holder check degrade until the context is carried on
+ * the submitted item command instead.
  */
 @Mixin(HeldItemRenderer.class)
 public class HeldItemRendererMixin {
 
     private static final String rtxremix$RENDER_HELD_ITEM =
             "renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;"
-            + "Lnet/minecraft/client/render/model/json/ModelTransformationMode;Z"
+            + "Lnet/minecraft/item/ItemDisplayContext;"
             + "Lnet/minecraft/client/util/math/MatrixStack;"
-            + "Lnet/minecraft/client/render/VertexConsumerProvider;I)V";
+            + "Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;I)V";
 
     @Inject(method = rtxremix$RENDER_HELD_ITEM, at = @At("HEAD"))
-    private void rtxremix$beginHeldItem(LivingEntity entity, ItemStack stack, ModelTransformationMode mode,
-                                        boolean leftHanded, MatrixStack matrices,
-                                        VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
+    private void rtxremix$beginHeldItem(LivingEntity entity, ItemStack stack, ItemDisplayContext mode,
+                                        MatrixStack matrices,
+                                        OrderedRenderCommandQueue queue, int light, CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();
         if (context.isRemixPass()) context.setHeldItemHolder(entity);
     }
 
     @Inject(method = rtxremix$RENDER_HELD_ITEM, at = @At("RETURN"))
-    private void rtxremix$endHeldItem(LivingEntity entity, ItemStack stack, ModelTransformationMode mode,
-                                      boolean leftHanded, MatrixStack matrices,
-                                      VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
+    private void rtxremix$endHeldItem(LivingEntity entity, ItemStack stack, ItemDisplayContext mode,
+                                      MatrixStack matrices,
+                                      OrderedRenderCommandQueue queue, int light, CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();
         if (context.isRemixPass()) context.clearHeldItemHolder();
     }
@@ -61,7 +67,7 @@ public class HeldItemRendererMixin {
             ItemStack item,
             float equipProgress,
             MatrixStack matrices,
-            VertexConsumerProvider vertexConsumers,
+            OrderedRenderCommandQueue queue,
             int light,
             CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();
@@ -78,7 +84,7 @@ public class HeldItemRendererMixin {
             ItemStack item,
             float equipProgress,
             MatrixStack matrices,
-            VertexConsumerProvider vertexConsumers,
+            OrderedRenderCommandQueue queue,
             int light,
             CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();

@@ -8,7 +8,6 @@ import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.client.texture.SpriteDimensions;
-import net.minecraft.resource.metadata.ResourceMetadata;
 import net.minecraft.util.Identifier;
 
 /** Real {@link Sprite}s for key and UV-remap tests, with the atlas rectangle chosen by the test. */
@@ -27,11 +26,10 @@ final class SpriteFixtures {
         SpriteContents contents = new SpriteContents(
                 Identifier.of("minecraft", "test/" + x + "_" + y),
                 new SpriteDimensions(size, size),
-                new NativeImage(size, size, false),
-                ResourceMetadata.NONE);
+                new NativeImage(size, size, false));
         // The constructor is protected; an anonymous subclass reaches it without
         // widening access for the sake of a test.
-        Sprite sprite = new Sprite(ATLAS, contents, atlasSize, atlasSize, x, y) {};
+        Sprite sprite = new Sprite(ATLAS, contents, atlasSize, atlasSize, x, y, 0) {};
         // The rectangle is fixed at construction and no test reads pixels, so the
         // off-heap image is released at once.
         contents.close();

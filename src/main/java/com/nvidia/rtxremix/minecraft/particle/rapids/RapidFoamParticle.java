@@ -8,19 +8,18 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.client.particle.SpriteBillboardParticle;
+import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.util.math.random.Random;
 
 @Environment(EnvType.CLIENT)
-public class RapidFoamParticle extends SpriteBillboardParticle {
+public class RapidFoamParticle extends BillboardParticle {
     private RapidFoamParticle(ClientWorld world, double x, double y, double z,
                               double velocityX, double velocityY, double velocityZ,
                               SpriteProvider spriteProvider) {
-        super(world, x, y, z);
-        this.setSprite(spriteProvider);
+        super(world, x, y, z, spriteProvider.getSprite(world.random));
         this.setBoundingBoxSpacing(0.015f, 0.015f);
         this.scale *= this.random.nextFloat() * 0.45f + 0.35f;
         this.maxAge = 14 + this.random.nextInt(22);
@@ -33,8 +32,8 @@ public class RapidFoamParticle extends SpriteBillboardParticle {
     }
 
     @Override
-    public ParticleTextureSheet getType() {
-        return ParticleTextureSheet.PARTICLE_SHEET_OPAQUE;
+    protected BillboardParticle.RenderType getRenderType() {
+        return BillboardParticle.RenderType.PARTICLE_ATLAS_OPAQUE;
     }
 
     @Override
@@ -56,7 +55,8 @@ public class RapidFoamParticle extends SpriteBillboardParticle {
         @Override
         public Particle createParticle(SimpleParticleType type, ClientWorld world,
                                        double x, double y, double z,
-                                       double velocityX, double velocityY, double velocityZ) {
+                                       double velocityX, double velocityY, double velocityZ,
+                                       Random random) {
             return new RapidFoamParticle(world, x, y, z, velocityX, velocityY, velocityZ, spriteProvider);
         }
     }

@@ -14,6 +14,16 @@ public interface BillboardParticleAccessor {
     @Accessor("scale")
     float getScale();
 
+    @Accessor("red") float getRed();
+    @Accessor("green") float getGreen();
+    @Accessor("blue") float getBlue();
+    @Accessor("alpha") float getAlpha();
+    @Accessor("zRotation") float getAngle();
+    @Accessor("lastZRotation") float getPrevAngle();
+
+    @Invoker("getRenderType")
+    BillboardParticle.RenderType invokeGetRenderType();
+
     @Invoker("getMinU")
     float invokeGetMinU();
 

@@ -8,7 +8,6 @@ import com.nvidia.rtxremix.minecraft.texture.DynamicTextureCache;
 import com.nvidia.rtxremix.minecraft.texture.GlyphPageMirror;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.PlayerSkinTexture;
 import net.minecraft.client.texture.TextureManager;
 import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,7 +24,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *   <li>{@link NativeImageBackedTexture}: if the image is already available at
  *       registration time, pixels are captured immediately; the texture remains
  *       tracked for later mutable uploads such as maps.</li>
- *   <li>{@link PlayerSkinTexture}: always async (image downloads from Mojang CDN),
+ *   <li>{@code PlayerSkinTexture} (1.21.1 only; 1.21.11 skins are
+ *       {@code NativeImageBackedTexture}s): always async (image downloads from Mojang CDN),
  *       so {@code PlayerSkinTextureMixin} can capture the uploaded image.</li>
  *   <li>Font glyph pages, which {@code GlyphAtlasTextureMixin} gives a
  *       {@link GlyphPageMirror}: the mirror is registered under the page's id so the
@@ -40,8 +40,6 @@ public class TextureManagerMixin {
     private void rtxremix$onRegisterTexture(Identifier id, AbstractTexture texture, CallbackInfo ci) {
         if (texture instanceof NativeImageBackedTexture nib) {
             DynamicTextureCache.onRegisterTexture(id, texture, nib.getImage());
-        } else if (texture instanceof PlayerSkinTexture) {
-            DynamicTextureCache.onRegisterTexture(id, texture, null);
         } else if (texture instanceof GlyphPageMirror.Owner page) {
             DynamicTextureCache.onRegisterGlyphPage(id, page.rtxremix$glyphPageMirror());
         }
