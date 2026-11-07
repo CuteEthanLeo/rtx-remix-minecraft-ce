@@ -663,6 +663,31 @@ Java_com_nvidia_rtxremix_RemixBridge_overwriteProcessCommandLine(JNIEnv* env, jc
 
 // ─── lifecycle ───────────────────────────────────────────────────────────
 
+// ─── process environment ─────────────────────────────────────────────────
+
+// The JVM's System.getenv is a snapshot taken at startup and cannot be
+// written, so a variable meant for native code loaded later, such as a Vulkan
+// layer switch the loader reads when the runtime creates its instance, is set
+// in the process environment block here.
+JNIEXPORT jint JNICALL
+Java_com_nvidia_rtxremix_RemixBridge_setProcessEnvironmentVariable(JNIEnv* env, jclass,
+    jstring jName, jstring jValue)
+{
+    if (!jName || !jValue)
+        return REMIXAPI_ERROR_CODE_INVALID_ARGUMENTS;
+    const jsize nameLength = env->GetStringLength(jName);
+    const jsize valueLength = env->GetStringLength(jValue);
+    if (nameLength == 0)
+        return REMIXAPI_ERROR_CODE_INVALID_ARGUMENTS;
+    std::vector<WCHAR> name(nameLength + 1, 0);
+    std::vector<WCHAR> value(valueLength + 1, 0);
+    env->GetStringRegion(jName, 0, nameLength, (jchar*)name.data());
+    env->GetStringRegion(jValue, 0, valueLength, (jchar*)value.data());
+    if (!SetEnvironmentVariableW(name.data(), value.data()))
+        return REMIXAPI_ERROR_CODE_GENERAL_FAILURE;
+    return REMIXAPI_ERROR_CODE_SUCCESS;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_nvidia_rtxremix_RemixBridge_startup(JNIEnv*, jclass,
     jlong hwnd, jboolean disableSrgb, jboolean forceNoSwapchain,

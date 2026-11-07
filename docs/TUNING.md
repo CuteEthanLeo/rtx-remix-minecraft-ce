@@ -130,6 +130,12 @@ their distance.
 | `rtxremix.particles.fastAirCollisionMaxBlocks` | Largest sweep, in cells, that the fast path handles | `ParticleStateMixin` |
 | `rtxremix.frameGenPacing` | Set to false to stop holding real frames to a steady interval while DLSS frame generation is on. By default, while `rtx.dlfg.enable` resolves true and the window is focused, the frame after each Present waits until an interval just above the recent slow frames, so the runtime's frame generation, which spaces each generated frame by the previous real-frame interval, puts them on screen evenly; Max Framerate is then applied by the same precise wait instead of vanilla's limiter. The Frame Generation Pacing setting switches it per player; on this branch a pacing line is logged every 300 frames | `FrameGenPacing`, `FrameGenPacer` |
 
+## Camera Effects
+
+| Key | Effect | Owner |
+|---|---|---|
+| `rtxremix.allowRtssVulkanLayer` | Set to true to let RivaTuner Statistics Server's Vulkan layer into the Remix runtime. By default the mod sets `DISABLE_RTSS_LAYER=1` for its own process before the runtime loads, because with DLSS frame generation in fullscreen that layer faults the GPU within seconds (`VK_ERROR_DEVICE_LOST`). The RTSS overlay then does not draw in the game. A `DISABLE_RTSS_LAYER` value already in the environment is left as is | `RtssVulkanLayerPolicy` |
+
 ## Profiling And Diagnostics
 
 | Key | Effect | Owner |

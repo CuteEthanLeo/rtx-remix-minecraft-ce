@@ -125,6 +125,24 @@ public class RemixAPI {
         return redaction.blankedValues();
     }
 
+    /**
+     * Sets a variable in this process's environment for native code the runtime loads, such
+     * as the Vulkan loader, which reads layer switches like {@code DISABLE_<LAYER>} when the
+     * runtime creates its Vulkan instance. Call before {@link #load(String)}. The JVM's
+     * {@link System#getenv()} snapshot does not change.
+     *
+     * @param dllPath Path to the d3d9.dll file from RTX Remix; binds the JNI
+     *                bridge beside it without loading the runtime
+     * @throws RemixException if the DLL cannot be found or Windows rejects the variable
+     */
+    public static void setProcessEnvironmentVariable(String dllPath, String name, String value) {
+        bindBridge(dllPath);
+        int result = RemixBridge.setProcessEnvironmentVariable(name, value);
+        if (result != ErrorCode.SUCCESS) {
+            throw new RemixException("Failed to set environment variable " + name, result);
+        }
+    }
+
     private static java.io.File bindBridge(String dllPath) {
         java.io.File dllFile = new java.io.File(dllPath);
         if (!dllFile.exists()) {

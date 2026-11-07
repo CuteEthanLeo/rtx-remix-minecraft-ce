@@ -309,6 +309,11 @@ diluting the sampler's candidate pool.
   `--xuid`, `--clientId`) are blanked in the process command line before the
   runtime loads, because its crash dumps copy that line (`RemixRenderer`,
   `CommandLineRedaction`).
+- RivaTuner's implicit Vulkan layer is kept out of the runtime's instance by
+  setting `DISABLE_RTSS_LAYER=1` in the process before the runtime loads,
+  unless `-Drtxremix.allowRtssVulkanLayer=true` or the player already set it:
+  with DLSS frame generation in fullscreen it faults the GPU
+  (`RtssVulkanLayerPolicy`, `RemixRenderer`).
 - Vanilla's shared worker pool and section-builder concurrency stay capped
   (`WorkerPoolCap`, `SectionBuildConcurrency`).
 - Nothing but the render thread reads client light (`World.getLightLevel`,
