@@ -29,6 +29,7 @@ import com.nvidia.rtxremix.minecraft.logic.ViewDistanceFade;
 import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
+import com.nvidia.rtxremix.minecraft.settings.FrameGenerationProbe;
 import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
 import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
@@ -84,6 +85,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.ToIntBiFunction;
 
 /**
  * Render-thread bridge between Minecraft's world and the RTX Remix runtime.
@@ -116,6 +118,8 @@ public class RemixRenderer {
     private RemixAPI remixApi;
     /** {@link RemixAPI#setConfigVariable}, bound once so per-frame callers allocate nothing. */
     private BiConsumer<String, String> configWriter;
+    /** {@link RemixAPI#getConfigVariableResolved(String, byte[])}, bound once for the same reason. */
+    private ToIntBiFunction<String, byte[]> configReader;
     private boolean initialized = false;
     private long windowHandle;
     
@@ -138,8 +142,24 @@ public class RemixRenderer {
     private BlockTextureManager textureManager;
     private PostProcessingSettings postProcessingSettings;
     private CameraEffectsSettings cameraEffectsSettings;
+    /** Tells {@link #cameraEffectsSettings} whether Remix's frame generation is on. */
+    private final FrameGenerationProbe frameGenerationProbe = new FrameGenerationProbe();
     private VolumetricQualitySettings volumetricQualitySettings;
-    
+
+    // The rendered camera as updateCamera last set it up, for motion blur's frame-generation
+    // adaptation, which needs the camera's turn rate in pixels.
+    private float frameCameraYaw = Float.NaN;
+    private float frameCameraPitch = Float.NaN;
+    private float frameHorizontalFov;
+    private int frameViewportWidth;
+
+    // Reused every frame: RemixAPI.setupCamera and present copy every field into the native
+    // call before they return, so nothing holds these objects past the call.
+    private final CameraInfoParameterizedEXT worldCameraParams = new CameraInfoParameterizedEXT();
+    private final CameraInfo worldCameraInfo = new CameraInfo();
+    private final CameraInfo viewModelCameraInfo = new CameraInfo();
+    private final PresentInfo presentInfo = new PresentInfo();
+
     // Entity rendering pipeline: vanilla capture + skinned submission
     private RemixEntityPass entityPass;
     private RemixEntitySubmitter entitySubmitter;
@@ -166,8 +186,21 @@ public class RemixRenderer {
         thread.setDaemon(true);
         return thread;
     });
+    /**
+     * Restores the old double-buffered particle order, where a frame publishes the previous
+     * frame's payload at its top and joins its own worker only after Submit. That kept the
+     * worker's join off the frame entirely, but drew particles one frame behind the scene, and
+     * particles carry no motion vectors, so smoke and flames visibly swam against the camera,
+     * worst between real frames under frame generation. By default the frame joins its own
+     * worker just before Submit and publishes the payload in the same frame; the worker runs in
+     * parallel with the camera, lights, terrain, entity and sky work, so it is normally done by
+     * then.
+     */
+    private static final boolean PARTICLES_PREVIOUS_FRAME =
+            Boolean.getBoolean("rtxremix.particles.previousFrame");
     private volatile CompletableFuture<ParticleRenderResult> particleRenderFuture;
-    // Double-buffer: holds frame N's prepared particles for submission during frame N+1.
+    // Only with PARTICLES_PREVIOUS_FRAME: holds frame N's prepared particles for submission
+    // during frame N+1. In the default same-frame order nothing is ever stored here.
     private PreparedFrame pendingParticleFrame;
     private long particleNanosThisFrame;
     /** World the pending payload was prepared against, so a swap cannot publish it. */
@@ -228,6 +261,18 @@ public class RemixRenderer {
     private int cntParticleMeshUpdates = -1;
     
     public RemixRenderer() {
+        worldCameraParams.nearPlane = 0.05f;
+        worldCameraParams.farPlane = 1000.0f;
+        worldCameraInfo.type = CameraType.WORLD;
+        worldCameraInfo.parameterizedExt = worldCameraParams;
+        viewModelCameraInfo.type = CameraType.VIEW_MODEL;
+        // The hand-FOV adjustment is already applied to first-person bones. Supplying the
+        // exact world camera keeps Remix's perspective-correction matrix at identity while
+        // retaining its per-frame view-model transform/history update.
+        viewModelCameraInfo.parameterizedExt = worldCameraParams;
+        presentInfo.skipVulkanSwapchain = 0;
+        presentInfo.interopFlipY = 1;
+        presentInfo.disableCpuWaitForExternalSemaphores = 0;
     }
     
     /**
@@ -320,7 +365,12 @@ public class RemixRenderer {
 
             postProcessingSettings = new PostProcessingSettings(remixApi::setConfigVariable);
             configWriter = remixApi::setConfigVariable;
+            configReader = remixApi::getConfigVariableResolved;
             cameraEffectsSettings = new CameraEffectsSettings(configWriter);
+            // Read once now that startup has loaded the configuration, so the first frame's
+            // motion blur already knows whether frame generation is on. A failed read is
+            // retried by the per-frame poll.
+            cameraEffectsSettings.setFrameGeneration(frameGenerationProbe.poll(configReader));
             volumetricQualitySettings = new VolumetricQualitySettings(remixApi::setConfigVariable);
             
             // NOTE: Submit() allocates the image, but semaphores are always ready
@@ -819,33 +869,38 @@ public class RemixRenderer {
                 return;
             }
 
-            // Submit the prepared frame from the previous render call before dispatching
-            // the next prepare task. The render thread never blocks on particles here:
-            // the work is already done and waiting. A world swap that keeps the connection
-            // alive, such as a portal, replaces client.world without a disconnect or a null
-            // frame, so the payload is checked against the world it was prepared for rather
-            // than relying on a teardown path to have discarded it.
-            if (pendingParticleFrame != null && pendingParticleFrameWorld != world) {
-                discardPendingParticleFrame();
-            }
-            submitPendingParticleFrame();
-
-            if (cameraEffectsSettings != null) {
-                ExportClock clock = ExportClock.get();
-                cameraEffectsSettings.onFrame(clock.nanos(), clock.frameSeconds());
+            if (PARTICLES_PREVIOUS_FRAME) {
+                // Submit the prepared frame from the previous render call before dispatching
+                // the next prepare task. The render thread never blocks on particles here:
+                // the work is already done and waiting. A world swap that keeps the connection
+                // alive, such as a portal, replaces client.world without a disconnect or a null
+                // frame, so the payload is checked against the world it was prepared for rather
+                // than relying on a teardown path to have discarded it.
+                if (pendingParticleFrame != null && pendingParticleFrameWorld != world) {
+                    discardPendingParticleFrame();
+                }
+                submitPendingParticleFrame();
             }
 
             Camera camera = client.gameRenderer.getCamera();
             float tickDelta = client.getRenderTickCounter().getTickDelta(true);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());
-            
+
             perfTimer.begin(perfCamera);
             try (ProfileScope cameraScope = ProfileScope.begin("Camera")) {
                 updateCamera(camera, tickDelta);
             } finally {
                 perfTimer.end(perfCamera);
             }
-            
+
+            // After the camera, whose turn rate motion blur adapts to under frame generation.
+            if (cameraEffectsSettings != null) {
+                cameraEffectsSettings.setFrameGeneration(frameGenerationProbe.onFrame(configReader));
+                ExportClock clock = ExportClock.get();
+                cameraEffectsSettings.onFrame(clock.nanos(), clock.frameSeconds(),
+                        frameCameraYaw, frameCameraPitch, frameHorizontalFov, frameViewportWidth);
+            }
+
             Vec3d cameraPos = camera.getPos();
 
             perfTimer.begin(perfLights);
@@ -1004,6 +1059,15 @@ public class RemixRenderer {
                 }
             }
 
+            if (!PARTICLES_PREVIOUS_FRAME) {
+                // Publish this frame's particles with the scene they were prepared for. The
+                // future is cleared before the join so no later path joins it a second time:
+                // whatever the join or the submit throws, the payload is already closed.
+                CompletableFuture<ParticleRenderResult> ownFuture = particleFuture;
+                particleFuture = null;
+                joinAndSubmitParticleFrame(ownFuture, world);
+            }
+
             perfTimer.begin(perfSubmit);
             try (ProfileScope submitScope = ProfileScope.begin("Submit")) {
                 submitFrame();
@@ -1012,10 +1076,12 @@ public class RemixRenderer {
                 perfTimer.end(perfSubmit);
             }
 
-            // Join after present: if the particle worker is slow, the delay lands in
-            // the inter-frame gap rather than pushing out this frame's submit.
-            joinAndStoreParticleFrame(particleFuture, world);
-            particleFuture = null;
+            if (PARTICLES_PREVIOUS_FRAME) {
+                // Join after Submit: if the particle worker is slow, the delay lands in
+                // the inter-frame gap rather than pushing out this frame's submit.
+                joinAndStoreParticleFrame(particleFuture, world);
+                particleFuture = null;
+            }
 
         } catch (RemixException e) {
             LOGGER.error("Remix error during frame render: {} (code: {})",
@@ -1139,10 +1205,58 @@ public class RemixRenderer {
         }
     }
 
-    /** Submits the frame prepared by the previous render call. No blocking: the work is already done. */
+    /**
+     * Submits the frame prepared by the previous render call, with
+     * {@link #PARTICLES_PREVIOUS_FRAME}. No blocking: the work is already done.
+     */
     private void submitPendingParticleFrame() {
         PreparedFrame frame = pendingParticleFrame;
         pendingParticleFrame = null;
+        pendingParticleFrameWorld = null;
+        submitParticleFrame(frame);
+    }
+
+    /**
+     * Joins this frame's particle worker and submits its payload before the frame's Submit, the
+     * default order. A payload prepared against a world that is no longer the client's is closed
+     * unpublished, like every other path that cannot publish it.
+     *
+     * <p>Both the wait and the submit are charged to the frame's particle time: unlike the
+     * previous-frame order, the wait is on the critical path here, so a worker that does stall
+     * the frame shows up where it costs.
+     *
+     * @param preparedFor the world the prepare task was dispatched against
+     */
+    private void joinAndSubmitParticleFrame(CompletableFuture<ParticleRenderResult> future,
+                                            ClientWorld preparedFor) {
+        if (future == null) return;
+        PreparedFrame frame = null;
+        try {
+            long waitStart = System.nanoTime();
+            ParticleRenderResult result = future.join();
+            particleNanosThisFrame += System.nanoTime() - waitStart;
+
+            if (result.error() != null) {
+                LOGGER.error("Error rendering particles", result.error());
+            } else {
+                frame = result.preparedFrame();
+            }
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            LOGGER.error("Error rendering particles", cause);
+        } finally {
+            if (particleRenderFuture == future) particleRenderFuture = null;
+        }
+        if (frame == null) return;
+        if (MinecraftClient.getInstance().world != preparedFor) {
+            frame.close();
+            return;
+        }
+        submitParticleFrame(frame);
+    }
+
+    /** Publishes a prepared payload and closes it, whether or not the submit succeeded. */
+    private void submitParticleFrame(PreparedFrame frame) {
         if (frame == null) return;
 
         long submitStart = System.nanoTime();
@@ -1161,9 +1275,9 @@ public class RemixRenderer {
     }
 
     /**
-     * Joins the particle worker after {@code submitFrame()} and stores the result for the
-     * next frame's submit. Never submits native Remix calls, which happen in
-     * {@link #submitPendingParticleFrame()}.
+     * With {@link #PARTICLES_PREVIOUS_FRAME}, joins the particle worker after
+     * {@code submitFrame()} and stores the result for the next frame's submit. Never submits
+     * native Remix calls, which happen in {@link #submitPendingParticleFrame()}.
      *
      * <p>Only the wait itself is charged to the frame, not the worker's own run time. Since the
      * prepare task is dispatched at the top of the frame and joined after Submit, it has
@@ -1199,8 +1313,9 @@ public class RemixRenderer {
 
     /**
      * Publishes the frame's total particle cost as one sample. {@code injectNanos} overwrites
-     * rather than accumulates, so the double-buffer's two contributions (the previous frame's
-     * submit and this frame's prepare) must be summed before a single injection.
+     * rather than accumulates, so the frame's two contributions (the join wait and the submit,
+     * of this frame's payload or, with {@link #PARTICLES_PREVIOUS_FRAME}, of the previous
+     * frame's) must be summed before a single injection.
      */
     private void flushParticleFrameTiming() {
         perfTimer.injectNanos(perfParticles, particleNanosThisFrame);
@@ -1281,31 +1396,30 @@ public class RemixRenderer {
                         aspect);
             }
     
-            CameraInfoParameterizedEXT worldCameraParams = CameraInfoParameterizedEXT.builder()
-                .position((float) pos.x, (float) pos.y, (float) pos.z)
-                .forward(forwardX, forwardY, forwardZ)
-                .up(upX, upY, upZ)
-                .right(rightX, rightY, rightZ)
-                .fovYInDegrees(worldFov)
-                .aspect(aspect)
-                .nearPlane(0.05f)
-                .farPlane(1000.0f)
-                .build();
-    
-            CameraInfo worldCameraInfo = CameraInfo.builder()
-                .type(CameraType.WORLD)
-                .parameterizedExt(worldCameraParams)
-                .build();
-    
-            CameraInfo viewModelCameraInfo = CameraInfo.builder()
-                .type(CameraType.VIEW_MODEL)
-                // The hand-FOV adjustment is already applied to first-person
-                // bones. Supplying the exact world camera keeps Remix's
-                // perspective-correction matrix at identity while retaining
-                // its per-frame view-model transform/history update.
-                .parameterizedExt(worldCameraParams)
-                .build();
-    
+            frameCameraYaw = yaw;
+            frameCameraPitch = pitch;
+            frameViewportWidth = width;
+            frameHorizontalFov = (float) Math.toDegrees(
+                    2.0 * Math.atan(Math.tan(Math.toRadians(worldFov) * 0.5) * aspect));
+
+            // The world and view-model camera infos are built once and share these parameters;
+            // see the constructor.
+            CameraInfoParameterizedEXT params = worldCameraParams;
+            params.position.x = (float) pos.x;
+            params.position.y = (float) pos.y;
+            params.position.z = (float) pos.z;
+            params.forward.x = forwardX;
+            params.forward.y = forwardY;
+            params.forward.z = forwardZ;
+            params.up.x = upX;
+            params.up.y = upY;
+            params.up.z = upZ;
+            params.right.x = rightX;
+            params.right.y = rightY;
+            params.right.z = rightZ;
+            params.fovYInDegrees = worldFov;
+            params.aspect = aspect;
+
             remixApi.setupCamera(worldCameraInfo);
             remixApi.setupCamera(viewModelCameraInfo);
             float viewDistanceStrength = viewDistanceFade.layerStrength(ClientViewDistance.chunks());
@@ -1398,13 +1512,11 @@ public class RemixRenderer {
                 failed = true;
                 logPresentFailureOnce("Error copying GL frame to Remix", e);
             }
-            PresentInfo presentInfo = new PresentInfo();
+            // The constant fields were set once in the constructor.
+            PresentInfo presentInfo = this.presentInfo;
             presentInfo.hwndOverride = windowHandle;
-            presentInfo.skipVulkanSwapchain = 0;
-            presentInfo.interopFlipY = 1;
             presentInfo.clientDoneSemaphore_ValueToWait =
                     interopGlVk.getClientDoneSemaphoreValue();
-            presentInfo.disableCpuWaitForExternalSemaphores = 0;
             try (ProfileScope ignored = ProfileScope.begin("Remix.Present")) {
                 remixApi.present(presentInfo);
             }
@@ -1734,6 +1846,14 @@ public class RemixRenderer {
 
     public CameraEffectsSettings getCameraEffectsSettings() {
         return cameraEffectsSettings;
+    }
+
+    /**
+     * Notes that a Remix menu closed, where frame generation is switched, so motion blur
+     * rereads it within a frame or two instead of at the next periodic read. Render thread only.
+     */
+    public void onRemixMenuClosed() {
+        frameGenerationProbe.onRemixMenuClosed();
     }
 
     public VolumetricQualitySettings getVolumetricQualitySettings() {

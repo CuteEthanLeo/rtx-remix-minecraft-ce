@@ -187,12 +187,16 @@ mirrored on upload, because vanilla assembles them on the GPU and never keeps
 them on the CPU.
 
 **Particles.** Slot preparation and CPU mesh snapshots run on a dedicated worker
-and are double buffered: the render thread publishes the previous frame's
-payload at the top of the frame and joins the worker after submit, so particles
-trail the scene by exactly one frame. Vanilla particle colours are lightmap
-tints, not albedos, and the runtime lights a blended particle from the radiance
-cache with no self-shadowing, so `ParticleTint` draws soot near-black to keep
-smoke dark over a lit floor.
+that starts with the frame and overlaps the camera, light, terrain, entity, and
+sky work; the render thread joins it just before Submit and publishes the payload
+in the same frame, because particles carry no motion vectors and a frame of lag
+shows as smoke swimming against the camera.
+`-Drtxremix.particles.previousFrame=true` restores the old double buffering,
+which publishes the previous frame's payload at the top of the frame and joins
+after Submit, so particles trail the scene by exactly one frame. Vanilla
+particle colours are lightmap tints, not albedos, and the runtime lights a
+blended particle from the radiance cache with no self-shadowing, so
+`ParticleTint` draws soot near-black to keep smoke dark over a lit floor.
 
 **Entities.** Entities and block entities that vanilla already draws are
 captured in place, so a model is evaluated once rather than once for OpenGL and
