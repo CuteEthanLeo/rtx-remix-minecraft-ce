@@ -129,6 +129,12 @@ their distance.
 | `rtxremix.particles.fastAirCollision` | Take a fast path through particle collision when every swept cell is air. Set to false to disable the fast path | `ParticleStateMixin` |
 | `rtxremix.particles.fastAirCollisionMaxBlocks` | Largest sweep, in cells, that the fast path handles | `ParticleStateMixin` |
 
+## Camera Effects
+
+| Key | Effect | Owner |
+|---|---|---|
+| `rtxremix.allowRtssVulkanLayer` | Set to true to let RivaTuner Statistics Server's Vulkan layer into the Remix runtime. By default the mod sets `DISABLE_RTSS_LAYER=1` for its own process before the runtime loads, because with DLSS frame generation in fullscreen that layer faults the GPU within seconds (`VK_ERROR_DEVICE_LOST`). The RTSS overlay then does not draw in the game. A `DISABLE_RTSS_LAYER` value already in the environment is left as is | `RtssVulkanLayerPolicy` |
+
 ## Profiling And Diagnostics
 
 | Key | Effect | Owner |
