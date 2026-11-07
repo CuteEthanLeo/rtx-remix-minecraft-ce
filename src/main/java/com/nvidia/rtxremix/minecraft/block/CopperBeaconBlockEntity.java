@@ -59,7 +59,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     private static final String DYE_KEY = "dye";
 
     public static final BlockEntityType<CopperBeaconBlockEntity> TYPE =
-            BlockEntityType.Builder.create(
+            net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder.create(
                     CopperBeaconBlockEntity::new, CopperBeaconBlock.INSTANCE).build();
 
     private float intensityMultiplier = DEFAULT_INTENSITY_MULTIPLIER;
@@ -408,7 +408,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
         pitch.writeNbt(pitchNbt);
         nbt.put(PITCH_KEY, pitchNbt);
         if (!dye.isEmpty()) {
-            nbt.put(DYE_KEY, dye.encode(registryLookup));
+            nbt.put(DYE_KEY, dye.toNbt(registryLookup));
         }
     }
 

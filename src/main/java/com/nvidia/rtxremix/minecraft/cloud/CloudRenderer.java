@@ -180,7 +180,7 @@ public final class CloudRenderer {
         if (!shouldSuppressVanillaClouds()) {
             return;
         }
-        updateCloudColor(world.getCloudsColor(tickDelta), world.getRainGradient(tickDelta));
+        updateCloudColor(Vec3d.unpackRgb(world.getCloudsColor(tickDelta)), world.getRainGradient(tickDelta));
 
         if (!proceduralClouds) {
             completedPaletteMeshes.clear();

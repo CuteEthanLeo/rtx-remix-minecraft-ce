@@ -351,7 +351,7 @@ public final class BlockQuadEmitter {
         // against the unoffset grid position; see the note there before adding a
         // light rule to a block that offsets.
         if (state.hasModelOffset()) {
-            Vec3d modelOffset = state.getModelOffset(world, pos);
+            Vec3d modelOffset = state.getModelOffset(pos);
             lx += (float) modelOffset.x;
             ly += (float) modelOffset.y;
             lz += (float) modelOffset.z;
@@ -726,7 +726,7 @@ public final class BlockQuadEmitter {
                 fluidCheckPos.getX(), fluidCheckPos.getY(), fluidCheckPos.getZ());
         BlockState belowState = getCachedBlockState(world,
                 fluidCheckPos.getX(), fluidCheckPos.getY(), fluidCheckPos.getZ());
-        if (!belowFluid.getFluid().matchesType(fluidState.getFluid()) && !belowState.isOpaqueFullCube(world, fluidCheckPos)) {
+        if (!belowFluid.getFluid().matchesType(fluidState.getFluid()) && !belowState.isOpaqueFullCube()) {
             setPos4(tempPositions, lx, ly, lz + 1, lx + 1, ly, lz + 1,
                     lx + 1, ly, lz, lx, ly, lz);
             if (isWater) {
@@ -754,7 +754,7 @@ public final class BlockQuadEmitter {
                     fluidCheckPos.getX(), fluidCheckPos.getY(), fluidCheckPos.getZ());
 
             if (sideFluid.getFluid().matchesType(fluidState.getFluid())) continue;
-            if (sideState.isOpaqueFullCube(world, fluidCheckPos)) continue;
+            if (sideState.isOpaqueFullCube()) continue;
 
             float sideH0, sideH1;
             switch (dir) {
@@ -817,11 +817,11 @@ public final class BlockQuadEmitter {
                 || !neighborState.isOpaque()) {
             return false;
         }
-        if (neighborState.isOpaqueFullCube(world, neighborPos)) {
+        if (neighborState.isOpaqueFullCube()) {
             return true;
         }
 
-        VoxelShape neighborShape = neighborState.getCullingShape(world, neighborPos);
+        VoxelShape neighborShape = neighborState.getCullingShape();
         return isFluidSideCovered(Direction.UP, 1.0f, true, neighborShape);
     }
 
@@ -987,7 +987,7 @@ public final class BlockQuadEmitter {
         }
 
         neighborPos.set(neighborX, neighborY, neighborZ);
-        boolean drawn = Block.shouldDrawSide(state, world, mutablePos, side, neighborPos);
+        boolean drawn = Block.shouldDrawSide(state, neighbor, side);
         faceCullKeys[slot] = key;
         faceCullResults[slot] = drawn ? FACE_CULL_DRAWN : FACE_CULL_HIDDEN;
         return drawn;

@@ -43,4 +43,12 @@ public interface WorldRendererTerrainAccess {
      * as already captured.
      */
     void rtxremix$onNeighbourColumnInvalidated(int cx, int cz);
+
+    /**
+     * Applies the chunk-load re-flag filter to the column (cx, cz) for every section from
+     * {@code minSy} to {@code maxSy}, in place of vanilla flagging the 3x3 columns around it.
+     *
+     * @return false when the filter is off and vanilla must flag the sections itself
+     */
+    boolean rtxremix$flagLoadedColumn(int cx, int minSy, int maxSy, int cz);
 }

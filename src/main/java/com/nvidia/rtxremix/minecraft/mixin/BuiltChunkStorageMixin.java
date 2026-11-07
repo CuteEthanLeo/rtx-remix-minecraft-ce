@@ -8,8 +8,6 @@ import com.nvidia.rtxremix.minecraft.terrain.BuiltChunkNeighbourhoodAccess;
 import com.nvidia.rtxremix.minecraft.terrain.visibility.BuiltChunkStorageSectionAccess;
 import com.nvidia.rtxremix.minecraft.terrain.NeighbourReflagFilter;
 import com.nvidia.rtxremix.minecraft.terrain.SkippedSectionRebuilds;
-import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
-import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.terrain.visibility.ChunkStorageTorus;
 import net.minecraft.client.render.BuiltChunkStorage;
 import net.minecraft.client.render.chunk.ChunkBuilder;
@@ -19,9 +17,6 @@ import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(BuiltChunkStorage.class)
 public abstract class BuiltChunkStorageMixin
@@ -42,31 +37,10 @@ public abstract class BuiltChunkStorageMixin
     @Shadow
     public ChunkBuilder.BuiltChunk[] chunks;
 
-    private ChunkStorageTorus.Workspace rtxremix$torusWorkspace;
-
-    @Inject(method = "updateCameraPosition(DD)V", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$updateCameraPosition(double cameraX, double cameraZ, CallbackInfo ci) {
-        if (!RtxRemixMod.isRtxEnabled()) {
-            return;
-        }
-        if (rtxremix$torusWorkspace == null) {
-            rtxremix$torusWorkspace = new ChunkStorageTorus.Workspace();
-        }
-
-        try (ProfileScope scope = ProfileScope.begin("ChunkStorage.updateCameraPosition")) {
-            int movedSlots = ChunkStorageTorus.reposition(
-                    this,
-                    rtxremix$torusWorkspace,
-                    sizeX,
-                    sizeY,
-                    sizeZ,
-                    world.getBottomY(),
-                    cameraX,
-                    cameraZ);
-            scope.captureCount(movedSlots).scannedChunkCount(sizeX + sizeZ);
-        }
-        ci.cancel();
-    }
+    // TODO(1.21.2): vanilla's updateCameraPosition now takes the camera section and already
+    // re-origins only the slots whose section changed, and it records the storage's centre,
+    // which getRenderedChunk reads. The 1.21.1 replacement (ChunkStorageTorus) skipped that
+    // bookkeeping, so it no longer replaces vanilla's.
 
     @Override
     public int rtxremix$getOriginX(int slotIndex) {
@@ -80,7 +54,7 @@ public abstract class BuiltChunkStorageMixin
 
     @Override
     public void rtxremix$setOrigin(int slotIndex, int x, int y, int z) {
-        chunks[slotIndex].setOrigin(x, y, z);
+        chunks[slotIndex].setSectionPos(ChunkSectionPos.asLong(x >> 4, y >> 4, z >> 4));
     }
 
     /** The slot vanilla aliases the section onto, or null unless that slot currently holds the section. */

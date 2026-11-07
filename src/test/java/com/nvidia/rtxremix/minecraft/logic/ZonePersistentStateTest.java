@@ -159,7 +159,7 @@ class ZonePersistentStateTest {
         Path file = tempDir.resolve("rtx_remix_zones.dat");
 
         ensureGameVersionForPersistentStateSave();
-        state.save(file.toFile(), null);
+        NbtIo.writeCompressed(state.toNbt(null), file);
 
         assertFalse(state.isDirty());
         NbtCompound root = NbtIo.readCompressed(file, NbtSizeTracker.ofUnlimitedBytes());

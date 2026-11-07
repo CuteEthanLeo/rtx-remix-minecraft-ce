@@ -8,6 +8,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.render.model.WeightedBakedModel;
+import net.minecraft.util.collection.DataPool;
 import net.minecraft.util.collection.Weighted;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.Random;
@@ -38,11 +39,7 @@ public abstract class WeightedBakedModelMixin {
 
     @Shadow
     @Final
-    private int totalWeight;
-
-    @Shadow
-    @Final
-    private List<Weighted.Present<BakedModel>> models;
+    private DataPool<BakedModel> models;
 
     @Inject(method = "getQuads", at = @At("HEAD"), cancellable = true)
     private void rtxremix$getQuads(
@@ -50,8 +47,15 @@ public abstract class WeightedBakedModelMixin {
             Direction face,
             Random random,
             CallbackInfoReturnable<List<BakedQuad>> cir) {
-        int remaining = Math.abs((int) random.nextLong()) % totalWeight;
-        List<Weighted.Present<BakedModel>> variants = models;
+        // 1.21.2 keeps the variants in a DataPool, which draws nextInt(totalWeight) and
+        // returns nothing when every weight is zero.
+        int totalWeight = models.totalWeight;
+        if (totalWeight == 0) {
+            cir.setReturnValue(Collections.emptyList());
+            return;
+        }
+        int remaining = random.nextInt(totalWeight);
+        List<Weighted.Present<BakedModel>> variants = models.getEntries();
         for (int i = 0, n = variants.size(); i < n; i++) {
             Weighted.Present<BakedModel> variant = variants.get(i);
             remaining -= variant.getWeight().getValue();

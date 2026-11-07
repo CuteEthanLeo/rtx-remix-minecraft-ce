@@ -42,7 +42,7 @@ public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
     }
 
     @WrapOperation(
-        method = "getGlyphRenderer",
+        method = "bake",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/RenderableGlyph;upload(II)V")
     )
     private void rtxremix$mirrorGlyphUpload(RenderableGlyph glyph, int x, int y, Operation<Void> original) {

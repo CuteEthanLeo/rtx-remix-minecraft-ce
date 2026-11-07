@@ -11,13 +11,12 @@ import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 import net.fabricmc.fabric.api.renderer.v1.render.RenderContext;
 import net.minecraft.block.BlockState;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.Sprite;
+import net.minecraft.item.ModelTransformationMode;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
 import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;
@@ -101,50 +100,10 @@ final class RemixRenderContext implements RenderContext {
         return !transformStack.isEmpty();
     }
 
-    // BakedModelConsumer (and the bakedModelConsumer() method on RenderContext)
-    // are @Deprecated(forRemoval = true) in Fabric API. Java 9+ tracks
-    // forRemoval separately from regular deprecation, so we need both
-    // suppressions. RenderContext still declares this as an abstract method,
-    // so we have to implement it until Fabric removes it from the interface.
-    // Replacement per the Fabric javadoc is to call FabricBakedModel.emitBlockQuads
-    // directly, which is what BlockQuadEmitter.emitFrapiBlock already does.
-    @SuppressWarnings({"deprecation", "removal"})
+    /** Terrain capture is a block context; Fabric API forbids this call there. */
     @Override
-    public BakedModelConsumer bakedModelConsumer() {
-        return new BakedModelConsumer() {
-            @Override
-            public void accept(BakedModel model) {
-                accept(model, RemixRenderContext.this.state);
-            }
-
-            @Override
-            public void accept(BakedModel model, @Nullable BlockState state) {
-                if (state == null) state = RemixRenderContext.this.state;
-
-                // Vanilla's per-position model-randomisation seed, matching
-                // BlockQuadEmitter.emitBlock. A constant here would put every
-                // instance of a multi-variant block on the same variant, which
-                // is the bug the seed plumbing exists to fix; this path is
-                // deprecated but still reachable, so it has to agree.
-                long seed = state.getRenderingSeed(RemixRenderContext.this.pos);
-                Random random = Random.create(seed);
-
-                for (Direction dir : Direction.values()) {
-                    // Re-seeded per direction, as vanilla does and as the loops
-                    // in BlockQuadEmitter.emitVanillaBlock do.
-                    random.setSeed(seed);
-                    for (BakedQuad quad : model.getQuads(state, dir, random)) {
-                        emitter.fromVanilla(quad, null, dir);
-                        emitter.emit();
-                    }
-                }
-                random.setSeed(seed);
-                for (BakedQuad quad : model.getQuads(state, null, random)) {
-                    emitter.fromVanilla(quad, null, null);
-                    emitter.emit();
-                }
-            }
-        };
+    public ModelTransformationMode itemTransformationMode() {
+        throw new IllegalStateException("itemTransformationMode() can only be called on an item render context.");
     }
 
     /**

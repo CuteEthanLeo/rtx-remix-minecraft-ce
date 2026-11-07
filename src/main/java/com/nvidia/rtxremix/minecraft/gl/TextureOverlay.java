@@ -5,11 +5,11 @@
 package com.nvidia.rtxremix.minecraft.gl;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
+import com.mojang.blaze3d.systems.ProjectionType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
@@ -67,6 +67,7 @@ public class TextureOverlay {
         }
 
         Matrix4f savedProjection = RenderSystem.getProjectionMatrix();
+        ProjectionType savedProjectionType = RenderSystem.getProjectionType();
 
         // Opaque: the Remix image replaces vanilla's output rather than blending
         // with it, and it neither tests nor writes depth.
@@ -77,13 +78,12 @@ public class TextureOverlay {
         Matrix4f projMatrix = new Matrix4f().setOrtho(
             0.0f, (float) width, (float) height, 0.0f, -1000.0f, 1000.0f
         );
-        RenderSystem.setProjectionMatrix(projMatrix, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(projMatrix, ProjectionType.ORTHOGRAPHIC);
 
         RenderSystem.getModelViewStack().pushMatrix();
         RenderSystem.getModelViewStack().identity();
-        RenderSystem.applyModelViewMatrix();
 
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
         RenderSystem.setShaderTexture(0, texId);
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -101,8 +101,7 @@ public class TextureOverlay {
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
 
         RenderSystem.getModelViewStack().popMatrix();
-        RenderSystem.applyModelViewMatrix();
-        RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(savedProjection, savedProjectionType);
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();

@@ -2066,7 +2066,7 @@ public class RemixRenderer {
             return 0.0f;
         }
         BlockPos pos = BlockPos.ofFloored(cameraPos);
-        Biome.Precipitation precipitation = world.getBiome(pos).value().getPrecipitation(pos);
+        Biome.Precipitation precipitation = world.getBiome(pos).value().getPrecipitation(pos, world.getSeaLevel());
         return precipitation == Biome.Precipitation.RAIN ? world.getRainGradient(tickDelta) : 0.0f;
     }
 

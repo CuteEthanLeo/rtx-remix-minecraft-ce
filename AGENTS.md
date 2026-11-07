@@ -147,9 +147,9 @@ texture partitions that keep vanilla's cloud period and phase.
 merges them into chunk-column assets split into byte-capped pages per category,
 and the render thread publishes them under a frame budget and retires replaced
 pages through a bounded queue. Concurrent vanilla section builds are capped.
-Visibility rebuilds use a low-priority executor and produce a coarse frustum
-index that survives chunk slots being re-originned by replaying a render-thread
-move log. While capture is on, integrated-server chunk delivery and chunk
+Visibility rebuilds use a low-priority executor; since 1.21.2 vanilla's own
+octree answers the per-frame frustum query, so the mod adds no frustum index
+there (`ChunkRenderingDataPreparerMixin`). While capture is on, integrated-server chunk delivery and chunk
 unloads are paced by measured render-thread cost under separate budgets, with
 chunk caps on delivery and a ring-edge bypass for unloads
 (`LocalChunkBatchPacing`, `PacedUnloadQueue`, `ChunkDataSenderMixin`); a
@@ -166,11 +166,11 @@ Each policy has a `rtxremix.*` kill switch listed in `docs/TUNING.md`.
 
 **Allocation.** The collector's concurrent work is what stretches frames at
 high render distance, so the hot vanilla paths that run per section or per
-frame are ported allocation-free and kept that way: the chunk visibility walk
-and its far-section probe (`ChunkRenderingDataPreparerMixin`,
-`terrain/visibility/`), block model variant and part selection
-(`WeightedBakedModelMixin`, `MultipartBakedModelMixin`), biome colour blending,
-and the integrated server's per-tick chunk list. Retained section meshes live
+frame are ported allocation-free and kept that way: block model variant and
+part selection (`WeightedBakedModelMixin`, `MultipartBakedModelMixin`) and
+biome colour blending. The 1.21.1 allocation-free visibility walk
+(`terrain/visibility/`) is not ported to 1.21.2's octree walk yet, and 1.21.2
+already reuses the integrated server's per-tick chunk list. Retained section meshes live
 in C-allocated direct buffers outside the JDK's direct-memory budget
 (`SectionMeshData`, `DirectBufferPool`) and render-region snapshots in pooled
 heap arrays (`RenderRegionStoragePool`), both under explicit reference counts:
@@ -293,9 +293,13 @@ diluting the sampler's candidate pool.
   ignores a buffer that is already idle, and `RenderRegionStoragePool` relies
   on its callers' counts (`SectionMeshData`, `DirectBufferPool`,
   `RenderRegionStoragePool`).
-- The visibility walk port produces vanilla's visible set exactly;
-  `-Drtxremix.vanillaVisibilityWalk` and `-Drtxremix.logVisibleSet` are how to
-  prove it on a live world (`ChunkRenderingDataPreparerMixin`, `FarChunkProbeTest`).
+- A visibility walk port must produce vanilla's visible set exactly. The
+  1.21.2 branch runs vanilla's walk; a re-port must bring back
+  `-Drtxremix.vanillaVisibilityWalk` and `-Drtxremix.logVisibleSet` to prove it
+  on a live world (`ChunkRenderingDataPreparerMixin`, `FarChunkProbeTest`).
+- Every mixin target loads with its mixins applied under Fabric Loader
+  (`MixinTargetsApplyTest`); an injection point the targeted Minecraft version
+  lacks fails there instead of at game start.
 - A queued chunk unload is cancelled by the column's re-send, and a queued
   column that reaches the client ring's edge is sent at once regardless of
   budget (`PacedUnloadQueue`).

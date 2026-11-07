@@ -86,7 +86,7 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         }
         neighbor.set(origin, face);
         BlockState other = world.getBlockState(neighbor);
-        return !other.isOpaqueFullCube(world, neighbor);
+        return !other.isOpaqueFullCube();
     }
 
     @Override

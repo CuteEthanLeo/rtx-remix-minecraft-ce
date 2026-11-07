@@ -22,8 +22,10 @@ import net.minecraft.fluid.FluidState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.BlockRenderView;
-import net.minecraft.world.BlockView;
 import com.mojang.blaze3d.systems.VertexSorter;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -113,20 +115,23 @@ public class SectionBuilderMixin {
         rtxremix$tracyBlockLoop.set(ProfileScope.begin("block loop"));
     }
 
-    // isOpaqueFullCube: capture opacity / face masks / lights / quads
-    @Redirect(method = "build",
+    // isOpaqueFullCube: capture opacity / face masks / lights / quads. Since 1.21.2 the call
+    // takes no world or position, so the loop's position and the build's region are read
+    // from the enclosing frame.
+    @WrapOperation(method = "build",
               at = @At(value = "INVOKE",
-                       target = "Lnet/minecraft/block/BlockState;isOpaqueFullCube(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)Z"))
-    private boolean rtxremix$captureBlock(BlockState state, BlockView world, BlockPos pos) {
-        boolean opaque = state.isOpaqueFullCube(world, pos);
+                       target = "Lnet/minecraft/block/BlockState;isOpaqueFullCube()Z"))
+    private boolean rtxremix$captureBlock(BlockState state, Operation<Boolean> original,
+            @Local(argsOnly = true) ChunkRendererRegion world,
+            @Local(ordinal = 2) BlockPos pos) {
+        boolean opaque = original.call(state);
         BlockQuadEmitter emitter = BlockQuadEmitter.current();
         if (emitter != null && emitter.isActive()) {
             emitter.processBlock(state, world, pos, opaque);
             // Vanilla hands only MODEL blocks to renderBlock; ENTITYBLOCK_ANIMATED blocks
             // belong to their block-entity renderer.
             if (BlockQuadEmitter.getRenderTypeCached(state) == BlockRenderType.MODEL) {
-                // build() only ever passes its ChunkRendererRegion here.
-                emitter.emitBlock(state, pos, (BlockRenderView) world);
+                emitter.emitBlock(state, pos, world);
             }
         }
         return opaque;

@@ -29,7 +29,7 @@ public final class DynamicBufferUpload {
          *
          * @return whether the allocation must be re-specified because the upload does not fit
          */
-        boolean claim(int sizeBytes) {
+        public boolean claim(int sizeBytes) {
             if (sizeBytes <= capacityBytes) {
                 return false;
             }

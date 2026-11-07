@@ -5,15 +5,15 @@
 package com.nvidia.rtxremix.minecraft.weather;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
-import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.gl.Defines;
+import net.minecraft.client.gl.ShaderProgramKey;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
@@ -46,10 +46,15 @@ public final class RemixWeatherRenderer {
     private static final float FAR_PLANE = 1000.0f;
     private static final Identifier RAIN_TEXTURE =
             Identifier.ofVanilla("textures/environment/rain.png");
-    private static final Identifier RAIN_SHADER =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "rain_refraction");
-
-    private static ShaderProgram rainShader;
+    /**
+     * The rain refraction program. Since 1.21.2 the shader loader reads every program
+     * definition under {@code shaders/} on resource reload and compiles one on first use, so
+     * the key is all the registration there is.
+     */
+    private static final ShaderProgramKey RAIN_SHADER = new ShaderProgramKey(
+            Identifier.of(RtxRemixCommonMod.MOD_ID, "core/rain_refraction"),
+            VertexFormats.POSITION_TEXTURE_COLOR_LIGHT,
+            Defines.EMPTY);
 
     private final List<DeferredDraw> draws = new ArrayList<>(2);
     private Matrix4f projection;
@@ -60,12 +65,8 @@ public final class RemixWeatherRenderer {
     private int lastDrawCount;
     private int lastQuadCount;
 
+    /** Kept for the mod's init sequence; the shader loader finds the program on its own. */
     public static void registerShaders() {
-        CoreShaderRegistrationCallback.EVENT.register(context ->
-                context.register(
-                        RAIN_SHADER,
-                        VertexFormats.POSITION_TEXTURE_COLOR_LIGHT,
-                        shader -> rainShader = shader));
     }
 
     public void beginCaptureFrame(LightmapTextureManager lightmapTextureManager) {
@@ -133,6 +134,7 @@ public final class RemixWeatherRenderer {
 
     private void renderDeferredDraws(int finalColorTexture) {
         Matrix4f savedProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
+        ProjectionType savedProjectionType = RenderSystem.getProjectionType();
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
         boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
@@ -150,10 +152,9 @@ public final class RemixWeatherRenderer {
         boolean[] colorMask = readColorMask();
         float[] shaderColor = RenderSystem.getShaderColor().clone();
 
-        RenderSystem.setProjectionMatrix(projection, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(projection, ProjectionType.PERSPECTIVE);
         modelViewStack.pushMatrix();
         modelViewStack.set(modelView);
-        RenderSystem.applyModelViewMatrix();
 
         try {
             lightmap.enable();
@@ -192,19 +193,18 @@ public final class RemixWeatherRenderer {
                     blendDestinationAlpha);
             GL20.glBlendEquationSeparate(blendEquationRgb, blendEquationAlpha);
             modelViewStack.popMatrix();
-            RenderSystem.applyModelViewMatrix();
-            RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
+            RenderSystem.setProjectionMatrix(savedProjection, savedProjectionType);
             RenderSystem.setShaderColor(
                     shaderColor[0], shaderColor[1], shaderColor[2], shaderColor[3]);
         }
     }
 
     private void renderRain(int finalColorTexture) {
-        if (rainShader == null && hasRainDraw()) {
-            throw new IllegalStateException("Rain refraction shader was not loaded");
+        if (!hasRainDraw()) {
+            return;
         }
         RenderSystem.setShaderTexture(1, finalColorTexture);
-        renderDraws(true, rainShader);
+        renderDraws(true, RAIN_SHADER);
     }
 
     private boolean hasRainDraw() {
@@ -217,14 +217,13 @@ public final class RemixWeatherRenderer {
     }
 
     private void renderSnow() {
-        renderDraws(false, GameRenderer.getParticleProgram());
+        renderDraws(false, ShaderProgramKeys.PARTICLE);
     }
 
-    private void renderDraws(boolean rain, ShaderProgram shader) {
-        if (shader == null) {
-            return;
+    private void renderDraws(boolean rain, ShaderProgramKey shader) {
+        if (RenderSystem.setShader(shader) == null) {
+            throw new IllegalStateException("Weather shader " + shader + " failed to load");
         }
-        RenderSystem.setShader(() -> shader);
         for (int i = 0; i < draws.size(); i++) {
             DeferredDraw draw = draws.get(i);
             if (draw == null || draw.rain() != rain) {

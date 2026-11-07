@@ -8,10 +8,10 @@ import com.nvidia.rtxremix.minecraft.entity.EntityRenderContext;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.ModelTransformationMode;
 import net.minecraft.util.Hand;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -31,7 +31,7 @@ public class HeldItemRendererMixin {
 
     private static final String rtxremix$RENDER_HELD_ITEM =
             "renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;"
-            + "Lnet/minecraft/client/render/model/json/ModelTransformationMode;Z"
+            + "Lnet/minecraft/item/ModelTransformationMode;Z"
             + "Lnet/minecraft/client/util/math/MatrixStack;"
             + "Lnet/minecraft/client/render/VertexConsumerProvider;I)V";
 

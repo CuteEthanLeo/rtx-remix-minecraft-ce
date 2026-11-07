@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.entity;
 
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.Hand;
 import org.joml.Matrix4f;
@@ -49,6 +50,12 @@ public final class EntityRenderContext {
     private Hand activeHand;
     /** Entity whose hand-held item is being rendered, or null outside a held-item render. */
     private LivingEntity heldItemHolder;
+    /**
+     * Entities the dispatcher is rendering, innermost last. Since 1.21.2 a renderer and its
+     * feature layers see only a render state, so the held-item hook reads the holder here.
+     */
+    private Entity[] renderedEntities = new Entity[8];
+    private int renderedEntityDepth;
     private int blockItemLayer = NO_BLOCK_ITEM;
 
     /** The viewer's eye in the capture's space, valid while {@link #eyeKnown}. */
@@ -113,6 +120,9 @@ public final class EntityRenderContext {
      */
     public void reset() {
         depth = 0;
+        while (renderedEntityDepth > 0) {
+            renderedEntities[--renderedEntityDepth] = null;
+        }
         closeCapture();
     }
 
@@ -229,6 +239,26 @@ public final class EntityRenderContext {
      */
     public LivingEntity getHeldItemHolder() {
         return heldItemHolder;
+    }
+
+    /** Records that the dispatcher started rendering {@code entity}. Render thread only. */
+    public void pushRenderedEntity(Entity entity) {
+        if (renderedEntityDepth == renderedEntities.length) {
+            renderedEntities = java.util.Arrays.copyOf(renderedEntities, renderedEntities.length * 2);
+        }
+        renderedEntities[renderedEntityDepth++] = entity;
+    }
+
+    /** Pairs {@link #pushRenderedEntity}; harmless when nothing is open. */
+    public void popRenderedEntity() {
+        if (renderedEntityDepth > 0) {
+            renderedEntities[--renderedEntityDepth] = null;
+        }
+    }
+
+    /** The entity the dispatcher is rendering, innermost first, or null outside one. */
+    public Entity renderedEntity() {
+        return renderedEntityDepth > 0 ? renderedEntities[renderedEntityDepth - 1] : null;
     }
 
     /** Returns first-person hand ownership for a captured transform, if any. */

@@ -860,7 +860,7 @@ public final class CameraController {
                 return;
             }
             serverPlayer.teleport(serverPlayer.getServerWorld(),
-                    shot.x(), shot.y(), shot.z(), shot.yaw(), shot.pitch());
+                    shot.x(), shot.y(), shot.z(), java.util.Set.of(), shot.yaw(), shot.pitch(), true);
             serverPlayer.setVelocity(0.0, 0.0, 0.0);
         });
     }
@@ -1212,7 +1212,7 @@ public final class CameraController {
     private static void applyTimeOfDay(MinecraftClient client, long timeOfDay) {
         long normalized = normalizeTimeOfDay(timeOfDay);
         if (client.world != null) {
-            client.world.setTimeOfDay(normalized);
+            client.world.getLevelProperties().setTimeOfDay(normalized);
         }
 
         MinecraftServer server = client.getServer();
