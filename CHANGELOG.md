@@ -13,6 +13,12 @@ also part of every mod file name.
 
 ### Fixed
 
+- DLSS frame generation no longer loses the GPU device (`VK_ERROR_DEVICE_LOST`)
+  within seconds in fullscreen while RivaTuner Statistics Server runs, as it
+  does alongside MSI Afterburner. RTSS's Vulkan layer faulted the GPU in the
+  frame generation presenter; the mod now keeps that layer out of the game
+  process, so the RTSS overlay no longer draws in the game.
+  `-Drtxremix.allowRtssVulkanLayer=true` keeps it.
 - Near volumetric clouds hide the sun and moon discs without attenuating the
   ground's sunlight twice. Cirrus also attenuates the visible discs.
 - Time commands, sky-model changes, teleports and world changes reset cloud

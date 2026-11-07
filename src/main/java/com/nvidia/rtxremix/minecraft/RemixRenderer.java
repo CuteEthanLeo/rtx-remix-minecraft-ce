@@ -263,6 +263,7 @@ public class RemixRenderer {
             int blankedValues = RemixAPI.redactCommandLineOptions(dllPath, ACCOUNT_OPTIONS);
             LOGGER.info("Blanked {} account values in the process command line", blankedValues);
 
+            keepRtssLayerOutOfRuntime(dllPath);
             remixApi = RemixAPI.load(dllPath);
             LOGGER.info("RTX Remix API loaded successfully");
 
@@ -513,6 +514,34 @@ public class RemixRenderer {
         }
     }
     
+    /**
+     * Keeps RivaTuner Statistics Server's Vulkan layer out of the instance the runtime is about
+     * to create, unless the player allowed it; see {@link RtssVulkanLayerPolicy}. Must run before
+     * {@link RemixAPI#load}: the loader reads the switch when the instance is created. A failure
+     * is logged and startup continues, because without RTSS running the layer does nothing.
+     */
+    private static void keepRtssLayerOutOfRuntime(String dllPath) {
+        String existing = System.getenv(RtssVulkanLayerPolicy.DISABLE_VARIABLE);
+        if (!RtssVulkanLayerPolicy.shouldDisable(
+                System.getProperty(RtssVulkanLayerPolicy.ALLOW_PROPERTY), existing)) {
+            LOGGER.info("RTSS Vulkan layer left to the loader ({}={}, -D{}={})",
+                    RtssVulkanLayerPolicy.DISABLE_VARIABLE, existing,
+                    RtssVulkanLayerPolicy.ALLOW_PROPERTY,
+                    System.getProperty(RtssVulkanLayerPolicy.ALLOW_PROPERTY));
+            return;
+        }
+        try {
+            RemixAPI.setProcessEnvironmentVariable(dllPath,
+                    RtssVulkanLayerPolicy.DISABLE_VARIABLE, RtssVulkanLayerPolicy.DISABLE_VALUE);
+            LOGGER.info("RTSS Vulkan layer disabled for the Remix runtime: with DLSS frame generation"
+                    + " in fullscreen it faults the GPU (-D{}=true keeps it)",
+                    RtssVulkanLayerPolicy.ALLOW_PROPERTY);
+        } catch (RuntimeException e) {
+            LOGGER.warn("Could not disable the RTSS Vulkan layer; if RTSS runs, DLSS frame generation"
+                    + " in fullscreen may lose the GPU device", e);
+        }
+    }
+
     /**
      * Gets the Win32 HWND from a GLFW window handle.
      */

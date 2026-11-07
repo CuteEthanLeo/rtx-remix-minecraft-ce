@@ -42,6 +42,18 @@ public final class RemixBridge {
      */
     public static native int overwriteProcessCommandLine(String replacement);
 
+    // ─── process environment ─────────────────────────────────────────────
+
+    /**
+     * Sets a variable in this process's environment block, where native code loaded later,
+     * such as the Vulkan loader, reads it. {@link System#getenv()} does not see the change.
+     *
+     * @return REMIXAPI_ERROR_CODE_SUCCESS (0), REMIXAPI_ERROR_CODE_INVALID_ARGUMENTS for a
+     *         null or empty name or a null value, or REMIXAPI_ERROR_CODE_GENERAL_FAILURE when
+     *         Windows rejects the variable
+     */
+    public static native int setProcessEnvironmentVariable(String name, String value);
+
     // ─── lifecycle ───────────────────────────────────────────────────────
 
     public static native int startup(long hwnd, boolean disableSrgb,
