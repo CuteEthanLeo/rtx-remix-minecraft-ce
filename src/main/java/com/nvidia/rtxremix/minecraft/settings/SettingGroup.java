@@ -11,6 +11,7 @@ package com.nvidia.rtxremix.minecraft.settings;
 public enum SettingGroup {
     RENDER_DISTANCE(SettingCategory.PERFORMANCE, "rtxremix.settings.group.renderDistance"),
     FRAMERATE(SettingCategory.PERFORMANCE, "rtxremix.settings.group.framerate"),
+    TOP_OPTIMIZATION(SettingCategory.PERFORMANCE, "rtxremix.settings.group.topOptimization"),
     SKY(SettingCategory.LIGHTING, "rtxremix.settings.group.sky"),
     CLOUDS(SettingCategory.LIGHTING, "rtxremix.settings.group.clouds"),
     BLOCK_LIGHTS(SettingCategory.LIGHTING, "rtxremix.settings.group.blockLights"),

@@ -31,6 +31,17 @@ The background frame cap only lowers Minecraft's own Max Framerate;
 Unlimited leaves that setting in charge. A running benchmark is never capped,
 since it measures the renderer.
 
+**Top Optimization (Experimental)**, a Community Edition group, raises the frame
+rate without changing what is drawn. Its master switch is off by default; under
+it, **Pipelined Present** lets the CPU prepare the next frame while the GPU is
+still tracing this one, **Dry Puddle Cull** takes the invisible puddle decals
+out of the scene while the ground is dry, and the more aggressive **Submit
+Overlap**, off by default, stops the render thread waiting while Remix hands a
+frame to the GPU. Every switch applies at once. A technique that switches
+itself off after a runtime problem says why in its tooltip. `/rtx topopt ab`
+measures the speedup in your own world; [Tuning](TUNING.md#top-optimization)
+describes each technique.
+
 ## Lighting
 
 This page shapes the sky's light and appearance, clouds, and block lights.

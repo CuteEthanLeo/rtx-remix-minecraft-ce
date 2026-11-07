@@ -37,6 +37,7 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 | 体积光发糊 | froxel 网格三档：标准 16 px/48 层、高 12 px/64 层、极高 8 px/64 层（默认）；画质预设切换后重新写入 | 社区版 → 光照与体积光 → 体积光精度 | `settings/VolumetricQualitySettings.java` |
 | （新功能）动态模糊 | Remix 后处理的运动模糊，四档质量（关/标准/高/电影）、快门和最大模糊长度可调；手和方块描边不模糊；色差和暗角保持关闭 | 画面与曝光 → 镜头效果 | `settings/CameraEffectsSettings.java` |
 | （新功能）简体中文 | 全部设置与提示的中文翻译 | 跟随游戏语言 | `lang/zh_cn.json` |
+| （实验性）CPU 和 GPU 轮流空等，帧率上不去 | 「顶级优化」：画面内容不变，只改调度、跳过看不见的工作。流水线呈现让 CPU 在 GPU 画第 N 帧时就准备第 N+1 帧（Present 不再在 CPU 上等 GL）；干燥水坑剔除在地面干时把全透明的水坑贴花移出场景；更激进的提交重叠默认关。`/rtx topopt ab` 在游戏里交替开关测提速 | 性能 → 顶级优化（实验性，默认关） | `community/perf/*`、`RemixRenderer.java`、`gl/GlInterop.java` |
 
 另有一项维护性改动：官方 mod 从不覆盖已存在的 `rtx-remix/` conf，所以已安装官方版的玩家拿不到新的默认 conf。社区版在
 `rtx-remix-superseded-defaults.txt` 中记录了旧默认 conf 的哈希：**完全未改动**的旧默认会被升级，改过的保持原样
@@ -77,7 +78,10 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 ## 验证
 
 - 单元测试：`.\gradlew.bat test`（新增：`CloudTintTest`、`StarFieldTest`、`WaterLookTest`、`WetSurfacesTest`、
-  `CameraEffectsSettingsTest`、`SupersededPayloadDefaultsTest`、LabPBR 两种编码）。
+  `CameraEffectsSettingsTest`、`SupersededPayloadDefaultsTest`、LabPBR 两种编码；顶级优化：`TopOptimizationTest`、
+  `PresentWaitPolicyTest`、`TopOptimizationAbTest`、`PuddleDecalVisibilityTest`、`SubmitOverlapGuardTest`、
+  `ClientDoneTimelineTest`、`FrameTimeHistogramTest`、`ChunkManagerShownFlagsTest`）。
+- 顶级优化：游戏里执行 `/rtx topopt ab`，约 40 秒后聊天栏给出关/开两组的真实帧率、1% low 和提速倍数。
 - 画面：在同一机位分别用官方 jar 和社区版 jar 截图对比。建议用 `/rtx shot mark <名字>` 固定机位，覆盖晴天草地、
   雨天草地、雨天湖面、海滩、夜晚城市。
 - 玩家影子复现：`/weather clear` 等 10 秒，`/time set 1000`，F5，旁边放盔甲架并
@@ -174,6 +178,13 @@ What changed, each switchable in game (Options → RTX Remix Settings → Commun
   - `/rtx ce` tunes the shaft, sky-fill (1 = the physical sky brightness), halo (1 = physical), and lightning values
     for the session.
 - **Simplified Chinese** translation of every setting.
+- **Top Optimization** (Performance, experimental, off by default): frame-rate techniques that leave the image
+  unchanged. Pipelined Present lets Present wait for GL's composite on the GPU, so the CPU builds frame N+1 while the
+  GPU traces frame N; it blocks as before whenever a screen or Remix menu is open and for four frames after any resize,
+  world change, or re-import. Dry Puddle Cull gives puddle decals their own pages and hides them while their mask is
+  empty. Submit Overlap, off by default, skips the render thread's wait for the runtime's queue submission behind a
+  per-frame self-check. Misbehaving techniques switch themselves off for the session. `/rtx topopt ab` measures the
+  speedup in game, and the performance report logs the real wall-clock frame rate (`community/perf/*`).
 - Shipped confs that an install still has in their untouched upstream form are upgraded on extraction; edited ones
   are kept (`SupersededPayloadDefaults`).
 

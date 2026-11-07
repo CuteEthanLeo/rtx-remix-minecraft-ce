@@ -143,7 +143,7 @@ final class RtxSettingsCategoryScreen extends GameOptionsScreen {
     }
 
     private static boolean fullWidthRows(SettingGroup group) {
-        return group == SettingGroup.FRAMERATE;
+        return group == SettingGroup.FRAMERATE || group == SettingGroup.TOP_OPTIMIZATION;
     }
 
     private boolean commitTerrainEmission() {

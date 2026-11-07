@@ -22,6 +22,7 @@ import com.nvidia.rtxremix.minecraft.community.Puddles;
 import com.nvidia.rtxremix.minecraft.community.ShoreFoam;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
+import com.nvidia.rtxremix.minecraft.community.perf.PuddleDecalVisibility;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterialStore;
@@ -126,6 +127,7 @@ public class BlockTextureManager {
     private RemixMaterial rainRippleMaterial;
     private RemixMaterial puddleMaterial;
     private PuddleMask puddleMask;
+    private final PuddleDecalVisibility puddleDecalVisibility = new PuddleDecalVisibility();
     private RemixTexture shoreFoamTexture;
     private RemixMaterial waterCameraMediumMaterial;
     private long waterNormalHandle;
@@ -891,6 +893,15 @@ public class BlockTextureManager {
     public RemixMaterial getPuddleMaterial() { return puddleMaterial; }
 
     /**
+     * Whether the puddle decals can show anything: false only while the mask
+     * is empty and settled, when hiding them changes no pixel. True without a
+     * mask, so a missing puddle texture never changes what is drawn.
+     */
+    public boolean puddleDecalsNeeded() {
+        return puddleMask == null || puddleDecalVisibility.visible();
+    }
+
+    /**
      * Builds the puddle decal: a near-mirror sheet of dark water whose alpha
      * mask starts empty and grows with the ground's wetness.
      */
@@ -1253,7 +1264,10 @@ public class BlockTextureManager {
             return;
         }
         if (puddleMask != null) {
-            puddleMask.update(api, Puddles.isEnabled() ? level : 0);
+            int puddleLevel = Puddles.isEnabled() ? level : 0;
+            puddleMask.update(api, puddleLevel);
+            puddleDecalVisibility.update(
+                    puddleMask.shownLevel(), puddleMask.computingLevel(), puddleLevel);
         }
         int shown = wetAtlas.update(api, level, (name, data, w, h, format) -> upload(api, name, data, w, h,
                 format, format == TextureFormat.R8_UNORM ? TexturePurpose.DATA : TexturePurpose.COLOR));

@@ -379,7 +379,9 @@ public final class DirectQuadWriter {
                 if (cat == ChunkManager.CAT_SOLID) {
                     Identifier sprite = stageSpriteId[i];
                     if (Puddles.pools(sprite != null ? sprite.getPath() : null)) {
-                        writeGroundDecal(i, ChunkManager.CAT_OVERLAY, Puddles.BUCKET,
+                        // Puddles get their own pages so Top Optimization can
+                        // hide them while the ground is dry.
+                        writeGroundDecal(i, ChunkManager.CAT_PUDDLE, Puddles.BUCKET,
                                 Puddles.LIFT, Puddles.TILE_BLOCKS);
                     }
                     writeGroundDecal(i, ChunkManager.CAT_RAIN, RainRipples.BUCKET,
