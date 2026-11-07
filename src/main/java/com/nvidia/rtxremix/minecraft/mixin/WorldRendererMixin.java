@@ -122,7 +122,8 @@ public abstract class WorldRendererMixin
             new SectionRenderDispatcher.RenderSection[rtxremix$BLOCK_ENTITY_CHUNK_LIST_INITIAL_CAPACITY];
     private int rtxremix$blockEntityChunkBufferUsed;
     private final BuiltChunkArrayIterator rtxremix$blockEntityChunkIterator = new BuiltChunkArrayIterator();
-    private float[] rtxremix$starVertices = new float[0];
+    @Shadow
+    private net.minecraft.client.renderer.SkyRenderer skyRenderer;
 
     @Override
     public int rtxremix$getCloudTicks() {
@@ -130,13 +131,9 @@ public abstract class WorldRendererMixin
         return (int) levelRenderState.gameTime;
     }
 
-    // TODO(1.21.11): vanilla's star buffer moved from WorldRenderer.buildStarsBuffer into
-    // SkyRendering and is built straight into a GpuBuffer; the Remix star field gets no
-    // vanilla star vertices until that is hooked (copyStarVertices returns an empty array).
-
     @Override
     public float[] rtxremix$copyStarVertices() {
-        return rtxremix$starVertices.clone();
+        return ((WorldRendererStarAccess) skyRenderer).rtxremix$copyStarVertices();
     }
 
     // 26.2: setBlocksDirty and setSectionDirtyWithNeighbors moved to LevelExtractor; the water

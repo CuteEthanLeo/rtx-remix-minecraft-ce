@@ -56,7 +56,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements EntityBlock, Si
 
     public static final MapCodec<CopperBeaconBlock> CODEC = simpleCodec(CopperBeaconBlock::new);
 
-    public static final CopperBeaconBlock INSTANCE = new CopperBeaconBlock(beaconSettings());
+    public static final CopperBeaconBlock INSTANCE = new CopperBeaconBlock(beaconSettings(ID));
 
     public CopperBeaconBlock(BlockBehaviour.Properties settings) {
         super(settings, BEAM_COLOR);

@@ -81,9 +81,14 @@ public abstract class SpotLightBlock extends DirectionalBlock implements Overrid
         registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.NORTH));
     }
 
-    /** Shared settings for every beacon variant. */
-    protected static BlockBehaviour.Properties beaconSettings() {
+    /**
+     * Shared settings for every beacon variant. The block's registry key has to
+     * be set before the block is constructed, because the constructor derives
+     * the loot table and translation key from it.
+     */
+    protected static BlockBehaviour.Properties beaconSettings(String path) {
         return BlockBehaviour.Properties.of()
+                .setId(ResourceKey.create(Registries.BLOCK, id(path)))
                 .strength(3.0f)
                 .sound(SoundType.METAL)
                 .lightLevel(state -> LUMINANCE);
@@ -111,10 +116,17 @@ public abstract class SpotLightBlock extends DirectionalBlock implements Overrid
 
     /** Registers one variant, its item, and the creative tab entry. */
     private static void register(String path, SpotLightBlock block) {
-        Identifier id = Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, path);
+        Identifier id = id(path);
         Registry.register(BuiltInRegistries.BLOCK, id, block);
-        BlockItem item = Registry.register(BuiltInRegistries.ITEM, id, new BlockItem(block, new Item.Properties()));
+        Item.Properties itemSettings = new Item.Properties()
+                .setId(ResourceKey.create(Registries.ITEM, id))
+                .useBlockDescriptionPrefix();
+        BlockItem item = Registry.register(BuiltInRegistries.ITEM, id, new BlockItem(block, itemSettings));
         CreativeModeTabEvents.modifyOutputEvent(FUNCTIONAL_BLOCKS).register(output -> output.accept(item));
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(RtxRemixCommonMod.MOD_ID, path);
     }
 
     @Override

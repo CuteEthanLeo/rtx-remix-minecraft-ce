@@ -57,9 +57,7 @@ public class TextureOverlay {
     }
     
     private int sourceFbo;
-    private int sourceTexture;
     private int destinationFbo;
-    private int destinationTexture;
 
     private void renderTextureOverlay(int texId) {
         RenderTarget framebuffer = client.gameRenderer.mainRenderTarget();
@@ -74,17 +72,12 @@ public class TextureOverlay {
         if (sourceFbo == 0) {
             sourceFbo = GL45.glCreateFramebuffers();
         }
-        if (sourceTexture != texId) {
-            GL45.glNamedFramebufferTexture(sourceFbo, GL30.GL_COLOR_ATTACHMENT0, texId, 0);
-            sourceTexture = texId;
-        }
+        // Resizing can recycle a GL name after deleting its previous texture.
+        GL45.glNamedFramebufferTexture(sourceFbo, GL30.GL_COLOR_ATTACHMENT0, texId, 0);
         if (destinationFbo == 0) {
             destinationFbo = GL45.glCreateFramebuffers();
         }
-        if (destinationTexture != dstTex) {
-            GL45.glNamedFramebufferTexture(destinationFbo, GL30.GL_COLOR_ATTACHMENT0, dstTex, 0);
-            destinationTexture = dstTex;
-        }
+        GL45.glNamedFramebufferTexture(destinationFbo, GL30.GL_COLOR_ATTACHMENT0, dstTex, 0);
         int srcWidth = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_WIDTH);
         int srcHeight = GL45.glGetTextureLevelParameteri(texId, 0, GL11.GL_TEXTURE_HEIGHT);
         int dstWidth = framebuffer.width;
@@ -92,12 +85,19 @@ public class TextureOverlay {
         if (srcWidth <= 0 || srcHeight <= 0 || dstWidth <= 0 || dstHeight <= 0) {
             return;
         }
-        // Opaque replace. Texture row 0 lands at the top of the screen, matching the
-        // old top-left (0,0) UV quad: the interop blit already corrects orientation.
-        GL45.glBlitNamedFramebuffer(sourceFbo, destinationFbo,
-            0, 0, srcWidth, srcHeight,
-            0, dstHeight, dstWidth, 0,
-            GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
+        // Convert Remix's top-first image to GL framebuffer row order before the HUD
+        // is drawn. Clip control changes rasterization, not framebuffer-copy coordinates.
+        // Blits obey scissor even with DSA; restore it to preserve Minecraft's cache.
+        boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        if (scissor) GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        try {
+            GL45.glBlitNamedFramebuffer(sourceFbo, destinationFbo,
+                0, 0, srcWidth, srcHeight,
+                0, dstHeight, dstWidth, 0,
+                GL11.GL_COLOR_BUFFER_BIT, GL11.GL_LINEAR);
+        } finally {
+            if (scissor) GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        }
     }
 
     /**
@@ -112,8 +112,6 @@ public class TextureOverlay {
             GL30.glDeleteFramebuffers(destinationFbo);
             destinationFbo = 0;
         }
-        sourceTexture = 0;
-        destinationTexture = 0;
         LOGGER.info("TextureOverlay shutdown");
     }
 }

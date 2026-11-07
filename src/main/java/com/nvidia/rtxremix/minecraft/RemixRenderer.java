@@ -124,6 +124,7 @@ public class RemixRenderer {
     
     private boolean submitFrameCalled = false;
     private boolean presentFailureLogged = false;
+    private boolean frameCopyFailed;
 
     // Scene managers
     private ChunkManager chunkManager;
@@ -778,7 +779,7 @@ public class RemixRenderer {
             // RTX disabled: hand all rendering back to vanilla's GL path. Skip every
             // scene-submission step below (particle task, camera, lights, chunks,
             // entities, block entities, sky, atlas flush, Submit). The present path
-            // (RenderSystemMixin -> presentFrameVk -> blitGlToRemix) still runs
+            // (GlCommandEncoderMixin -> copyGlFrameToRemix -> presentFrameVk) still runs
             // unconditionally and composites vanilla's GL frame, exactly like the
             // no-world case above. The finally block closes the frame (gc, endFrame,
             // benchmark). VK<->GL semaphore signaling lives in the present path and is
@@ -826,7 +827,7 @@ public class RemixRenderer {
                 // after it would submit last frame's positions. Visible as a
                 // one-frame lag between a spinning beacon and its beam.
                 lightManager.updateEntityLights(world, camera, tickDelta);
-                lightManager.updateLights(world);
+                lightManager.updateLights(world, tickDelta);
             } finally {
                 perfTimer.end(perfLights);
             }
@@ -1362,17 +1363,14 @@ public class RemixRenderer {
      * per run rather than once per frame.
      */
     public void presentFrameVk() {
-        boolean failed = false;
+        boolean failed = frameCopyFailed;
+        frameCopyFailed = false;
         try {
-            try (ProfileScope ignored = ProfileScope.begin("Interop.GLToVK")) {
-                blitGlToRemix();
-            } catch (RuntimeException e) {
-                failed = true;
-                logPresentFailureOnce("Error copying GL frame to Remix", e);
-            }
             PresentInfo presentInfo = new PresentInfo();
             presentInfo.hwndOverride = windowHandle;
             presentInfo.skipVulkanSwapchain = 0;
+            // GL framebuffer copies retain their lower-left row order even with
+            // upper-left clip control; Vulkan's swapchain expects the top row first.
             presentInfo.interopFlipY = 1;
             presentInfo.clientDoneSemaphore_ValueToWait =
                     interopGlVk.getClientDoneSemaphoreValue();
@@ -1417,7 +1415,17 @@ public class RemixRenderer {
         }
     }
 
-    private void blitGlToRemix() {
+    /** Receives the completed GUI/world texture before GlSurface presents it. Render thread only. */
+    public void copyGlFrameToRemix(int sourceFbo, int width, int height) {
+        try (ProfileScope ignored = ProfileScope.begin("Interop.GLToVK")) {
+            blitGlToRemix(sourceFbo, width, height);
+        } catch (RuntimeException e) {
+            frameCopyFailed = true;
+            logPresentFailureOnce("Error copying GL frame to Remix", e);
+        }
+    }
+
+    private void blitGlToRemix(int sourceFbo, int width, int height) {
         if (!submitFrameCalled) {
             // if there was no submitFrame, then interop image might not be allocated yet
             // we must have a image to blit into (e.g. UI if there's no world)
@@ -1427,9 +1435,9 @@ public class RemixRenderer {
         // must be called after Submit(), which allocates the image
         InteropInfo interopInfo = remixApi.dxvkGetInteropInfo();
         interopGlVk.recreateImagesIf(interopInfo);
-
-        int srcFbo = 0; // 0 is a default framebuffer
-        interopGlVk.copyFromFramebuffer(srcFbo);
+        // Menu-only frames also need the Vulkan-to-GL ownership transfer.
+        interopGlVk.waitForVk(interopInfo);
+        interopGlVk.copyFromFramebuffer(sourceFbo, width, height);
 
         // signal that GL is done copying, so VK can read the image and present
         interopGlVk.signalDone();

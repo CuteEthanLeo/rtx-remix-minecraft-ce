@@ -204,10 +204,12 @@ public class BlockTextureManager {
         public boolean hasPBR, hasSSS;
         float[] lightColor;
 
-        SpriteEntry(int i, Identifier id, TextureAtlasSprite s) {
+        SpriteEntry(int i, Identifier id, TextureAtlasSprite s, int atlasWidth, int atlasHeight) {
             this.index = i; this.id = id;
             u0 = s.getU0(); v0 = s.getV0(); u1 = s.getU1(); v1 = s.getV1();
-            pixX = s.getX(); pixY = s.getY();
+            // Sprite UVs exclude the atlas slot's padding; getX/getY include it.
+            pixX = Math.round(s.getU0() * atlasWidth);
+            pixY = Math.round(s.getV0() * atlasHeight);
             SpriteContents contents = s.contents();
             pixW = contents.width(); pixH = contents.height();
             transparentPixels = scanTransparency(contents, pixW, pixH);
@@ -340,7 +342,7 @@ public class BlockTextureManager {
         int pbr = 0, emissiveCount = 0, idx = 0;
 
         for (var e : map.entrySet()) {
-            SpriteEntry se = new SpriteEntry(idx++, e.getKey(), e.getValue());
+            SpriteEntry se = new SpriteEntry(idx++, e.getKey(), e.getValue(), atlasW, atlasH);
             byte[] alb = extractRGBA(se.pixX, se.pixY, se.pixW, se.pixH);
             int luminance = lumMap.getOrDefault(e.getKey().toString(), 0);
 
@@ -1384,7 +1386,8 @@ public class BlockTextureManager {
         for (TextureAtlasSprite sprite : acc.getSprites().values()) {
             NativeImage img = ((SpriteContentsAccessor) sprite.contents()).getImage();
             if (img == null) continue;
-            int sx = sprite.getX(), sy = sprite.getY();
+            int sx = Math.round(sprite.getU0() * w);
+            int sy = Math.round(sprite.getV0() * h);
             int sw = sprite.contents().width(), sh = sprite.contents().height();
             for (int y = 0; y < sh; y++)
                 for (int x = 0; x < sw; x++) {

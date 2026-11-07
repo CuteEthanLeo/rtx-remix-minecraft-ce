@@ -185,9 +185,9 @@ public class LightManager {
     /**
      * Updates sky light and draws entity + sky lights.
      */
-    public void updateLights(ClientLevel world) {
+    public void updateLights(ClientLevel world, float tickDelta) {
         if (world == null || renderer.getRemixApi() == null) return;
-        updateSkyLight(world);
+        updateSkyLight(world, tickDelta);
         drawActiveLights();
     }
 
@@ -1098,21 +1098,17 @@ public class LightManager {
     //  Sky light
     // ================================================================
 
-    private void updateSkyLight(ClientLevel world) {
+    private void updateSkyLight(ClientLevel world, float tickDelta) {
         // Only a NORMAL sky has a sun and a moon. The End and the Nether pin their time, so
         // evaluating them would light a permanent noon or midnight that vanilla never draws.
-        float rain = world.getRainLevel(0.0f);
-        float thunder = world.getThunderLevel(0.0f);
+        float rain = world.getRainLevel(tickDelta);
+        float thunder = world.getThunderLevel(tickDelta);
         skyLightState = world.dimensionType().skybox() == net.minecraft.world.level.dimension.DimensionType.Skybox.OVERWORLD
                 ? evaluateSkyLightState(
-                        // 1.21.11: the sky angle is an environment attribute in degrees.
-                        world.environmentAttributes().getDimensionValue(
-                                net.minecraft.world.attribute.EnvironmentAttributes.SUN_ANGLE) / 360.0f,
+                        com.nvidia.rtxremix.minecraft.sky.WorldSky.skyAngle(world, tickDelta),
                         rain,
                         thunder,
-                        NightLight.moonPhaseScale(net.minecraft.world.level.dimension.DimensionType.MOON_BRIGHTNESS_PER_PHASE[
-                                world.environmentAttributes().getDimensionValue(
-                                        net.minecraft.world.attribute.EnvironmentAttributes.MOON_PHASE).index()]))
+                        NightLight.moonPhaseScale(com.nvidia.rtxremix.minecraft.sky.WorldSky.moonSize(world, tickDelta)))
                 : SkyLightState.empty();
         float sunVolumetricScale = SunShafts.sunVolumetricScale(
                 skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));

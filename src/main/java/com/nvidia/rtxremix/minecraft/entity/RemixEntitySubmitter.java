@@ -2318,8 +2318,8 @@ public class RemixEntitySubmitter {
             for (Map.Entry<Identifier, TextureAtlasSprite> entry : sprites.entrySet()) {
                 Identifier spriteId = entry.getKey();
                 TextureAtlasSprite sprite = entry.getValue();
-                int x = sprite.getX();
-                int y = sprite.getY();
+                int x = Math.round(sprite.getU0() * w);
+                int y = Math.round(sprite.getV0() * h);
                 int spriteW = sprite.contents().width();
                 int spriteH = sprite.contents().height();
                 NativeImage nImg = loadVariant(rm, spriteId, "_n");

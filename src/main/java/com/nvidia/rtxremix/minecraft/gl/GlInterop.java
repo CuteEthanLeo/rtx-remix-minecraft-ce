@@ -124,7 +124,8 @@ public final class GlInterop {
         glFlush();
     }
 
-    public void copyFromFramebuffer(int sourceFbo) {
+    /** Copies the complete rendered texture, independently of the WGL drawable's size. */
+    public void copyFromFramebuffer(int sourceFbo, int sourceWidth, int sourceHeight) {
         drainStaleGlErrors();
         if (!colorImage.available()) {
             return;
@@ -135,8 +136,8 @@ public final class GlInterop {
                 destinationFbo,
                 0,
                 0,
-                colorImage.width,
-                colorImage.height,
+                sourceWidth,
+                sourceHeight,
                 0,
                 0,
                 colorImage.width,
