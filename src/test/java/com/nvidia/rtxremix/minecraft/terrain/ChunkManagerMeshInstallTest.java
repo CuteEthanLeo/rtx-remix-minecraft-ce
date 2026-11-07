@@ -160,7 +160,7 @@ class ChunkManagerMeshInstallTest {
         try {
             Object owner = markColumnDirty(manager, 2, 5, 1 << ChunkManager.CAT_CUTOUT);
             int[] ownerFingerprints = (int[]) field(owner, "categoryFingerprints");
-            int[] originalFingerprints = {11, 22, 33, 44, 55, 66};
+            int[] originalFingerprints = {11, 22, 33, 44, 55, 66, 77};
             System.arraycopy(originalFingerprints, 0, ownerFingerprints, 0,
                     originalFingerprints.length);
             set(owner, "dirtyMask", 0);
@@ -175,7 +175,7 @@ class ChunkManagerMeshInstallTest {
             activePages.add(newInstalledPage(replacedCutout, ChunkManager.CAT_CUTOUT, 0));
             activePages.add(newInstalledPage(translucent, ChunkManager.CAT_TRANSLUCENT, 0));
 
-            int[] resultFingerprints = {101, 202, 303, 404, 505, 606};
+            int[] resultFingerprints = {101, 202, 303, 404, 505, 606, 707};
             long accountedBytes = 4096;
             Object result = newResult(owner, intField(owner, "generation"),
                     1 << ChunkManager.CAT_CUTOUT, resultFingerprints,
@@ -190,7 +190,9 @@ class ChunkManagerMeshInstallTest {
             assertSame(solid, pageInstance(activePages.get(0)));
             assertSame(translucent, pageInstance(activePages.get(1)));
             assertSame(replacementCutout, pageInstance(activePages.get(2)));
-            assertArrayEquals(new int[]{11, 202, 33, 44, 55, 66}, ownerFingerprints,
+            assertEquals(ChunkManager.CAT_COUNT, originalFingerprints.length,
+                    "one fingerprint per terrain category");
+            assertArrayEquals(new int[]{11, 202, 33, 44, 55, 66, 77}, ownerFingerprints,
                     "Only categories present in the build result may advance fingerprints");
             assertTrue(booleanField(owner, "hasPublishedState"));
             assertFalse(booleanField(owner, "buildInFlight"));

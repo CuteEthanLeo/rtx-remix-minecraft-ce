@@ -174,6 +174,13 @@ final class RtxOptionFactory {
                     .append(Component.translatable("rtxremix.settings.tooltip.overridden")
                             .withStyle(ChatFormatting.YELLOW));
         }
+        String blocked = setting.blockedReason();
+        if (blocked != null) {
+            return Tooltip.create(CommonComponents.joinLines(
+                    Component.translatable(setting.tooltipKey()), defaultLine,
+                    Component.translatable("rtxremix.settings.tooltip.blocked", blocked)
+                            .withStyle(ChatFormatting.RED)));
+        }
         return Tooltip.create(CommonComponents.joinLines(
                 Component.translatable(setting.tooltipKey()), defaultLine));
     }

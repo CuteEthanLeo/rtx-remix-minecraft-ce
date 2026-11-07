@@ -28,10 +28,21 @@ final class PuddleMask {
     private final RemixTexture texture;
     private int shownLevel;
     private CompletableFuture<Computed> computing;
+    private int computingLevel = -1;
 
     PuddleMask(float[] depth, RemixTexture texture) {
         this.depth = depth;
         this.texture = texture;
+    }
+
+    /** The level last uploaded; 0 means the mask is empty and the decals draw nothing. */
+    int shownLevel() {
+        return shownLevel;
+    }
+
+    /** The level being computed off the render thread, or -1 when none is. */
+    int computingLevel() {
+        return computingLevel;
     }
 
     /** Moves toward {@code targetLevel}; call once per frame on the render thread. */
@@ -40,6 +51,7 @@ final class PuddleMask {
             if (!computing.isDone()) return;
             Computed computed = computing.join();
             computing = null;
+            computingLevel = -1;
             if (!texture.isDeleted()) {
                 patch(api, computed.rgba());
                 shownLevel = computed.level();
@@ -48,6 +60,7 @@ final class PuddleMask {
         }
         if (targetLevel == shownLevel) return;
         int level = targetLevel;
+        computingLevel = level;
         computing = CompletableFuture.supplyAsync(() -> {
             byte[] rgba = new byte[depth.length * 4];
             Puddles.mask(depth, level, rgba);

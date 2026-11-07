@@ -135,6 +135,54 @@ their distance.
 |---|---|---|
 | `rtxremix.allowRtssVulkanLayer` | Set to true to let RivaTuner Statistics Server's Vulkan layer into the Remix runtime. By default the mod sets `DISABLE_RTSS_LAYER=1` for its own process before the runtime loads, because with DLSS frame generation in fullscreen that layer faults the GPU within seconds (`VK_ERROR_DEVICE_LOST`). The RTSS overlay then does not draw in the game. A `DISABLE_RTSS_LAYER` value already in the environment is left as is | `RtssVulkanLayerPolicy` |
 
+## Top Optimization
+
+Community Edition, experimental. Settings → Performance → Top Optimization
+holds a master switch, off by default, and one switch per technique. Every
+technique changes when work is scheduled or skips work that cannot reach the
+image, never what is drawn, and each switches live without a restart or a
+terrain rebuild. `/rtx topopt` shows the state and `/rtx topopt ab` measures
+the speedup in game; see the [In-Game Guide](IN_GAME_GUIDE.md#top-optimization).
+
+- **Pipelined Present** (on under the master switch). Before, `Remix.Present`
+  blocked the render thread until GL had signalled that its composite of the
+  frame was done, which in turn waited for the GPU to finish tracing it, so a
+  frame cost the CPU time plus the GPU time. Pipelined, Present passes
+  `disableCpuWaitForExternalSemaphores = 1` and returns at once, and the CPU
+  prepares frame N+1 while the GPU traces frame N. `PresentWaitPolicy` keeps
+  every present that could meet a reallocated interop image blocking: any open
+  screen or Remix menu, frames without a world, and the first four frames after
+  a resize, a world change, an interop re-import, a failure, or any change to
+  Top Optimization. Interop imports are replaced only after `glFinish`, and the
+  client-done value Present waits for advances only past a signal GL accepted
+  (`GlInterop`, `ClientDoneTimeline`). Three present or interop failures within
+  600 frames switch the technique off for the session.
+- **Dry Puddle Cull** (on). Puddle decals have their own terrain pages
+  (`ChunkManager.CAT_PUDDLE`). At wetness level 0 their mask is transparent in
+  every texel, yet each ray reaching a hard, rain-exposed block top still tested
+  them. They leave the scene once the empty mask has been uploaded and three
+  frames have passed, and return as soon as any puddle is wanted, before its
+  mask uploads (`PuddleDecalVisibility`).
+- **Submit Overlap** (off). Submit passes
+  `REMIXAPI_SUBMIT_INTEROP_BIT_DISABLE_CPU_WAIT_FOR_VK_SUBMIT`, so the render
+  thread stops waiting while the runtime hands the frame to the GPU queue.
+  Used only on steady pipelined frames, after `SubmitOverlapGuard` has learned
+  how far the Remix-done value advances per ordinary Submit; an overlapped
+  frame whose interop info does not advance by that step, or whose image
+  changed, switches the technique off for the session.
+
+Each 300-frame performance report in the log adds the real frame rate (the
+wall-clock period between world frames, with p50, p95, p99 and the 1% low),
+the time spent in the interop and Present calls after `renderAndSubmitFrame`,
+and a Top Optimization line counting how frames were presented. `Frame total`
+still covers `renderAndSubmitFrame` alone.
+
+| Key | Effect | Owner |
+|---|---|---|
+| `rtxremix.topopt` | `true` or `false` pins the master switch for the launch, whatever the settings say | `TopOptimization` |
+| `rtxremix.topopt.<id>` | `true` or `false` pins one technique: `pipelinedPresent`, `dryPuddleCull`, or `submitOverlap`. `-Drtxremix.topopt=false` is the way out if a launch with Top Optimization on misbehaves | `TopOptimization` |
+| `rtxremix.topopt.log` | Log every change of present mode, such as pipelined to screen open | `TopOptimization`, `RemixRenderer` |
+
 ## Profiling And Diagnostics
 
 | Key | Effect | Owner |

@@ -16,6 +16,7 @@ import com.nvidia.rtxremix.PresentInfo;
 import com.nvidia.rtxremix.RemixAPI;
 import com.nvidia.rtxremix.RemixException;
 import com.nvidia.rtxremix.StartupInfo;
+import com.nvidia.rtxremix.SubmitInfo;
 import com.nvidia.rtxremix.minecraft.asset.RemixInstanceStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixLightStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMaterial;
@@ -33,6 +34,10 @@ import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
 import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
 import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import com.nvidia.rtxremix.minecraft.community.perf.PresentWaitPolicy;
+import com.nvidia.rtxremix.minecraft.community.perf.SubmitOverlapGuard;
+import com.nvidia.rtxremix.minecraft.community.perf.TopOptimization;
+import com.nvidia.rtxremix.minecraft.community.perf.TopOptimizationControls;
 import com.nvidia.rtxremix.minecraft.settings.PostProcessingSettings;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
@@ -72,6 +77,7 @@ import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.glfw.GLFWNativeWin32;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GLCapabilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,10 +127,29 @@ public class RemixRenderer {
     private long windowHandle;
     
     private GlInterop interopGlVk = null;
-    
+
     private boolean submitFrameCalled = false;
     private boolean presentFailureLogged = false;
     private boolean frameCopyFailed;
+
+    // Community Edition: Top Optimization. The present policy decides per frame
+    // whether Present waits for GL on the GPU; see PresentWaitPolicy.
+    private final PresentWaitPolicy presentPolicy = new PresentWaitPolicy();
+    private final SubmitOverlapGuard submitOverlapGuard = new SubmitOverlapGuard();
+    /** Reused every frame, so presenting allocates nothing. */
+    private final PresentInfo presentInfo = new PresentInfo();
+    private final SubmitInfo overlapSubmitInfo = new SubmitInfo();
+    private boolean submitOverlappedThisFrame;
+    /** Whether the last present followed a main-path world submit. */
+    private boolean lastPresentWorldFrame;
+    private long lastPresentNanos;
+    private long lastFrameEndNanos;
+    private boolean lastFrameEndWasWorld;
+    private boolean firstPipelinedPresentLogged;
+    private int lastWindowFramebufferWidth;
+    private int lastWindowFramebufferHeight;
+    /** The world of the last main-path submit; null outside a world, so no world is retained. */
+    private ClientLevel lastSubmittedWorld;
 
     // Scene managers
     private ChunkManager chunkManager;
@@ -407,7 +432,10 @@ public class RemixRenderer {
             cntParticleCapacityGrows = perfTimer.registerCounter("Ptcl.CapacityGrows");
             cntParticleCapacity = perfTimer.registerCounter("Ptcl.Capacity");
             cntParticleMeshUpdates = perfTimer.registerCounter("Ptcl.MeshUpdates");
-            
+            perfTimer.setReportAppendix(this::appendTopOptimizationReport);
+            overlapSubmitInfo.interopFlags = SubmitInfo.DISABLE_CPU_WAIT_FOR_VK_SUBMIT;
+            LOGGER.info("Top Optimization: {}", TopOptimization.get().describe());
+
             initAssetStores();
             blockOutlinePass = new RemixBlockOutlinePass(remixApi);
             
@@ -797,6 +825,7 @@ public class RemixRenderer {
             ClientLevel world = client.level;
             
             if (world == null || client.gameRenderer == null) {
+                lastSubmittedWorld = null;
                 if (chunkManager != null) chunkManager.hideRetainedInstances();
                 discardPendingParticleFrame();
                 // Closed by the finally, like the RTX-disabled branch below. endFrame is not
@@ -950,6 +979,11 @@ public class RemixRenderer {
                     textureManager.updateWetness(rain);
                     if (chunkManager != null) {
                         chunkManager.setRainRipplesVisible(RainRipples.visible(rain));
+                        // Community Edition: Top Optimization takes dry, fully
+                        // transparent puddle decals out of the scene.
+                        chunkManager.setPuddlesVisible(
+                                !TopOptimization.get().active(TopOptimization.Technique.DRY_PUDDLE_CULL)
+                                        || textureManager.puddleDecalsNeeded());
                     }
                 }
             }
@@ -1006,9 +1040,14 @@ public class RemixRenderer {
                 }
             }
 
+            prepareSubmit(world);
             perfTimer.begin(perfSubmit);
             try (ProfileScope submitScope = ProfileScope.begin("Submit")) {
-                submitFrame();
+                if (submitOverlappedThisFrame) {
+                    remixApi.submit(overlapSubmitInfo);
+                } else {
+                    submitFrame();
+                }
                 submitFrameCalled = true;
             } finally {
                 perfTimer.end(perfSubmit);
@@ -1244,6 +1283,19 @@ public class RemixRenderer {
         if (!initialized || benchmarkController == null) {
             return;
         }
+        // Community Edition: the real frame time is the wall-clock period
+        // between two consecutive world frames' ends, which includes the wait
+        // in Present that renderAndSubmitFrame's own timing never sees.
+        long now = System.nanoTime();
+        boolean worldFrame = lastPresentWorldFrame;
+        long period = lastFrameEndNanos != 0 && worldFrame && lastFrameEndWasWorld
+                ? now - lastFrameEndNanos : 0L;
+        lastFrameEndNanos = now;
+        lastFrameEndWasWorld = worldFrame;
+        if (period > 0) {
+            perfTimer.recordRealFrame(period);
+        }
+        TopOptimizationControls.onFrameEnd(now, period, lastPresentNanos, presentPolicy.lastMode());
         benchmarkController.onMinecraftRenderFrameEnd(fullFrameNanos, perfTimer);
     }
 
@@ -1394,8 +1446,16 @@ public class RemixRenderer {
     public void presentFrameVk() {
         boolean failed = frameCopyFailed;
         frameCopyFailed = false;
+        // A main-path submit this frame means a world frame; the fallback
+        // submit in blitGlToRemix covers menus and RTX-off frames.
+        boolean worldFrame = submitFrameCalled;
         try {
-            PresentInfo presentInfo = new PresentInfo();
+            long presentStart = System.nanoTime();
+            // Community Edition: Top Optimization decides whether Remix waits
+            // for GL's client-done signal on the GPU (pipelined) or blocks this
+            // thread until GL finished, as before. A frame whose copy failed
+            // always blocks: noteInteropFailure settles the policy.
+            PresentWaitPolicy.Mode mode = decidePresentMode(worldFrame);
             presentInfo.hwndOverride = windowHandle;
             presentInfo.skipVulkanSwapchain = 0;
             // GL framebuffer copies retain their lower-left row order even with
@@ -1403,18 +1463,117 @@ public class RemixRenderer {
             presentInfo.interopFlipY = 1;
             presentInfo.clientDoneSemaphore_ValueToWait =
                     interopGlVk.getClientDoneSemaphoreValue();
-            presentInfo.disableCpuWaitForExternalSemaphores = 0;
+            presentInfo.disableCpuWaitForExternalSemaphores =
+                    mode == PresentWaitPolicy.Mode.PIPELINED ? 1 : 0;
             try (ProfileScope ignored = ProfileScope.begin("Remix.Present")) {
                 remixApi.present(presentInfo);
+            } finally {
+                lastPresentNanos = System.nanoTime() - presentStart;
+                perfTimer.recordOuter(PerformanceTimer.OUTER_PRESENT, lastPresentNanos);
             }
             submitFrameCalled = false;
         } catch (Exception e) {
             failed = true;
             logPresentFailureOnce("Error presenting frame", e);
+            noteInteropFailure();
         }
+        lastPresentWorldFrame = worldFrame;
         if (!failed) {
             presentFailureLogged = false;
         }
+    }
+
+    /** One present's mode under Top Optimization; logs transitions when asked to. */
+    private PresentWaitPolicy.Mode decidePresentMode(boolean worldFrame) {
+        TopOptimization topOpt = TopOptimization.get();
+        PresentWaitPolicy.Mode previous = presentPolicy.lastMode();
+        PresentWaitPolicy.Mode mode = presentPolicy.decide(
+                topOpt.active(TopOptimization.Technique.PIPELINED_PRESENT),
+                topOpt.isVetoed(TopOptimization.Technique.PIPELINED_PRESENT),
+                topOpt.generation(),
+                worldFrame,
+                RtxRemixMod.isRemixMenuOpen(),
+                Minecraft.getInstance().gui.screen() != null);
+        if (mode != previous) {
+            if (topOpt.logTransitions()) {
+                LOGGER.info("Top Optimization: present {} -> {}", previous, mode);
+            }
+            if (mode == PresentWaitPolicy.Mode.PIPELINED && !firstPipelinedPresentLogged) {
+                firstPipelinedPresentLogged = true;
+                LOGGER.info("Top Optimization: pipelined presents started; Present now waits for GL on the GPU");
+            }
+        }
+        return mode;
+    }
+
+    /**
+     * A present or interop failure: the next presents block, and repeated
+     * failures veto pipelining for the session. Also called when the VK-to-GL
+     * step of a frame fails.
+     */
+    public void noteInteropFailure() {
+        TopOptimization topOpt = TopOptimization.get();
+        if (topOpt.active(TopOptimization.Technique.PIPELINED_PRESENT)) {
+            if (presentPolicy.failure()) {
+                topOpt.veto(TopOptimization.Technique.PIPELINED_PRESENT,
+                        PresentWaitPolicy.STRIKE_LIMIT + " present or interop failures within "
+                                + PresentWaitPolicy.STRIKE_WINDOW_FRAMES + " frames");
+            }
+        } else {
+            presentPolicy.discontinuity();
+        }
+    }
+
+    /**
+     * Settles the present policy across world and window changes, and decides
+     * whether this frame's Submit may overlap the runtime's queue submission.
+     */
+    private void prepareSubmit(ClientLevel world) {
+        if (world != lastSubmittedWorld) {
+            lastSubmittedWorld = world;
+            presentPolicy.discontinuity();
+            submitOverlapGuard.reset();
+        }
+        com.mojang.blaze3d.platform.Window window = Minecraft.getInstance().getWindow();
+        int width = window.getWidth();
+        int height = window.getHeight();
+        boolean resized = width != lastWindowFramebufferWidth || height != lastWindowFramebufferHeight;
+        if (resized) {
+            lastWindowFramebufferWidth = width;
+            lastWindowFramebufferHeight = height;
+            // The runtime reallocates the interop images for the new size during
+            // a Submit. A frame whose present did not wait for GL may still be
+            // using the old images, so let it finish first.
+            if (presentPolicy.lastPresentPipelined()) {
+                GL11.glFinish();
+            }
+            presentPolicy.discontinuity();
+            submitOverlapGuard.reset();
+        }
+        submitOverlappedThisFrame = !resized
+                && TopOptimization.get().active(TopOptimization.Technique.SUBMIT_OVERLAP)
+                && presentPolicy.lastPresentPipelined()
+                && submitOverlapGuard.ready();
+    }
+
+    /** The Top Optimization lines of each 300-frame performance report. */
+    private void appendTopOptimizationReport(StringBuilder sb) {
+        sb.append("  --- Top Optimization ---\n");
+        sb.append("  State: ").append(TopOptimization.get().describe()).append('\n');
+        sb.append("  Presents:");
+        for (PresentWaitPolicy.Mode mode : PresentWaitPolicy.Mode.values()) {
+            int count = presentPolicy.count(mode);
+            if (count > 0) {
+                sb.append(' ').append(mode.name().toLowerCase(java.util.Locale.ROOT)).append('=').append(count);
+            }
+        }
+        sb.append('\n');
+        presentPolicy.resetCounts();
+    }
+
+    /** The present policy, for the status command. */
+    public PresentWaitPolicy getPresentPolicy() {
+        return presentPolicy;
     }
 
     private void logPresentFailureOnce(String message, Exception e) {
@@ -1431,45 +1590,82 @@ public class RemixRenderer {
      * no interop texture exists this frame; the caller then skips compositing.
      */
     public int blitVkImageToGL() {
+        long start = System.nanoTime();
+        boolean overlapped = submitOverlappedThisFrame;
+        submitOverlappedThisFrame = false;
         try (ProfileScope ignored = ProfileScope.begin("Interop.VKToGL")) {
             // must be called after Submit(), which allocates the image
             InteropInfo interopInfo = remixApi.dxvkGetInteropInfo();
-            interopGlVk.recreateImagesIf(interopInfo);
+            if (interopGlVk.recreateImagesIf(interopInfo)) {
+                presentPolicy.discontinuity();
+                submitOverlapGuard.reset();
+            } else if (submitFrameCalled && !submitOverlapGuard.record(overlapped,
+                    interopInfo.dxvkDoneSemaphore_ValueToWait, interopInfo.imageMemory_Handle)) {
+                // Community Edition: an overlapped Submit must already have
+                // published this frame's interop info; see SubmitOverlapGuard.
+                TopOptimization.get().veto(TopOptimization.Technique.SUBMIT_OVERLAP,
+                        "the interop info read after an overlapped submit did not describe the new frame");
+                submitOverlapGuard.reset();
+                presentPolicy.discontinuity();
+            }
 
             // to blit, we need to wait for VK to finish writing into GPU image
-            interopGlVk.waitForVk(interopInfo);
+            interopGlVk.waitForVk(interopInfo, !overlapped);
 
             // return VK-GL shared image, so GL can copy/draw on top
             return interopGlVk.getTexture();
+        } finally {
+            perfTimer.recordOuter(PerformanceTimer.OUTER_VK_TO_GL, System.nanoTime() - start);
         }
     }
 
     /** Receives the completed GUI/world texture before GlSurface presents it. Render thread only. */
     public void copyGlFrameToRemix(int sourceFbo, int width, int height) {
+        long start = System.nanoTime();
         try (ProfileScope ignored = ProfileScope.begin("Interop.GLToVK")) {
             blitGlToRemix(sourceFbo, width, height);
         } catch (RuntimeException e) {
             frameCopyFailed = true;
             logPresentFailureOnce("Error copying GL frame to Remix", e);
+            noteInteropFailure();
+        } finally {
+            perfTimer.recordOuter(PerformanceTimer.OUTER_GL_TO_VK, System.nanoTime() - start);
         }
     }
 
     private void blitGlToRemix(int sourceFbo, int width, int height) {
+        InteropInfo interopInfo;
         if (!submitFrameCalled) {
             // if there was no submitFrame, then interop image might not be allocated yet
             // we must have a image to blit into (e.g. UI if there's no world)
             submitFrame();
+            interopInfo = remixApi.dxvkGetInteropInfo();
+            if (interopGlVk.recreateImagesIf(interopInfo)) {
+                presentPolicy.discontinuity();
+            }
+            // Community Edition: this Submit renders into the same image GL is
+            // about to overwrite, so the copy waits until Remix has finished.
+            // Without the wait, Remix's write could land after the copy and
+            // cover the menu frame.
+            interopGlVk.waitForVk(interopInfo);
+        } else {
+            // must be called after Submit(), which allocates the image
+            interopInfo = remixApi.dxvkGetInteropInfo();
+            if (interopGlVk.recreateImagesIf(interopInfo)) {
+                presentPolicy.discontinuity();
+            }
+            // 26.2 copies here, at GlSurface's present, so a world frame also takes
+            // the Vulkan-to-GL ownership transfer for this copy.
+            interopGlVk.waitForVk(interopInfo);
         }
 
-        // must be called after Submit(), which allocates the image
-        InteropInfo interopInfo = remixApi.dxvkGetInteropInfo();
-        interopGlVk.recreateImagesIf(interopInfo);
-        // Menu-only frames also need the Vulkan-to-GL ownership transfer.
-        interopGlVk.waitForVk(interopInfo);
-        interopGlVk.copyFromFramebuffer(sourceFbo, width, height);
-
-        // signal that GL is done copying, so VK can read the image and present
-        interopGlVk.signalDone();
+        try {
+            interopGlVk.copyFromFramebuffer(sourceFbo, width, height);
+        } finally {
+            // signal that GL is done copying, so VK can read the image and present;
+            // signaled even after a failed copy so the timeline keeps moving
+            interopGlVk.signalDone();
+        }
     }
 
     public int getInteropDepthTexture() {
@@ -1528,7 +1724,10 @@ public class RemixRenderer {
         LOGGER.info("Clearing world resources...");
         joinInFlightParticleRenderTask();
         discardPendingParticleFrame();
-        
+        presentPolicy.discontinuity();
+        submitOverlapGuard.reset();
+        lastSubmittedWorld = null;
+
         if (chunkManager != null) {
             chunkManager.clear();
         }

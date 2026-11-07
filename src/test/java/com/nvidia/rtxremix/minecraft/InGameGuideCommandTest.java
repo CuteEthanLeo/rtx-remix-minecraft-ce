@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft;
 
@@ -43,7 +46,9 @@ class InGameGuideCommandTest {
     private static final List<Path> COMMAND_SOURCES = List.of(
             Path.of("src", "main", "java", "com", "nvidia", "rtxremix", "minecraft", "RtxRemixMod.java"),
             Path.of("src", "main", "java", "com", "nvidia", "rtxremix", "minecraft", "camera",
-                    "CameraController.java"));
+                    "CameraController.java"),
+            Path.of("src", "main", "java", "com", "nvidia", "rtxremix", "minecraft", "community", "perf",
+                    "TopOptimizationControls.java"));
 
     /** The literal every documented command hangs from. */
     private static final String ROOT = "rtx";

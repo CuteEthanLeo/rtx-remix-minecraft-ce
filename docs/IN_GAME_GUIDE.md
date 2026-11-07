@@ -138,6 +138,28 @@ can later stand at each one and take the picture again.
 | `/rtx shot mark <name>` | Mark the current pose and scene under that name, replacing a shot of the same name |
 | `/rtx shot remove <name>` | Remove a shot |
 
+## Top Optimization
+
+Community Edition, experimental: frame-rate optimizations that do not change
+what is drawn. The same switches live under Settings → Performance → Top
+Optimization; see [Tuning](TUNING.md#top-optimization) for how each one works.
+
+| Command | What it does |
+|---|---|
+| `/rtx topopt` | Show what is on, the real frame rate of recent gameplay frames, and how frames are presented |
+| `/rtx topopt status` | The same |
+| `/rtx topopt on` | Turn Top Optimization on and save it, like the settings switch |
+| `/rtx topopt off` | Turn it off and save it |
+| `/rtx topopt <technique> on` | Turn one technique on: `pipelinedPresent`, `dryPuddleCull`, or `submitOverlap` |
+| `/rtx topopt <technique> off` | Turn one technique off |
+| `/rtx topopt ab` | Measure the speedup where you stand: about 40 seconds of Top Optimization off and on in alternating blocks, then the frame rates, 1% lows, and the speedup in chat |
+
+The A/B run toggles Top Optimization for its own blocks only and puts your
+setting back when it ends. Keep playing the way you normally do while it runs,
+or stand still for the cleanest number; opening any screen aborts it. The
+readout counts real wall-clock frames, so with frame generation on it reports
+the rendered frames, not the generated ones.
+
 ## Diagnostics
 
 | Command | What it does |

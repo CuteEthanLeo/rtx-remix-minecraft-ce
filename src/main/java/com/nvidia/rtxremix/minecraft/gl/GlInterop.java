@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.gl;
 
@@ -26,6 +29,12 @@ import static org.lwjgl.opengl.GL45.*;
 
 /**
  * Imports Remix color and primary-depth images into OpenGL under one semaphore pair.
+ *
+ * <p>Community Edition: the client-done value handed to Present only ever
+ * advances past a signal GL accepted ({@link ClientDoneTimeline}), and an
+ * import is replaced or deleted only after {@code glFinish}. Present may
+ * return before GL finishes a frame, so queued GL work can still reference an
+ * import that a resize or a DLSS change is about to replace.
  */
 public final class GlInterop {
     private static final Logger LOGGER = LoggerFactory.getLogger(GlInterop.class);
@@ -35,7 +44,7 @@ public final class GlInterop {
     private final InteropImage depthImage = new InteropImage(false);
     private int vkDoneSemaphore;
     private int clientDoneSemaphore;
-    private long clientDoneSemaphoreValue;
+    private final ClientDoneTimeline clientDoneTimeline = new ClientDoneTimeline();
     private int[] barrierTextures = new int[0];
     private int[] barrierLayouts = new int[0];
 
@@ -71,12 +80,22 @@ public final class GlInterop {
     }
 
     public boolean recreateImagesIf(InteropInfo info) {
+        int colorFormat = glInternalFormat(info.interopImageFormat);
+        int depthFormat = glInternalFormat(info.interopDepthImageFormat);
+        if (colorImage.replaces(info.imageMemory_Handle, info.width, info.height, colorFormat)
+                || depthImage.replaces(
+                        info.depthImageMemory_Handle, info.depthWidth, info.depthHeight, depthFormat)) {
+            // GL work queued by earlier frames may still sample or write the old
+            // import, and a pipelined present no longer guarantees it finished.
+            // Replacements happen only on resizes and render-scale changes.
+            glFinish();
+        }
         boolean recreated = colorImage.recreate(
                 info.imageMemory_Handle,
                 info.allocationSize,
                 info.width,
                 info.height,
-                glInternalFormat(info.interopImageFormat),
+                colorFormat,
                 GL_LINEAR,
                 "color");
         recreated |= depthImage.recreate(
@@ -84,7 +103,7 @@ public final class GlInterop {
                 info.depthAllocationSize,
                 info.depthWidth,
                 info.depthHeight,
-                glInternalFormat(info.interopDepthImageFormat),
+                depthFormat,
                 GL_NEAREST,
                 "depth");
         if (recreated) {
@@ -94,6 +113,18 @@ public final class GlInterop {
     }
 
     public void waitForVk(InteropInfo info) {
+        waitForVk(info, true);
+    }
+
+    /**
+     * Queues a GL wait for Remix's output.
+     *
+     * @param checkAfterWait whether to read the GL error state right after the
+     *        wait. Skipped only for an overlapped submit, whose signal may not be
+     *        submitted yet: there a threaded driver can hold the error query
+     *        until it is, which moves the submit wait onto the render thread.
+     */
+    public void waitForVk(InteropInfo info, boolean checkAfterWait) {
         drainStaleGlErrors();
         int result = RemixBridge.openglSemaphoreParameterui64vEXT(
                 vkDoneSemaphore,
@@ -105,23 +136,41 @@ public final class GlInterop {
         }
         glWaitSemaphoreEXT(
                 vkDoneSemaphore, NO_BUFFERS, barrierTextures, barrierLayouts);
-        checkGlError("glWaitSemaphoreEXT");
+        if (checkAfterWait) {
+            checkGlError("glWaitSemaphoreEXT");
+        }
     }
 
+    /**
+     * Signals the next client-done value. The value Present waits for
+     * ({@link #getClientDoneSemaphoreValue}) advances only if GL accepted the
+     * signal, so a failure here never leaves Present waiting for a value that
+     * will not come. GL is flushed either way so the frame's commands start.
+     */
     public void signalDone() {
-        clientDoneSemaphoreValue++;
-        int result = RemixBridge.openglSemaphoreParameterui64vEXT(
-                clientDoneSemaphore,
-                RemixBridge.GL_TIMELINE_SEMAPHORE_VALUE_NV,
-                clientDoneSemaphoreValue);
-        checkGlError("glSemaphoreParameterui64vNV(signal)");
-        if (result != 0) {
-            throw new IllegalStateException("Failed to set client-done semaphore value");
+        long value = clientDoneTimeline.beginSignal();
+        boolean accepted = false;
+        try {
+            int result = RemixBridge.openglSemaphoreParameterui64vEXT(
+                    clientDoneSemaphore,
+                    RemixBridge.GL_TIMELINE_SEMAPHORE_VALUE_NV,
+                    value);
+            checkGlError("glSemaphoreParameterui64vNV(signal)");
+            if (result != 0) {
+                throw new IllegalStateException("Failed to set client-done semaphore value");
+            }
+            glSignalSemaphoreEXT(
+                    clientDoneSemaphore, NO_BUFFERS, barrierTextures, barrierLayouts);
+            checkGlError("glSignalSemaphoreEXT");
+            accepted = true;
+        } finally {
+            if (accepted) {
+                clientDoneTimeline.signalAccepted();
+            } else {
+                clientDoneTimeline.signalFailed();
+            }
+            glFlush();
         }
-        glSignalSemaphoreEXT(
-                clientDoneSemaphore, NO_BUFFERS, barrierTextures, barrierLayouts);
-        checkGlError("glSignalSemaphoreEXT");
-        glFlush();
     }
 
     /** Copies the complete rendered texture, independently of the WGL drawable's size. */
@@ -163,11 +212,24 @@ public final class GlInterop {
         return clientDoneSemaphore;
     }
 
+    /** The value Present may wait for: the last client-done signal GL accepted. */
     public long getClientDoneSemaphoreValue() {
-        return clientDoneSemaphoreValue;
+        return clientDoneTimeline.valueToPresent();
+    }
+
+    /** Width of the imported color image, or 0 when none is imported. */
+    public int getColorWidth() {
+        return colorImage.width;
+    }
+
+    /** Height of the imported color image, or 0 when none is imported. */
+    public int getColorHeight() {
+        return colorImage.height;
     }
 
     public void destroy() {
+        // Frames may still be in flight: let them finish with the imports first.
+        glFinish();
         colorImage.destroy();
         depthImage.destroy();
         if (vkDoneSemaphore != 0) {
@@ -241,6 +303,20 @@ public final class GlInterop {
 
         private InteropImage(boolean color) {
             this.color = color;
+        }
+
+        /** Whether {@link #recreate} with these values would delete the current import. */
+        private boolean replaces(long newMemoryHandle, int newWidth, int newHeight, int newInternalFormat) {
+            if (!available()) {
+                return false;
+            }
+            if (newMemoryHandle == 0 || newMemoryHandle == -1L) {
+                return true;
+            }
+            return memoryHandle != newMemoryHandle
+                    || width != newWidth
+                    || height != newHeight
+                    || internalFormat != newInternalFormat;
         }
 
         private boolean recreate(

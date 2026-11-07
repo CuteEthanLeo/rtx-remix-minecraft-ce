@@ -82,7 +82,8 @@ public class ChunkManager {
     public static final int CAT_OVERLAY     = 3;  // decal overlays, DECAL_STATIC + alpha blend
     public static final int CAT_WATER       = 4;  // water surfaces on their own pages, ANIMATED_WATER
     public static final int CAT_RAIN        = 5;  // raindrop ripple decals, hidden while it does not rain
-    public static final int CAT_COUNT       = 6;
+    public static final int CAT_PUDDLE      = 6;  // puddle decals; Top Optimization hides them while the ground is dry
+    public static final int CAT_COUNT       = 7;
 
     /** Light cull distance in chunks when the user sets none. */
     public static final int DEFAULT_LIGHT_CULL_CHUNKS = 8;
@@ -1422,7 +1423,7 @@ public class ChunkManager {
                 // Water has its own pages so Remix can classify it as animated
                 // water: moving layered normals and water-aware denoiser history.
                 case CAT_WATER -> InstanceCategoryBit.ANIMATED_WATER;
-                case CAT_RAIN -> InstanceCategoryBit.DECAL_STATIC;
+                case CAT_RAIN, CAT_PUDDLE -> InstanceCategoryBit.DECAL_STATIC;
                 default -> 0;
             };
 
@@ -1757,8 +1758,12 @@ public class ChunkManager {
             if (retainedInstancesHidden) {
                 for (ColumnRenderState state : renderColumns.values()) {
                     for (int pageIndex = 0; pageIndex < state.activePages.size(); pageIndex++) {
-                        RemixInstance instance = state.activePages.get(pageIndex).instance;
+                        InstalledMeshPage page = state.activePages.get(pageIndex);
+                        RemixInstance instance = page.instance;
                         if (instance != null && !instance.isDeletedFast()) {
+                            // Visibility changes made while hidden skipped these
+                            // instances, so restate their flags before resubmitting.
+                            instance.setCategoryFlags(shownFlags(page));
                             instance.drawFast(api);
                             drawCalls++;
                         }
@@ -1806,9 +1811,18 @@ public class ChunkManager {
 
     /** The flags a page is shown with: rain ripples stay hidden while it does not rain. */
     private int shownFlags(InstalledMeshPage page) {
-        return page.category == CAT_RAIN && !rainRipplesVisible
-                ? page.categoryFlags | InstanceCategoryBit.HIDDEN
-                : page.categoryFlags;
+        return shownFlags(page.category, page.categoryFlags, rainRipplesVisible, puddlesVisible);
+    }
+
+    /**
+     * The flags a page of {@code category} is shown with: rain ripples stay
+     * hidden while it does not rain, and puddle decals while
+     * {@link #setPuddlesVisible} says they cannot show.
+     */
+    static int shownFlags(int category, int categoryFlags, boolean rainRipplesVisible, boolean puddlesVisible) {
+        boolean hidden = (category == CAT_RAIN && !rainRipplesVisible)
+                || (category == CAT_PUDDLE && !puddlesVisible);
+        return hidden ? categoryFlags | InstanceCategoryBit.HIDDEN : categoryFlags;
     }
 
     /**
@@ -1818,11 +1832,28 @@ public class ChunkManager {
     public void setRainRipplesVisible(boolean visible) {
         if (visible == rainRipplesVisible) return;
         rainRipplesVisible = visible;
+        restateCategoryFlags(CAT_RAIN);
+    }
+
+    /**
+     * Community Edition: shows or hides every puddle-decal page. Only a
+     * change touches the retained instances, so this is cheap to call every
+     * frame.
+     */
+    public void setPuddlesVisible(boolean visible) {
+        if (visible == puddlesVisible) return;
+        puddlesVisible = visible;
+        restateCategoryFlags(CAT_PUDDLE);
+    }
+
+    /** Resubmits every retained page of one category with its current shown flags. */
+    private void restateCategoryFlags(int category) {
         RemixAPI api = renderer.getRemixApi();
         if (api == null || retainedInstancesHidden) return;
         for (ColumnRenderState state : renderColumns.values()) {
-            for (InstalledMeshPage page : state.activePages) {
-                if (page.category != CAT_RAIN) continue;
+            for (int pageIndex = 0; pageIndex < state.activePages.size(); pageIndex++) {
+                InstalledMeshPage page = state.activePages.get(pageIndex);
+                if (page.category != category) continue;
                 RemixInstance instance = page.instance;
                 if (instance == null || instance.isDeletedFast()) continue;
                 instance.setCategoryFlags(shownFlags(page));
@@ -1832,6 +1863,7 @@ public class ChunkManager {
     }
 
     private boolean rainRipplesVisible;
+    private boolean puddlesVisible = true;
 
     /** Hides retained terrain instances while preserving cached meshes. */
     public void hideRetainedInstances() {
@@ -1958,7 +1990,7 @@ public class ChunkManager {
     private static InstanceInfoBlendEXT blendExtForCategory(int cat) {
         return switch (cat) {
             case CAT_CUTOUT   -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaTest(128);
-            case CAT_OVERLAY, CAT_RAIN -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaBlend(1);
+            case CAT_OVERLAY, CAT_RAIN, CAT_PUDDLE -> InstanceInfoBlendEXT.textureTimesVertexColorAlphaBlend(1);
             default           -> InstanceInfoBlendEXT.textureTimesVertexColor();
         };
     }

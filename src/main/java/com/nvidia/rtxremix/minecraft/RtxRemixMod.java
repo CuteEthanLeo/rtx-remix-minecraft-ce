@@ -11,6 +11,7 @@ import com.nvidia.rtxremix.minecraft.community.CommunityEdition;
 import com.nvidia.rtxremix.minecraft.community.DaylightSky;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
+import com.nvidia.rtxremix.minecraft.community.perf.TopOptimizationControls;
 import com.nvidia.rtxremix.minecraft.weather.RemixWeatherRenderer;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
@@ -212,6 +213,11 @@ public class RtxRemixMod implements ClientModInitializer {
     /** Returns the shared Minecraft-side input gate used by the GLFW callback mixins. */
     public static RemixInputGate getRemixInputGate() {
         return REMIX_INPUT_GATE;
+    }
+
+    /** Whether a Remix menu holds input; Top Optimization keeps presents serialized while one does. */
+    public static boolean isRemixMenuOpen() {
+        return REMIX_INPUT_GATE.isCaptureSessionOpen();
     }
 
     /** Returns the version stamped into this mod's Fabric metadata. */
@@ -709,6 +715,7 @@ public class RtxRemixMod implements ClientModInitializer {
                     LOGGER.error("Remix frame failed; skipping compositing this frame", e);
                     mod.frameFailureLogged = true;
                 }
+                renderer.noteInteropFailure();
                 return;
             }
             mod.frameFailureLogged = false;
@@ -1125,6 +1132,7 @@ public class RtxRemixMod implements ClientModInitializer {
                     }))
                 .then(sssCommand())
                 .then(communityTuningCommand())
+                .then(TopOptimizationControls.command())
                 .then(zoneCommand())
                 .then(ClientCommands.literal("conf")
                     .then(ClientCommands.literal("reload")

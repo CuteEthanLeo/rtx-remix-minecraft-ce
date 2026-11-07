@@ -1,10 +1,16 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import com.nvidia.rtxremix.HardcodedVertex;
+import com.nvidia.rtxremix.minecraft.community.Puddles;
+import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import org.junit.jupiter.api.Test;
@@ -203,6 +209,36 @@ class DirectQuadWriterTest {
         assertNotEquals(BlockTextureManager.layerType("translucent"), BlockTextureManager.layerType("glass"),
                 "glass needs its own atlas material slot");
         assertTrue(BlockTextureManager.layerType("glass") < BlockTextureManager.LAYER_COUNT);
+    }
+
+    @Test
+    void puddleDecalsGetTheirOwnCategoryBesideTheRipples() {
+        // Community Edition: Top Optimization hides puddle pages while the
+        // ground is dry, which needs them apart from every other decal.
+        float[] top = {
+                0.0f, 1.0f, 0.0f,
+                0.0f, 1.0f, 1.0f,
+                1.0f, 1.0f, 1.0f,
+                1.0f, 1.0f, 0.0f
+        };
+        DirectQuadWriter writer = new DirectQuadWriter();
+        writer.beginSection();
+        writer.setRainExposed(true);
+        writer.stageQuad(top, FRONT_UVS,
+                0.0f, 1.0f, 0.0f,
+                0xFFFFFFFF, Identifier.withDefaultNamespace("block/stone"),
+                0.0f, 0.0f, 1.0f, 1.0f,
+                "solid");
+        writer.flushBlock(null);
+
+        SectionMeshData meshData = writer.buildMeshData();
+        try {
+            assertEquals(ChunkManager.CAT_PUDDLE, surface(meshData, Puddles.BUCKET).category());
+            assertEquals(ChunkManager.CAT_RAIN, surface(meshData, RainRipples.BUCKET).category());
+            assertEquals(ChunkManager.CAT_SOLID, surface(meshData, WetSurfaces.wetKey("solid")).category());
+        } finally {
+            meshData.release();
+        }
     }
 
     private static SectionMeshData.Surface surface(SectionMeshData meshData, String bucketKey) {

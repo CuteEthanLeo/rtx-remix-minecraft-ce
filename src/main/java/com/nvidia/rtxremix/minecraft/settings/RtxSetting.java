@@ -1,6 +1,9 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
@@ -29,6 +32,7 @@ public final class RtxSetting<T> {
     private final Consumer<T> applier;
     private boolean applySliderValueImmediately = true;
     private int step = 1;
+    private Supplier<String> blockedReason = () -> null;
 
     private RtxSetting(String id, SettingGroup group, String labelKey, String tooltipKey,
                        Kind kind, double min, double max, T defaultValue,
@@ -96,6 +100,21 @@ public final class RtxSetting<T> {
         }
         this.step = step;
         return this;
+    }
+
+    /**
+     * Community Edition: names, through a non-null reason, a state that keeps
+     * the setting's value from taking effect this session, such as a veto or
+     * a JVM override. The menu shows the reason in the tooltip.
+     */
+    public RtxSetting<T> withBlockedReason(Supplier<String> reason) {
+        this.blockedReason = Objects.requireNonNull(reason, "reason");
+        return this;
+    }
+
+    /** Why the value does not take effect this session, or null when it does. */
+    public String blockedReason() {
+        return blockedReason.get();
     }
 
     public T get() { return getter.get(); }

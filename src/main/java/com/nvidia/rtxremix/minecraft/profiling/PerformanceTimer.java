@@ -1,9 +1,13 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 RTX Remix for Minecraft Community Edition contributors
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Modified by RTX Remix for Minecraft Community Edition; see COMMUNITY.md.
  */
 package com.nvidia.rtxremix.minecraft.profiling;
 
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +55,22 @@ public class PerformanceTimer {
     // Per-frame snapshot data (valid between beginFrame/endFrame)
     private final long[] sectionLastNanos = new long[MAX_SECTIONS];
     private final long[] counterLastValue = new long[MAX_COUNTERS];
+
+    // Community Edition: "Frame total" spans renderAndSubmitFrame only. The real
+    // frame time is the wall-clock period between Minecraft frames, and the
+    // outer rows time the interop and present work that runs after it.
+    /** {@link #recordOuter} row: the GL wait for Remix's output and its import. */
+    public static final int OUTER_VK_TO_GL = 0;
+    /** {@link #recordOuter} row: the GL copy of the finished frame back to Remix. */
+    public static final int OUTER_GL_TO_VK = 1;
+    /** {@link #recordOuter} row: Remix's Present call, including any wait for GL. */
+    public static final int OUTER_PRESENT = 2;
+    private static final String[] OUTER_NAMES = {"Interop VK->GL", "Interop GL->VK", "Remix.Present"};
+    private final FrameTimeHistogram realFrames = new FrameTimeHistogram();
+    private final long[] outerTotalNanos = new long[OUTER_NAMES.length];
+    private final long[] outerMaxNanos = new long[OUTER_NAMES.length];
+    private final int[] outerCount = new int[OUTER_NAMES.length];
+    private Consumer<StringBuilder> reportAppendix;
 
     public int registerSection(String name) {
         if (sectionCount >= MAX_SECTIONS) {
@@ -146,6 +166,27 @@ public class PerformanceTimer {
         counterFrameValue[counterIdx] += delta;
     }
 
+    /**
+     * Records one world frame's wall-clock period, from the end of the
+     * previous Minecraft frame to the end of this one.
+     */
+    public void recordRealFrame(long periodNanos) {
+        realFrames.add(periodNanos);
+    }
+
+    /** Adds one sample to an outer row ({@link #OUTER_VK_TO_GL}, {@link #OUTER_GL_TO_VK}, {@link #OUTER_PRESENT}). */
+    public void recordOuter(int row, long nanos) {
+        if (row < 0 || row >= OUTER_NAMES.length || nanos < 0) return;
+        outerTotalNanos[row] += nanos;
+        outerMaxNanos[row] = Math.max(outerMaxNanos[row], nanos);
+        outerCount[row]++;
+    }
+
+    /** Appends extra lines to each report; runs only when a report is written. */
+    public void setReportAppendix(Consumer<StringBuilder> appendix) {
+        this.reportAppendix = appendix;
+    }
+
     private void emitProfilePlots(long frameNanos) {
         if (!ProfileScope.isDeepProfilingEnabled()) return;
 
@@ -172,6 +213,15 @@ public class PerformanceTimer {
         sb.append(String.format("\n=== Performance Report (%d frames) ===\n", frameCount));
         sb.append(String.format("  Frame total:  avg=%.2fms  min=%.2fms  max=%.2fms  (~%.0f fps)\n",
             avgFrameMs, minFrameMs, maxFrameMs, fps));
+        if (realFrames.count() > 0) {
+            sb.append(String.format(
+                "  Real frame:   avg=%.2fms  p50=%.2fms  p95=%.2fms  p99=%.2fms  max=%.2fms"
+                    + "  (%.1f fps real, 1%% low %.1f fps, %d frames)\n",
+                realFrames.meanMillis(), realFrames.percentileMillis(0.50),
+                realFrames.percentileMillis(0.95), realFrames.percentileMillis(0.99),
+                realFrames.maxMillis(), realFrames.fps(), realFrames.onePercentLowFps(),
+                realFrames.count()));
+        }
 
         for (int i = 0; i < sectionCount; i++) {
             double avgMs = (sectionTotalNanos[i] / (double) frameCount) / 1_000_000.0;
@@ -183,6 +233,18 @@ public class PerformanceTimer {
                 sectionNames[i] + ":", avgMs, minMs, maxMs, pct));
         }
 
+        boolean outerHeader = false;
+        for (int i = 0; i < OUTER_NAMES.length; i++) {
+            if (outerCount[i] == 0) continue;
+            if (!outerHeader) {
+                sb.append("  --- Outside renderAndSubmitFrame (per call) ---\n");
+                outerHeader = true;
+            }
+            sb.append(String.format("  %-20s avg=%.2fms  max=%.2fms  (%d calls)\n",
+                OUTER_NAMES[i] + ":", outerTotalNanos[i] / (double) outerCount[i] / 1_000_000.0,
+                outerMaxNanos[i] / 1_000_000.0, outerCount[i]));
+        }
+
         if (counterCount > 0) {
             sb.append("  --- Counters (per frame) ---\n");
             for (int i = 0; i < counterCount; i++) {
@@ -192,6 +254,9 @@ public class PerformanceTimer {
             }
         }
 
+        if (reportAppendix != null) {
+            reportAppendix.accept(sb);
+        }
         sb.append("=====================================");
         LOGGER.info(sb.toString());
     }
@@ -211,6 +276,12 @@ public class PerformanceTimer {
             counterTotal[i] = 0;
             counterMin[i] = Long.MAX_VALUE;
             counterMax[i] = 0;
+        }
+        realFrames.reset();
+        for (int i = 0; i < OUTER_NAMES.length; i++) {
+            outerTotalNanos[i] = 0;
+            outerMaxNanos[i] = 0;
+            outerCount[i] = 0;
         }
     }
 

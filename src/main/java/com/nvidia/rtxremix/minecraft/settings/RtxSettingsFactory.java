@@ -28,6 +28,7 @@ import com.nvidia.rtxremix.minecraft.community.Puddles;
 import com.nvidia.rtxremix.minecraft.community.SunShafts;
 import com.nvidia.rtxremix.minecraft.community.WaterLook;
 import com.nvidia.rtxremix.minecraft.community.WetSurfaces;
+import com.nvidia.rtxremix.minecraft.community.perf.TopOptimization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +111,9 @@ public final class RtxSettingsFactory {
 
         // --- Framerate ---
         list.add(unfocusedFramerate());
+
+        // --- Top Optimization (Community Edition, experimental) ---
+        list.addAll(topOptimization(TopOptimization.get()));
 
         // --- Sky & time of day ---
         list.add(RtxSetting.ofBool("sky.enabled", SettingGroup.SKY,
@@ -351,6 +355,29 @@ public final class RtxSettingsFactory {
                 postProcessing::getHighLightAdaptation, postProcessing::setHighLightAdaptation));
 
         return new RtxSettings(list);
+    }
+
+    /**
+     * The master switch and one switch per technique. Their defaults are the
+     * owner's constants, because the live state is still at its defaults when
+     * the registry is built and the settings file loads afterwards. A
+     * technique that cannot run this session says why in its tooltip.
+     */
+    static List<RtxSetting<Boolean>> topOptimization(TopOptimization topOpt) {
+        List<RtxSetting<Boolean>> settings = new ArrayList<>();
+        String masterLabel = "rtxremix.setting." + TopOptimization.SETTING_ID;
+        settings.add(RtxSetting.ofBool(TopOptimization.SETTING_ID, SettingGroup.TOP_OPTIMIZATION,
+                        masterLabel, masterLabel + ".tip", false,
+                        topOpt::isEnabled, topOpt::setEnabled)
+                .withBlockedReason(topOpt::masterBlockedReason));
+        for (TopOptimization.Technique technique : TopOptimization.Technique.values()) {
+            String label = "rtxremix.setting." + technique.settingId();
+            settings.add(RtxSetting.ofBool(technique.settingId(), SettingGroup.TOP_OPTIMIZATION,
+                            label, label + ".tip", technique.defaultWanted(),
+                            () -> topOpt.isWanted(technique), v -> topOpt.setWanted(technique, v))
+                    .withBlockedReason(() -> topOpt.blockedReason(technique)));
+        }
+        return settings;
     }
 
     static RtxSetting<Integer> unfocusedFramerate() {

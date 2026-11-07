@@ -186,6 +186,18 @@ wrapper, and runtime support for updating a texture from memory. Glyph pages are
 mirrored on upload, because vanilla assembles them on the GPU and never keeps
 them on the CPU.
 
+**Frame pacing.** Remix renders into one interop color and one depth image; GL
+waits for Remix's done value on the GPU, composites the HUD, copies the frame
+back, and signals a client-done value, and Present then copies the image to the
+swapchain. By default Present blocks the render thread until GL's signal lands,
+so CPU and GPU take turns. Top Optimization's pipelined present
+(`community/perf/`) passes `disableCpuWaitForExternalSemaphores` on steady
+gameplay frames only, so the CPU builds frame N+1 while the GPU traces frame N.
+`PresentWaitPolicy` blocks whenever a screen or Remix menu is open and for a few
+frames after anything that may reallocate the interop images; `GlInterop`
+finishes GL before replacing an import, and its client-done value advances only
+past an accepted signal.
+
 **Particles.** Slot preparation and CPU mesh snapshots run on a dedicated worker
 and are double buffered: the render thread publishes the previous frame's
 payload at the top of the frame and joins the worker after submit, so particles
@@ -331,6 +343,12 @@ diluting the sampler's candidate pool.
   `TerrainState`).
 - Keep `rtx.showUICursor = false` in `packaging/rtx.conf`. The mod does not
   write this key; the runtime software cursor can leave the OS cursor hidden.
+- Present only ever waits for a client-done value GL accepted a signal for, and
+  only `PresentWaitPolicy` may let Present skip its CPU wait. Anything that can
+  reallocate the interop images (a resize, a DLSS or frame-generation change, a
+  world change) must happen while presents block, which is why the policy
+  blocks while any screen or Remix menu is open and settles after such events
+  (`RemixRenderer`, `GlInterop`, `ClientDoneTimeline`).
 - Change `BlockLightDefaults` and `BlockLightIntensityControls` together.
   Their rule-id sets are validated during resource reload, not just unit tests.
 - Run entity capture on the render thread. Vanilla shares mutable renderer and
