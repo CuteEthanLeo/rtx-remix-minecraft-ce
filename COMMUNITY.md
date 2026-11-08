@@ -29,7 +29,7 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 | （新功能）体积云 | 写实尺度的体积云（云底约 y=400）：晴天是铺到地平线、底平顶亮的积云，7 km 高空有成片、纤细的丝状卷云，闪电从云里把雷暴云照亮，雷暴时长出 1500 格高、带砧状云顶的积雨云塔，下雨转为阴天。所有云都在天空穹顶里按体积光线步进，与大气共用同一个太阳、月亮和透射 LUT，并按空气透视融进地平线；相机周围几百格内另用同一个云场生成看不见的网格，只负责真实阴影和光柱；远处云挡住太阳时整片地面变暗，星星、银河、流星被云遮住。默认开启；之前手动选过「程序化」云的存档保持原样 | 云 → 体积云 / 体积云精度 / 云量 | `community/clouds/*`、`cloud/VolumetricCloudTiles.java`、`shaders/cloud_sky.comp` |
 | 雨天云发棕、夜晚云发白 | 云的反照率与次表面散射随时间和天气变化：雨中风暴灰，夜里暗蓝 | 社区版 → 云层明暗 | `community/CloudTint.java`、`cloud/CloudRenderer.java` |
 | 湖水发黑、水面单调 | 水体透射距离 1 m → 3.5 m，按生物群系分 9 种水色；水面单独成页并标记为动态水（双层流动波浪，雨中更粗糙）；岸边泡沫 | 社区版 → 真实水体 / 流动波浪 / 岸边浪花 | `community/WaterLook.java`、`community/ShoreFoam.java`、`terrain/*` |
-| 夜晚单薄 | 6000 颗亮度、色温各异的星星，沿银河聚集；程序化银河带（满月时变淡）；月光更强更冷；夜间薄雾让灯光有光晕；夜间环境光默认 2.5 → 1.4 | 社区版 → 星空 | `community/StarField.java`、`community/NightSky*.java`、`confs/time/*.conf` |
+| 夜晚单薄 | 6000 颗亮度、色温各异的星星，沿银河聚集；程序化银河带（满月时变淡）；月光更强更冷；夜间薄雾让灯光有光晕；夜间天空环境光默认 2.5 → 0（天穹本身已经照亮夜晚，再加一层会把月光下的草地染绿） | 社区版 → 星空 | `community/StarField.java`、`community/NightSky*.java`、`confs/time/*.conf` |
 | 晨昏没有体积光 | 太阳高度 2°–20° 时太阳对雾的散射最高放大到 4 倍，天空环境光对雾的散射降到 0.35，光柱和阴影的反差拉开；清晨是贴地、成团飘动的晨雾，黄昏是偏暖的薄霾，都强烈向前散射 | 社区版 → 光照与体积光 → 晨昏光柱 | `community/SunShafts.java`、`confs/time/dawn.conf`、`dusk.conf` |
 | 雨天体积光平淡 | 地面仍是阴天光照，但太阳对雾的散射单独补偿回晴天的 20%（雷暴 8%），从云缝中照出斜光柱；雨幕噪声加到 3 个 octave，密度曲线更陡，雨幕之间有清楚的空隙 | 社区版 → 光照与体积光 → 云隙光柱 | `community/SunShafts.java`、`confs/weather/*.conf` |
 | （新功能）闪电照亮雨幕 | 每道闪电沿高度放 3 个冷白光源，对雾的散射为 4 倍，照亮周围的雨幕并投下短暂的影子；远处闪电让天空环境光闪一下 | 社区版 → 光照与体积光 → 闪电照亮雨幕 | `community/LightningFlash.java`、`light/LightManager.java` |

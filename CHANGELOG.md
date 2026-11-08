@@ -9,7 +9,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
-## Community Edition 0.1.0-ce.6 - Unreleased
+## Community Edition 0.1.0-ce.7 - 2026-11-09
+
+### Added
+
+- Top Optimization (Settings -> Performance, experimental, off by default):
+  frame-rate techniques that leave the image unchanged. Pipelined Present lets
+  the CPU prepare the next frame while the GPU traces the current one on steady
+  gameplay frames, and still blocks while a screen or Remix menu is open and for
+  a few frames after anything that may reallocate the interop images. Dry Puddle
+  Cull takes puddle decals out of the scene while the ground is dry. Submit
+  Overlap, off, skips the CPU wait for the queue submission behind a per-frame
+  self-check. `/rtx topopt ab` measures the real frame rate with the switch off
+  and on; `-Drtxremix.topopt=false` pins it off for a launch.
 
 ### Fixed
 
@@ -19,16 +31,37 @@ also part of every mod file name.
   frame generation presenter; the mod now keeps that layer out of the game
   process, so the RTSS overlay no longer draws in the game.
   `-Drtxremix.allowRtssVulkanLayer=true` keeps it.
-- Near volumetric clouds hide the sun and moon discs without attenuating the
-  ground's sunlight twice. Cirrus also attenuates the visible discs.
-- Time commands, sky-model changes, teleports and world changes reset cloud
-  accumulation and reject queued images from the previous scene.
 - Distant volumetric clouds no longer flicker, and the sun no longer flashes
   through them ten times a second, with the daylight cycle frozen. The sky's
   frame-interpolated time of day stepped back within a tick on about half the
   cloud updates, which counted as a time command: each one discarded the
   accumulated sky and showed a cloudless sun until the next march landed. A
   real reset now keeps the previous clouds published until then.
+
+### Changed
+
+- Particles are published in the same frame they were prepared for instead of
+  one frame late, so smoke no longer swims against the camera, most visibly
+  between real frames under DLSS frame generation.
+  `-Drtxremix.particles.previousFrame=true` restores the old order.
+- The first sight of an entity type no longer decodes its textures on the render
+  thread: they load in the background and are created under a per-frame budget.
+  `-Drtxremix.entityTextures.sync=true` restores the synchronous load.
+- With frame generation on, motion blur shortens its exposure at a low base
+  frame rate and in fast turns (`-Drtxremix.motionBlur.fgAdaptive=false` opts
+  out). The packaged `rtx.conf` picks the lightweight frame-generation model and
+  turns Reflex on.
+- COMMUNITY.md now describes the puddles and rain ripples that ce.6 already
+  shipped, the 6000-star count, and the night sky ambient default of 0.
+
+## Community Edition 0.1.0-ce.6 - 2026-11-06
+
+### Fixed
+
+- Near volumetric clouds hide the sun and moon discs without attenuating the
+  ground's sunlight twice. Cirrus also attenuates the visible discs.
+- Time commands, sky-model changes, teleports and world changes reset cloud
+  accumulation and reject queued images from the previous scene.
 - Small changes to star and Milky Way cloud occlusion accumulate against the
   last uploaded mesh, preventing slowly moving clouds from leaving stars visible.
 - Lightning illuminates the visible cloud dome with the nearest strike's cold
