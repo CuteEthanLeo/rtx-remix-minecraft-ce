@@ -1569,6 +1569,10 @@ public class RemixRenderer {
         }
         sb.append('\n');
         presentPolicy.resetCounts();
+        // The Vulkan layer is one of RTSS's two ways in; RtssHookBlock keeps out the other,
+        // whose DLL arrives some seconds after start, so it is reported here rather than at init.
+        sb.append("  RTSS hook DLL: ")
+                .append(RtssHookBlock.hookDllLoaded() ? "in process" : "absent").append('\n');
     }
 
     /** The present policy, for the status command. */

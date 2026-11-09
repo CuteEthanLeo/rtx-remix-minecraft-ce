@@ -134,6 +134,7 @@ their distance.
 | Key | Effect | Owner |
 |---|---|---|
 | `rtxremix.allowRtssVulkanLayer` | Set to true to let RivaTuner Statistics Server's Vulkan layer into the Remix runtime. By default the mod sets `DISABLE_RTSS_LAYER=1` for its own process before the runtime loads, because with DLSS frame generation in fullscreen that layer faults the GPU within seconds (`VK_ERROR_DEVICE_LOST`). The RTSS overlay then does not draw in the game. A `DISABLE_RTSS_LAYER` value already in the environment is left as is | `RtssVulkanLayerPolicy` |
+| `rtxremix.allowRtssHooks` | Set to true to let RivaTuner Statistics Server's hook DLL (`RTSSHooks64.dll`) into the game. By default, while RTSS runs at launch, the mod sets Windows' extension-point mitigation for its own process at pre-launch, because that DLL hooks Vulkan presentation independently of the layer and faults the GPU once DLSS frame generation is on. Other processes keep RTSS; this process also refuses AppInit DLLs and legacy input methods. The 300-frame performance report shows whether the DLL is in the process | `RtssHookBlock` |
 
 ## Top Optimization
 

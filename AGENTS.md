@@ -318,7 +318,11 @@ diluting the sampler's candidate pool.
   setting `DISABLE_RTSS_LAYER=1` in the process before the runtime loads,
   unless `-Drtxremix.allowRtssVulkanLayer=true` or the player already set it:
   with DLSS frame generation in fullscreen it faults the GPU
-  (`RtssVulkanLayerPolicy`, `RemixRenderer`).
+  (`RtssVulkanLayerPolicy`, `RemixRenderer`). Its hook DLL, which a global
+  window hook maps in and which hooks Vulkan on its own, is kept out by the
+  extension-point mitigation set at pre-launch while RTSS runs, unless
+  `-Drtxremix.allowRtssHooks=true`; this process only, never an RTSS profile
+  (`RtssHookBlock`).
 - Vanilla's shared worker pool and section-builder concurrency stay capped
   (`WorkerPoolCap`, `SectionBuildConcurrency`).
 - Nothing but the render thread reads client light (`World.getLightLevel`,

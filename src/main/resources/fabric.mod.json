@@ -19,6 +19,7 @@
     "environment": "*",
     "entrypoints": {
         "preLaunch": [
+            "com.nvidia.rtxremix.minecraft.RtssHookBlock",
             "com.nvidia.rtxremix.minecraft.WorkerPoolCap"
         ],
         "main": [

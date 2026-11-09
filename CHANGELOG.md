@@ -19,6 +19,15 @@ also part of every mod file name.
   frame generation presenter; the mod now keeps that layer out of the game
   process, so the RTSS overlay no longer draws in the game.
   `-Drtxremix.allowRtssVulkanLayer=true` keeps it.
+- DLSS frame generation also no longer loses the GPU device when it is turned
+  on more than a few seconds into a session with RTSS running. RTSS's hook DLL,
+  injected through a global window hook about 15 s after start, hooks Vulkan
+  presentation even without its layer. While RTSS runs at launch, the mod now
+  sets Windows' extension-point mitigation for its own process at pre-launch,
+  which keeps that DLL out of this game only: other games and Java programs
+  keep the RTSS overlay, and no RTSS profile is changed. The mitigation also
+  refuses AppInit DLLs and legacy (pre-TSF) input methods in this process.
+  `-Drtxremix.allowRtssHooks=true` lets RTSS in.
 - Near volumetric clouds hide the sun and moon discs without attenuating the
   ground's sunlight twice. Cirrus also attenuates the visible discs.
 - Time commands, sky-model changes, teleports and world changes reset cloud
