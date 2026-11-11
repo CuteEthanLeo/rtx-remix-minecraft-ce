@@ -13,6 +13,9 @@ also part of every mod file name.
 
 ### Added
 
+- A package for Minecraft 1.21.9, ported back from the 1.21.10 branch. Fabric
+  API for 1.21.9 has no world render events, so the mod raises them itself
+  from the same points in the frame.
 - A package for Minecraft 1.21.10, ported back from the 1.21.11 branch. It
   carries that branch's limitations, listed in COMMUNITY.md, except that
   cutout and mipped cutout blocks are told apart again.
