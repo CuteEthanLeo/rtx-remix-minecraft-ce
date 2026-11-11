@@ -11,6 +11,12 @@ also part of every mod file name.
 
 ## Community Edition 0.1.0-ce.6.1 - 2026-11-11
 
+### Added
+
+- A package for Minecraft 1.21.10, ported back from the 1.21.11 branch. It
+  carries that branch's limitations, listed in COMMUNITY.md, except that
+  cutout and mipped cutout blocks are told apart again.
+
 ### Fixed
 
 - The game starts on Minecraft 1.21.11. The ce.6 package for 1.21.11 stopped
