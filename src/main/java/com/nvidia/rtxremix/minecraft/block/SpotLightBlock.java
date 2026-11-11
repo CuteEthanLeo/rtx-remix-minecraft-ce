@@ -81,9 +81,16 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
         setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.NORTH));
     }
 
-    /** Shared settings for every beacon variant. */
-    protected static AbstractBlock.Settings beaconSettings() {
+    /**
+     * Shared settings for every beacon variant, keyed to its registry id.
+     *
+     * <p>Since 1.21.2 a block's settings carry its registry key, from which the block derives its
+     * loot table, and the block constructor rejects settings without one. The key therefore has to
+     * be set before the variant's static instance is constructed, ahead of registration.
+     */
+    protected static AbstractBlock.Settings beaconSettings(String path) {
         return AbstractBlock.Settings.create()
+                .registryKey(RegistryKey.of(RegistryKeys.BLOCK, id(path)))
                 .strength(3.0f)
                 .sounds(BlockSoundGroup.METAL)
                 .luminance(state -> LUMINANCE);
@@ -111,10 +118,25 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
 
     /** Registers one variant, its item, and the creative tab entry. */
     private static void register(String path, SpotLightBlock block) {
-        Identifier id = Identifier.of(RtxRemixCommonMod.MOD_ID, path);
+        Identifier id = id(path);
         Registry.register(Registries.BLOCK, id, block);
-        BlockItem item = Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
+        BlockItem item = Registry.register(Registries.ITEM, id, new BlockItem(block, itemSettings(path)));
         ItemGroupEvents.modifyEntriesEvent(FUNCTIONAL_BLOCKS).register(entries -> entries.add(item));
+    }
+
+    /**
+     * Settings for a variant's block item: its registry key, which 1.21.2 item construction
+     * requires, and the block's {@code block.*} translation key, which the lang files carry and
+     * which 1.21.2 block items no longer inherit from their block.
+     */
+    static Item.Settings itemSettings(String path) {
+        return new Item.Settings()
+                .registryKey(RegistryKey.of(RegistryKeys.ITEM, id(path)))
+                .useBlockPrefixedTranslationKey();
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.of(RtxRemixCommonMod.MOD_ID, path);
     }
 
     @Override

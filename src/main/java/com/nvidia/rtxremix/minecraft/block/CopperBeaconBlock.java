@@ -57,7 +57,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
 
     public static final MapCodec<CopperBeaconBlock> CODEC = createCodec(CopperBeaconBlock::new);
 
-    public static final CopperBeaconBlock INSTANCE = new CopperBeaconBlock(beaconSettings());
+    public static final CopperBeaconBlock INSTANCE = new CopperBeaconBlock(beaconSettings(ID));
 
     public CopperBeaconBlock(AbstractBlock.Settings settings) {
         super(settings, BEAM_COLOR);

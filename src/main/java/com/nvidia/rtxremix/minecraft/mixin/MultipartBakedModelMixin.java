@@ -5,13 +5,10 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import net.minecraft.block.BlockState;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.render.model.MultipartBakedModel;
 import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.CheckedRandom;
 import net.minecraft.util.math.random.Random;
-import org.apache.commons.lang3.tuple.Pair;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -24,35 +21,36 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
 
 /**
  * Selects a multipart model's parts without the per-call garbage vanilla makes. Fences,
  * walls, panes, redstone and every other multipart blockstate reach this for each face of
- * each block during a section build, and vanilla creates a fresh {@code Random} (a
- * {@code CheckedRandom} with its {@code AtomicLong} seed and Gaussian state) for every
- * matching part plus a result list per call, whether one part matched or five.
+ * each block during a section build, and vanilla builds a fresh result list per call and
+ * copies each part's quads into it through {@code addAll}'s intermediate array, whether one
+ * part matched or five.
  *
- * <p>The part selection and the seed handed to each part are vanilla's: the same
- * {@code random.nextLong()} draw seeds a reused {@code CheckedRandom} per part, which yields
- * the sequence {@code Random.create(seed)} would. A single matching part returns that part's
- * own quad list, as {@link net.minecraft.client.render.model.WeightedBakedModel} already does
- * for its chosen variant; callers treat model quad lists as read-only. Several matching parts
- * still concatenate into a new list.
+ * <p>The part selection and the random each part sees are vanilla's: one
+ * {@code random.nextLong()} draw, then the caller's random reseeded with it before each
+ * matching part. A single matching part returns that part's own quad list, as
+ * {@link net.minecraft.client.render.model.WeightedBakedModel} already does for its chosen
+ * variant; callers treat model quad lists as read-only. Several matching parts still
+ * concatenate into a new list.
+ *
+ * <p>Since 1.21.2 the components are {@code MultipartBakedModel.class_10204} records rather
+ * than commons-lang {@code Pair}s; the field's generic type is erased, so a stale type here
+ * compiles and passes the mixin tests but fails with a {@code ClassCastException} on the
+ * first multipart block a section build meets.
  */
 @Mixin(MultipartBakedModel.class)
 public abstract class MultipartBakedModelMixin {
 
     @Shadow
     @Final
-    private List<Pair<Predicate<BlockState>, BakedModel>> components;
+    private List<MultipartBakedModel.class_10204> components;
 
     @Shadow
     @Final
     private Map<BlockState, BitSet> stateCache;
-
-    private static final ThreadLocal<CheckedRandom> rtxremix$partRandom =
-            ThreadLocal.withInitial(() -> new CheckedRandom(0L));
 
     @Inject(method = "getQuads", at = @At("HEAD"), cancellable = true)
     private void rtxremix$getQuads(
@@ -68,19 +66,18 @@ public abstract class MultipartBakedModelMixin {
         if (selected == null) {
             selected = new BitSet();
             for (int i = 0, n = components.size(); i < n; i++) {
-                if (components.get(i).getLeft().test(state)) {
+                if (components.get(i).condition().test(state)) {
                     selected.set(i);
                 }
             }
             stateCache.put(state, selected);
         }
         long seed = random.nextLong();
-        CheckedRandom partRandom = rtxremix$partRandom.get();
         List<BakedQuad> result = null;
         boolean owned = false;
         for (int i = selected.nextSetBit(0); i >= 0; i = selected.nextSetBit(i + 1)) {
-            partRandom.setSeed(seed);
-            List<BakedQuad> quads = components.get(i).getRight().getQuads(state, face, partRandom);
+            random.setSeed(seed);
+            List<BakedQuad> quads = components.get(i).model().getQuads(state, face, random);
             if (result == null) {
                 result = quads;
             } else {

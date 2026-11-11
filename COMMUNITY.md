@@ -65,7 +65,7 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 
 ## 安装（本地）
 
-1. 构建：`.\gradlew.bat package -Parch=win64`，得到 `build\distributions\rtx-remix-renderer-0.1.0-ce.1-…-win64.jar`。
+1. 构建：`.\gradlew.bat package -Parch=win64`，得到 `build\distributions\rtx-remix-renderer-<版本>-…-win64.jar`。
 2. 安装到已有的官方安装目录（会自动备份被替换的 jar 和 conf）：
    ```powershell
    .\packaging\community-install.ps1 -GameDir 'D:\PCL\.minecraft\versions\RTX' -Jar '<上一步的 jar>'
