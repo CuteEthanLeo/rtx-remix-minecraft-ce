@@ -55,7 +55,6 @@ import com.nvidia.rtxremix.minecraft.entity.RemixEntitySubmitter;
 import com.nvidia.rtxremix.minecraft.entity.RemixFirstPersonPass;
 import com.nvidia.rtxremix.minecraft.cloud.CloudRenderer;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.render.state.OutlineRenderState;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.BlockEntity;
@@ -1519,11 +1518,9 @@ public class RemixRenderer {
      * Captures vanilla's targeted-block outline for Remix submission later in
      * the same frame.
      */
-    public void captureBlockOutline(
-            WorldRenderContext context,
-            OutlineRenderState outline) {
+    public void captureBlockOutline(OutlineRenderState outline) {
         if (blockOutlinePass != null) {
-            blockOutlinePass.captureBlockOutline(context, outline);
+            blockOutlinePass.captureBlockOutline(outline);
         }
     }
     

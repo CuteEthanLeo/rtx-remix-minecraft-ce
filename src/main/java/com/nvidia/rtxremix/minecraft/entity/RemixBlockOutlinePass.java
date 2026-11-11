@@ -18,7 +18,6 @@ import com.nvidia.rtxremix.minecraft.asset.RemixMaterialStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMesh;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshStore;
 import com.nvidia.rtxremix.minecraft.asset.RemixMeshSurface;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.state.OutlineRenderState;
 import net.minecraft.client.world.ClientWorld;
@@ -37,7 +36,7 @@ import java.util.List;
  * voxel-shape edge becomes a thin camera-facing ribbon. Its dynamic mesh is
  * recreated for each captured outline because the Remix scene API exposes
  * immutable mesh geometry. The instance is submitted only in frames where
- * Fabric reports a block outline. {@link InstanceCategoryBit#WORLD_UI} applies
+ * vanilla draws a block outline. {@link InstanceCategoryBit#WORLD_UI} applies
  * Remix's world-UI material treatment while preserving scene depth testing.
  */
 public final class RemixBlockOutlinePass implements AutoCloseable {
@@ -70,22 +69,19 @@ public final class RemixBlockOutlinePass implements AutoCloseable {
 
     /**
      * Starts a new vanilla world-render frame. The mesh remains allocated, but
-     * the captured outline does not carry over if Fabric omits the callback.
+     * the captured outline does not carry over if vanilla draws none.
      */
     public void beginFrame() {
         pendingOutline = null;
     }
 
     /**
-     * Captures the targeted block's vanilla outline shape. Shape evaluation
-     * happens during the Fabric callback so modded block shape behavior is
-     * preserved exactly at the point vanilla draws it.
+     * Captures the targeted block's vanilla outline shape from vanilla's
+     * extracted outline state, whose shape vanilla already evaluated against
+     * the targeting entity, so modded block shape behavior is preserved
+     * exactly at the point vanilla draws it.
      */
-    public void captureBlockOutline(
-            WorldRenderContext context,
-            OutlineRenderState outline) {
-        // 1.21.9+: Fabric's BEFORE_BLOCK_OUTLINE hands over vanilla's extracted outline
-        // state, whose shape vanilla already evaluated against the targeting entity.
+    public void captureBlockOutline(OutlineRenderState outline) {
         MinecraftClient client = MinecraftClient.getInstance();
         ClientWorld world = client.world;
         BlockPos blockPos = outline == null ? null : outline.pos();

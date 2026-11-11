@@ -72,8 +72,6 @@ import it.unimi.dsi.fastutil.longs.LongSets;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.world.AbstractWorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -85,7 +83,9 @@ import net.minecraft.client.gui.screen.option.OptionsScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
+import net.minecraft.client.render.state.OutlineRenderState;
 import net.minecraft.client.gui.screen.ingame.HandledScreens;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
@@ -593,50 +593,6 @@ public class RtxRemixMod implements ClientModInitializer {
                     }
                 });
 
-        // Applies pending world and resource changes and preloads the large
-        // block-entity atlases before vanilla's world render, where block entities
-        // are captured in place by BlockEntityRenderDispatcherMixin.
-        // 1.21.11: Fabric split world rendering into extraction and drawing events. START maps to
-        // END_EXTRACTION (the first event still before vanilla draws anything), and END moved to
-        // WorldRendererMixin's render() tail, which calls onWorldRenderEnd().
-        WorldRenderEvents.END_EXTRACTION.register(context -> {
-            if (renderer != null && renderer.isInitialized()) {
-                renderer.beginBlockOutlineFrame();
-            }
-            if (isRendererProfilingActive()) {
-                try (ProfileScope startScope = ProfileScope.begin("WorldRender.START")) {
-                    renderer.beginWorldRenderFrame();
-                }
-                transitionWorldRenderPhase("WorldRender.vanilla.setup");
-            } else {
-                closeWorldRenderPhaseScope();
-            }
-        });
-
-        WorldRenderEvents.START_MAIN.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.terrainOpaque"));
-        WorldRenderEvents.BEFORE_ENTITIES.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.entities"));
-        WorldRenderEvents.AFTER_ENTITIES.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.blockEntities"));
-        WorldRenderEvents.BEFORE_BLOCK_OUTLINE.register((context, outlineRenderState) -> {
-            transitionWorldRenderPhase("WorldRender.vanilla.blockOutline");
-            if (renderer != null
-                    && renderer.isInitialized()
-                    && isRtxEnabled()) {
-                renderer.captureBlockOutline(context, outlineRenderState);
-            }
-            return true;
-        });
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.debugAndTranslucent"));
-        WorldRenderEvents.BEFORE_TRANSLUCENT.register(context ->
-            transitionWorldRenderPhase("WorldRender.vanilla.translucent"));
-        WorldRenderEvents.END_MAIN.register(context -> {
-            transitionWorldRenderPhase("WorldRender.vanilla.last");
-            closeWorldRendererProfilerPhase(context);
-        });
-
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             try (ProfileScope tickScope = ProfileScope.begin("ClientTick.END.benchmark")) {
                 if (renderer != null) {
@@ -647,6 +603,76 @@ public class RtxRemixMod implements ClientModInitializer {
         });
 
         LOGGER.info("RTX Remix Renderer initialized successfully!");
+    }
+
+    /**
+     * End of vanilla's extraction, the last point before it draws anything. Applies pending
+     * world and resource changes and preloads the large block-entity atlases before vanilla's
+     * world render, where block entities are captured in place by
+     * BlockEntityRenderDispatcherMixin.
+     *
+     * <p>Fabric API for 1.21.9 has no world render events, so {@code WorldRendererMixin} calls
+     * this and the {@code onWorldRender*} hooks below from the points in vanilla's traversal
+     * where Fabric API for 1.21.10 fires the event each is named after.
+     */
+    public static void onWorldRenderEndExtraction() {
+        RtxRemixMod mod = instance;
+        if (mod == null) {
+            return;
+        }
+        if (renderer != null && renderer.isInitialized()) {
+            renderer.beginBlockOutlineFrame();
+        }
+        if (mod.isRendererProfilingActive()) {
+            try (ProfileScope startScope = ProfileScope.begin("WorldRender.START")) {
+                renderer.beginWorldRenderFrame();
+            }
+            mod.transitionWorldRenderPhase("WorldRender.vanilla.setup");
+        } else {
+            mod.closeWorldRenderPhaseScope();
+        }
+    }
+
+    public static void onWorldRenderStartMain() {
+        enterWorldRenderPhase("WorldRender.vanilla.terrainOpaque");
+    }
+
+    public static void onWorldRenderBeforeEntities() {
+        enterWorldRenderPhase("WorldRender.vanilla.entities");
+    }
+
+    public static void onWorldRenderAfterEntities() {
+        enterWorldRenderPhase("WorldRender.vanilla.blockEntities");
+    }
+
+    /** Vanilla is about to draw {@code outlineRenderState}; it draws it whether Remix captures it or not. */
+    public static void onWorldRenderBeforeBlockOutline(OutlineRenderState outlineRenderState) {
+        enterWorldRenderPhase("WorldRender.vanilla.blockOutline");
+        if (renderer != null
+                && renderer.isInitialized()
+                && isRtxEnabled()) {
+            renderer.captureBlockOutline(outlineRenderState);
+        }
+    }
+
+    public static void onWorldRenderBeforeDebugRender() {
+        enterWorldRenderPhase("WorldRender.vanilla.debugAndTranslucent");
+    }
+
+    public static void onWorldRenderBeforeTranslucent() {
+        enterWorldRenderPhase("WorldRender.vanilla.translucent");
+    }
+
+    public static void onWorldRenderEndMain(WorldRenderer worldRenderer) {
+        enterWorldRenderPhase("WorldRender.vanilla.last");
+        closeWorldRendererProfilerPhase(worldRenderer);
+    }
+
+    private static void enterWorldRenderPhase(String phaseName) {
+        RtxRemixMod mod = instance;
+        if (mod != null) {
+            mod.transitionWorldRenderPhase(phaseName);
+        }
     }
 
     /**
@@ -756,8 +782,8 @@ public class RtxRemixMod implements ClientModInitializer {
         }
     }
 
-    private static void closeWorldRendererProfilerPhase(AbstractWorldRenderContext context) {
-        if (context != null && context.worldRenderer() instanceof WorldRendererProfilingAccess access) {
+    private static void closeWorldRendererProfilerPhase(WorldRenderer worldRenderer) {
+        if (worldRenderer instanceof WorldRendererProfilingAccess access) {
             access.rtxremix$closeProfilerPhaseForFabricEvent();
         }
     }

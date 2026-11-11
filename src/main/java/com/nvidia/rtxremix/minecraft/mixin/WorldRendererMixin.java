@@ -37,6 +37,7 @@ import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.chunk.ChunkBuilder;
 import net.minecraft.client.render.chunk.ChunkRenderData;
 import net.minecraft.client.render.chunk.ChunkRendererRegionBuilder;
+import net.minecraft.client.render.state.WorldRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.player.BlockBreakingInfo;
@@ -78,6 +79,9 @@ import java.util.SortedSet;
  *   <li>The block-entity walk is narrowed to chunks that hold one.</li>
  *   <li>Every vanilla render phase, {@code setupTerrain} and
  *       {@code updateChunks} are labelled for Tracy and JFR.</li>
+ *   <li>The mod's world-render hooks are called from the points where Fabric API
+ *       for 1.21.10 fires its world render events, which Fabric API for 1.21.9
+ *       does not have.</li>
  * </ul>
  */
 @Mixin(WorldRenderer.class)
@@ -113,6 +117,10 @@ public abstract class WorldRendererMixin
     @Shadow
     @Final
     private Long2ObjectMap<SortedSet<BlockBreakingInfo>> blockBreakingProgressions;
+
+    @Shadow
+    @Final
+    private WorldRenderState worldRenderState;
 
     private ProfileScope rtxremix$profilerPhaseScope;
     private String rtxremix$profilerPhaseName;
@@ -356,6 +364,105 @@ public abstract class WorldRendererMixin
         RtxRemixMod.onWorldRenderEnd();
     }
 
+    // The injectors from here to rtxremix$endMain stand in for Fabric's world render events.
+    // method_62214 is the main pass's renderer lambda, which Yarn leaves unnamed. None of them
+    // cancels or changes vanilla work.
+
+    /** The border is the last render state vanilla extracts. */
+    @Inject(
+            method = "render",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/WorldBorderRendering;updateRenderState(Lnet/minecraft/world/border/WorldBorder;Lnet/minecraft/util/math/Vec3d;DLnet/minecraft/client/render/state/WorldBorderRenderState;)V",
+                    shift = At.Shift.AFTER
+            ))
+    private void rtxremix$endExtraction(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderEndExtraction();
+    }
+
+    @Inject(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/SectionRenderState;renderSection(Lnet/minecraft/client/render/BlockRenderLayerGroup;)V",
+                    ordinal = 0
+            ))
+    private void rtxremix$startMain(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderStartMain();
+    }
+
+    @Inject(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE_STRING",
+                    target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V",
+                    args = "ldc=submitEntities"
+            ))
+    private void rtxremix$beforeEntities(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderBeforeEntities();
+    }
+
+    @Inject(
+            method = "method_62214",
+            slice = @Slice(
+                    from = @At(
+                            value = "INVOKE_STRING",
+                            target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V",
+                            args = "ldc=submitEntities")),
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/OutlineVertexConsumerProvider;draw()V",
+                    shift = At.Shift.AFTER
+            ))
+    private void rtxremix$afterEntities(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderAfterEntities();
+    }
+
+    /**
+     * Past vanilla's two early returns, so this runs only for an outline vanilla draws in
+     * this pass. The outline is read from the renderer's own state, as Fabric reads it.
+     */
+    @Inject(
+            method = "renderTargetBlockOutline",
+            at = @At(
+                    value = "FIELD",
+                    target = "Lnet/minecraft/client/render/state/CameraRenderState;pos:Lnet/minecraft/util/math/Vec3d;"
+            ))
+    private void rtxremix$beforeBlockOutline(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderBeforeBlockOutline(worldRenderState.outlineRenderState);
+    }
+
+    @Inject(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/debug/DebugRenderer;render(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/Frustum;Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;DDDZ)V"
+            ))
+    private void rtxremix$beforeDebugRender(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderBeforeDebugRender();
+    }
+
+    @Inject(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE_STRING",
+                    target = "Lnet/minecraft/util/profiler/Profiler;push(Ljava/lang/String;)V",
+                    args = "ldc=translucent"
+            ))
+    private void rtxremix$beforeTranslucent(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderBeforeTranslucent();
+    }
+
+    @Inject(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE:LAST",
+                    target = "Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;draw()V"
+            ))
+    private void rtxremix$endMain(CallbackInfo ci) {
+        RtxRemixMod.onWorldRenderEndMain((WorldRenderer) (Object) this);
+    }
+
     @WrapOperation(
             method = "render",
             at = @At(
@@ -437,7 +544,7 @@ public abstract class WorldRendererMixin
         return rtxremix$blockEntityChunkIterator.reset(rtxremix$blockEntityChunks, blockEntityChunks);
     }
 
-    // setupTerrain's successor, taking (Camera, Frustum, boolean); Yarn 1.21.10 leaves it unnamed.
+    // setupTerrain's successor, taking (Camera, Frustum, boolean); Yarn 1.21.9 leaves it unnamed.
     @Inject(method = "method_74752", at = @At("HEAD"))
     private void rtxremix$setupTerrainHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
