@@ -448,8 +448,8 @@ public final class BlockQuadEmitter {
         }
 
         int color = 0xFFFFFFFF;
-        if (bq.getColorIndex() >= 0 && blockColors != null) {
-            int tint = getBlockTint(state, world, bq.getColorIndex());
+        if (bq.getTintIndex() >= 0 && blockColors != null) {
+            int tint = getBlockTint(state, world, bq.getTintIndex());
             int r = (tint >> 16) & 0xFF, g = (tint >> 8) & 0xFF, b = tint & 0xFF;
             color = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
@@ -524,7 +524,8 @@ public final class BlockQuadEmitter {
 
         renderContext.prepare(world, state, mutablePos.toImmutable(), this::frapiCullTest);
 
-        fbm.emitBlockQuads(world, state, mutablePos.toImmutable(), randomSupplier, renderContext);
+        fbm.emitBlockQuads(renderContext.getEmitter(), world, state, mutablePos.toImmutable(), randomSupplier,
+                renderContext.cullTest());
 
         List<SectionBlockData.BlockQuad> frapiQuads = renderContext.harvest();
         for (SectionBlockData.BlockQuad fq : frapiQuads) {

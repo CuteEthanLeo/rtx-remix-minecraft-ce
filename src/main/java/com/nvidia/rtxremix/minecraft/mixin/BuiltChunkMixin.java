@@ -89,11 +89,13 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
     }
 
     /**
-     * The probe sees exactly the columns the snapshot holds: ChunkRendererRegionBuilder.build
-     * reads ClientChunkManager.getChunk(x, z, FULL, true), which returns the shared EmptyChunk
-     * precisely when this create=false probe returns null, and nothing interleaves on the
-     * render thread between the two. A null region (empty own section) is recorded too: it
-     * has no geometry that a neighbour could make wrong.
+     * The probe sees no column the snapshot lacks: ChunkRendererRegionBuilder.build reads
+     * ClientChunkManager.getChunk(x, z, FULL, true), which returns the shared EmptyChunk
+     * precisely when the probe's create=false lookup returns null, and nothing interleaves on
+     * the render thread between the two. Since 1.21.4 the probe also wants the column's light
+     * enabled, so a column the snapshot holds while its light is still pending is recorded as
+     * absent; that only keeps a re-flag which could have been dropped. A null region (empty
+     * own section) is recorded too: it has no geometry that a neighbour could make wrong.
      */
     @Inject(
             method = "createRebuildTask(Lnet/minecraft/client/render/chunk/ChunkRendererRegionBuilder;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk$Task;",

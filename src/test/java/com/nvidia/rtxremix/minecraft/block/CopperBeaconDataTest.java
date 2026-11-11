@@ -86,6 +86,9 @@ class CopperBeaconDataTest {
     void itemModelIsWhereThisVersionLooksForIt() {
         assertNotNull(CopperBeaconDataTest.class.getResource(ASSETS + "models/item/copper_beacon.json"),
                 "the beacon has no item model");
+        // Since 1.21.4 an item draws through its item model definition, which names the model above.
+        assertNotNull(CopperBeaconDataTest.class.getResource(ASSETS + "items/copper_beacon.json"),
+                "the beacon has no item model definition");
     }
 
     private static JsonElement read(String resource) throws IOException {

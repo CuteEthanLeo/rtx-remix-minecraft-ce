@@ -52,9 +52,9 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - **第三人称玩家影子**：静态审查没有找到压掉影子的代码，需要在游戏里按复现步骤确认（见下方「验证」）后再修。
 - 雨滴落在**水面**（湖、河）上的环形涟漪：仍用「雨中加快、加细的双层波浪」近似。露天地面上的积水坑和雨滴涟漪已经加入（见上表「积水坑」「雨滴涟漪」）。
 
-### Minecraft 1.21.3 分支（`mc/1.21.3`）移植状态
+### Minecraft 1.21.4 分支（`mc/1.21.4`）移植状态
 
-这个分支就是 `mc/1.21.2` 的移植，对着 1.21.3 重新编译和测试（1.21.3 是 1.21.2 的热修复版本，移植代码没有改动）。它从 1.21.1 移植到 1.21.2，**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。和 1.21.1 相比：
+这个分支在 `mc/1.21.3`（即 1.21.2 的移植）的基础上前移到 1.21.4，没有停用任何功能。1.21.4 重做了物品渲染（物品模型定义和 `ItemRenderState`），所以手持物品的图层分类和手持火焰改挂在 `ItemModelManager` / `ItemRenderState` 上；雨雪改从 `VertexConsumerProvider` 捕获；星星改为逐顶点抄录；玩家皮肤改由注册时带图像的 `NativeImageBackedTexture` 进入贴图缓存；Fabric 渲染 API 去掉了 `RenderContext`，第三方模型改经 `QuadEmitter` 捕获。手持火焰对由多个烘焙层组成的物品只在第一层发一次。下面是 1.21.2 移植时的说明，同样适用。它从 1.21.1 移植到 1.21.2，**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。和 1.21.1 相比：
 
 - 区块可见性遍历的零分配移植和增量传播的每帧预算没有移植，改走原版遍历；1.21.1 的粗粒度视锥索引由 1.21.2 原版自带的八叉树取代；区块存储环形重定位改走原版（1.21.2 原版已经只重定位变化的槽位）。`rtxremix.vanillaVisibilityWalk`、`rtxremix.logVisibleSet` 在这个分支不存在。
 - 集成服务器每 tick 区块列表复用、deadmau5 耳朵的名字缓存：1.21.2 原版已经不再分配，相应 mixin 删除。
@@ -203,8 +203,11 @@ Known gaps: the third-person player shadow still needs an in-game reproduction b
 water (lakes, rivers) are still approximated by faster, finer wave layers (puddles and ripples on open ground are
 implemented, see above).
 
-The `mc/1.21.3` branch is the `mc/1.21.2` port rebuilt and retested against 1.21.3, a hotfix release of 1.21.2, with
-no change to the port. It is ported from 1.21.1 and is verified only by the build, the JVM tests, and
+The `mc/1.21.4` branch moves the `mc/1.21.2` port forward to 1.21.4 and drops no feature. 1.21.4 reworked item
+rendering, so held-item layer classification and the held flame hook into `ItemModelManager` and `ItemRenderState`;
+rain and snow are captured from the `VertexConsumerProvider`, stars vertex by vertex, player skins through the
+image-backed texture they now register as, and third-party Fabric models through `QuadEmitter` now that
+`RenderContext` is gone. It is ported from 1.21.1 and is verified only by the build, the JVM tests, and
 `MixinTargetsApplyTest`, which loads every mixin target under Fabric Loader; rendering is not yet verified in game.
 It runs vanilla's chunk visibility walk (the allocation-free port and the propagation budget are not ported; vanilla's
 new octree replaces the coarse frustum index), drops the server tick-list and deadmau5 name mixins that 1.21.2 made

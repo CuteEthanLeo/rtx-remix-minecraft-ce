@@ -36,7 +36,7 @@ import java.util.Map;
  * variant; callers treat model quad lists as read-only. Several matching parts still
  * concatenate into a new list.
  *
- * <p>Since 1.21.2 the components are {@code MultipartBakedModel.class_10204} records rather
+ * <p>Since 1.21.2 the selectors are {@code MultipartBakedModel.Selector} records rather
  * than commons-lang {@code Pair}s; the field's generic type is erased, so a stale type here
  * compiles and passes the mixin tests but fails with a {@code ClassCastException} on the
  * first multipart block a section build meets.
@@ -46,7 +46,7 @@ public abstract class MultipartBakedModelMixin {
 
     @Shadow
     @Final
-    private List<MultipartBakedModel.class_10204> components;
+    private List<MultipartBakedModel.Selector> selectors;
 
     @Shadow
     @Final
@@ -65,8 +65,8 @@ public abstract class MultipartBakedModelMixin {
         BitSet selected = stateCache.get(state);
         if (selected == null) {
             selected = new BitSet();
-            for (int i = 0, n = components.size(); i < n; i++) {
-                if (components.get(i).condition().test(state)) {
+            for (int i = 0, n = selectors.size(); i < n; i++) {
+                if (selectors.get(i).condition().test(state)) {
                     selected.set(i);
                 }
             }
@@ -77,7 +77,7 @@ public abstract class MultipartBakedModelMixin {
         boolean owned = false;
         for (int i = selected.nextSetBit(0); i >= 0; i = selected.nextSetBit(i + 1)) {
             random.setSeed(seed);
-            List<BakedQuad> quads = components.get(i).model().getQuads(state, face, random);
+            List<BakedQuad> quads = selectors.get(i).model().getQuads(state, face, random);
             if (result == null) {
                 result = quads;
             } else {

@@ -5,15 +5,13 @@
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import net.fabricmc.fabric.api.renderer.v1.material.RenderMaterial;
-import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableQuadView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
+import net.fabricmc.fabric.api.renderer.v1.mesh.QuadTransform;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
-import net.fabricmc.fabric.api.renderer.v1.render.RenderContext;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.Sprite;
-import net.minecraft.item.ModelTransformationMode;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -27,21 +25,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * {@link RenderContext} implementation that captures quads emitted by FRAPI
- * models via {@code emitBlockQuads()}. The captured quads are converted to
- * {@link SectionBlockData.BlockQuad} records with full sprite/layer context.
+ * Captures quads emitted by FRAPI models via {@code emitBlockQuads()}: the
+ * model writes into {@link #getEmitter()} and consults {@link #cullTest()}.
+ * The captured quads are converted to {@link SectionBlockData.BlockQuad}
+ * records with full sprite/layer context.
  *
  * <p>Thread-local: one instance is reused per worker thread (via ThreadLocal
  * in {@link BlockQuadEmitter}).
  */
-final class RemixRenderContext implements RenderContext {
+final class RemixRenderContext {
 
     private final CapturingQuadEmitter emitter = new CapturingQuadEmitter();
-    private final Consumer<Mesh> meshConsumer = mesh -> mesh.outputTo(getEmitter());
+    private final Predicate<@Nullable Direction> faceCullTest = this::isFaceCulled;
     private final Deque<QuadTransform> transformStack = new ArrayDeque<>();
     private final List<SectionBlockData.BlockQuad> captured = new ArrayList<>();
 
@@ -65,45 +63,32 @@ final class RemixRenderContext implements RenderContext {
         return List.copyOf(captured);
     }
 
-    // --- RenderContext ---
-
-    @Override
-    public QuadEmitter getEmitter() {
+    /** The emitter a model writes its quads into, cleared of any unfinished quad. */
+    QuadEmitter getEmitter() {
         emitter.clear();
         return emitter;
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public Consumer<Mesh> meshConsumer() {
-        return meshConsumer;
+    /** The cull test handed to {@code emitBlockQuads()}; a null face is never culled. */
+    Predicate<@Nullable Direction> cullTest() {
+        return faceCullTest;
     }
 
-    @Override
-    public boolean isFaceCulled(@Nullable Direction face) {
+    boolean isFaceCulled(@Nullable Direction face) {
         if (face == null) return false;
         return cullTest != null && cullTest.test(face);
     }
 
-    @Override
-    public void pushTransform(QuadTransform transform) {
+    void pushTransform(QuadTransform transform) {
         transformStack.push(transform);
     }
 
-    @Override
-    public void popTransform() {
+    void popTransform() {
         transformStack.pop();
     }
 
-    @Override
-    public boolean hasTransform() {
+    boolean hasTransform() {
         return !transformStack.isEmpty();
-    }
-
-    /** Terrain capture is a block context; Fabric API forbids this call there. */
-    @Override
-    public ModelTransformationMode itemTransformationMode() {
-        throw new IllegalStateException("itemTransformationMode() can only be called on an item render context.");
     }
 
     /**
@@ -124,7 +109,7 @@ final class RemixRenderContext implements RenderContext {
         private Direction cullFaceVal;
         private Direction nominalFaceVal;
         private RenderMaterial materialVal;
-        private int colorIndexVal = -1;
+        private int tintIndexVal = -1;
         private int tagVal;
 
         private Sprite bakedSprite;
@@ -143,10 +128,20 @@ final class RemixRenderContext implements RenderContext {
             cullFaceVal = null;
             nominalFaceVal = null;
             materialVal = null;
-            colorIndexVal = -1;
+            tintIndexVal = -1;
             tagVal = 0;
             bakedSprite = null;
             faceNormalDirty = true;
+        }
+
+        @Override
+        public void pushTransform(QuadTransform transform) {
+            RemixRenderContext.this.pushTransform(transform);
+        }
+
+        @Override
+        public void popTransform() {
+            RemixRenderContext.this.popTransform();
         }
 
         @Override
@@ -299,8 +294,8 @@ final class RemixRenderContext implements RenderContext {
         }
 
         @Override
-        public QuadEmitter colorIndex(int colorIndex) {
-            this.colorIndexVal = colorIndex;
+        public QuadEmitter tintIndex(int tintIndex) {
+            this.tintIndexVal = tintIndex;
             return this;
         }
 
@@ -399,7 +394,7 @@ final class RemixRenderContext implements RenderContext {
                                         @Nullable Direction cullFace) {
             this.cullFaceVal = cullFace;
             this.materialVal = material;
-            this.colorIndexVal = quad.getColorIndex();
+            this.tintIndexVal = quad.getTintIndex();
             this.bakedSprite = quad.getSprite();
             this.nominalFaceVal = quad.getFace();
 
@@ -442,7 +437,7 @@ final class RemixRenderContext implements RenderContext {
             cullFace(source.cullFace());
             nominalFace(source.nominalFace());
             material(source.material());
-            colorIndex(source.colorIndex());
+            tintIndex(source.tintIndex());
             tag(source.tag());
             return this;
         }
@@ -534,7 +529,7 @@ final class RemixRenderContext implements RenderContext {
         }
 
         @Override public RenderMaterial material() { return materialVal; }
-        @Override public int colorIndex() { return colorIndexVal; }
+        @Override public int tintIndex() { return tintIndexVal; }
         @Override public int tag() { return tagVal; }
 
         @Override

@@ -5,53 +5,57 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.sky.WorldRendererStarAccess;
-import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.SkyRendering;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexFormatElement;
+import net.minecraft.client.render.VertexConsumer;
+import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
- * Copies vanilla's star positions while their CPU buffer still exists. Since 1.21.2 the star
- * buffer belongs to {@link SkyRendering} rather than the world renderer, which forwards
- * {@link WorldRendererStarAccess} here.
+ * Copies vanilla's star positions as they are tessellated. Since 1.21.2 the star buffer
+ * belongs to {@link SkyRendering} rather than the world renderer, which forwards
+ * {@link WorldRendererStarAccess} here. Since 1.21.4 the tessellation writes into a consumer
+ * that is uploaded and discarded by its caller, so the positions are taken one vertex at a
+ * time on their way in.
  */
 @Mixin(SkyRendering.class)
 public abstract class SkyRenderingMixin implements WorldRendererStarAccess {
-    // No initializer: tessellateStars runs from a field initializer of the target, before
+    private static final int rtxremix$INITIAL_STAR_FLOATS = 4096;
+
+    // No initializers: tessellateStar runs from a field initializer of the target, before
     // a mixin field initializer would.
     private float[] rtxremix$starVertices;
+    private int rtxremix$starFloatCount;
 
-    @Inject(method = "tessellateStars", at = @At("RETURN"))
-    private void rtxremix$captureStarVertices(
-            Tessellator tessellator,
-            CallbackInfoReturnable<BuiltBuffer> cir) {
-        BuiltBuffer builtBuffer = cir.getReturnValue();
-        BuiltBuffer.DrawParameters parameters = builtBuffer.getDrawParameters();
-        int positionOffset = parameters.format().getOffset(VertexFormatElement.POSITION);
-        if (positionOffset < 0) {
-            rtxremix$starVertices = new float[0];
-            return;
-        }
+    @Inject(method = "tessellateStar", at = @At("HEAD"))
+    private void rtxremix$beginStarCapture(VertexConsumer vertexConsumer, CallbackInfo ci) {
+        rtxremix$starVertices = new float[rtxremix$INITIAL_STAR_FLOATS];
+        rtxremix$starFloatCount = 0;
+    }
 
-        int vertexCount = parameters.vertexCount();
-        int stride = parameters.format().getVertexSizeByte();
-        ByteBuffer vertices = builtBuffer.getBuffer().duplicate().order(ByteOrder.nativeOrder());
-        float[] positions = new float[vertexCount * 3];
-        for (int vertex = 0; vertex < vertexCount; vertex++) {
-            int source = vertex * stride + positionOffset;
-            int destination = vertex * 3;
-            positions[destination] = vertices.getFloat(source);
-            positions[destination + 1] = vertices.getFloat(source + Float.BYTES);
-            positions[destination + 2] = vertices.getFloat(source + 2 * Float.BYTES);
+    @ModifyArg(
+            method = "tessellateStar",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/VertexConsumer;vertex(Lorg/joml/Vector3f;)Lnet/minecraft/client/render/VertexConsumer;"))
+    private Vector3f rtxremix$captureStarVertex(Vector3f position) {
+        if (rtxremix$starFloatCount + 3 > rtxremix$starVertices.length) {
+            rtxremix$starVertices = Arrays.copyOf(rtxremix$starVertices, rtxremix$starVertices.length * 2);
         }
-        rtxremix$starVertices = positions;
+        rtxremix$starVertices[rtxremix$starFloatCount++] = position.x;
+        rtxremix$starVertices[rtxremix$starFloatCount++] = position.y;
+        rtxremix$starVertices[rtxremix$starFloatCount++] = position.z;
+        return position;
+    }
+
+    @Inject(method = "tessellateStar", at = @At("RETURN"))
+    private void rtxremix$endStarCapture(VertexConsumer vertexConsumer, CallbackInfo ci) {
+        rtxremix$starVertices = Arrays.copyOf(rtxremix$starVertices, rtxremix$starFloatCount);
     }
 
     @Override

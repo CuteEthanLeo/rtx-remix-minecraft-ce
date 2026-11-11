@@ -6,6 +6,7 @@ package com.nvidia.rtxremix.minecraft.entity;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -57,6 +58,8 @@ public final class EntityRenderContext {
     private Entity[] renderedEntities = new Entity[8];
     private int renderedEntityDepth;
     private int blockItemLayer = NO_BLOCK_ITEM;
+    /** Stack of the item being rendered, or null outside one and once it has been taken. */
+    private ItemStack renderedItem;
 
     /** The viewer's eye in the capture's space, valid while {@link #eyeKnown}. */
     private final Vector3f eye = new Vector3f();
@@ -94,6 +97,7 @@ public final class EntityRenderContext {
         this.activeHand = null;
         this.heldItemHolder = null;
         this.blockItemLayer = NO_BLOCK_ITEM;
+        this.renderedItem = null;
         this.eyeKnown = false;
         this.boneCounter = 0;
         // Bone transforms are not cleared: the pre-allocated Matrix4f objects are
@@ -131,6 +135,7 @@ public final class EntityRenderContext {
         this.activeHand = null;
         this.heldItemHolder = null;
         this.blockItemLayer = NO_BLOCK_ITEM;
+        this.renderedItem = null;
         this.eyeKnown = false;
     }
 
@@ -144,8 +149,8 @@ public final class EntityRenderContext {
      * {@code BlockTextureManager} layer type, or {@link #NO_BLOCK_ITEM}. Ice and
      * stained glass are {@code L_TRANS}, clear glass {@code L_GLASS}.
      *
-     * <p>Set by {@code ItemRendererMixin} for the duration of one
-     * {@code ItemRenderer.renderItem} call and sampled by
+     * <p>Set by {@code ItemRenderStateMixin} for the duration of one
+     * {@code ItemRenderState.render} call and sampled by
      * {@link RemixCapturingConsumer} as each part opens, so the answer travels
      * with the geometry that item produced.
      */
@@ -155,6 +160,26 @@ public final class EntityRenderContext {
 
     public void setBlockItemLayer(int blockItemLayer) {
         this.blockItemLayer = blockItemLayer;
+    }
+
+    /**
+     * Marks {@code stack} as the item being rendered, or null for none. Set by
+     * {@code ItemRenderStateMixin} alongside {@link #setBlockItemLayer}.
+     */
+    public void setRenderedItem(ItemStack stack) {
+        renderedItem = stack;
+    }
+
+    /**
+     * The stack of the item being rendered, handed out once: the item renderer's hook runs
+     * for every baked layer of an item, and the item's lit element belongs to the item, so
+     * the first layer takes the stack and later ones get null, as does a call outside an
+     * item render.
+     */
+    public ItemStack takeRenderedItem() {
+        ItemStack stack = renderedItem;
+        renderedItem = null;
+        return stack;
     }
 
     /**

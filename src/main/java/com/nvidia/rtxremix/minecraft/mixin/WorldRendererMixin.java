@@ -38,7 +38,6 @@ import net.minecraft.client.render.BuiltChunkStorage;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.Tessellator;
@@ -263,9 +262,9 @@ public abstract class WorldRendererMixin
             return LongSets.emptySet();
         }
 
-        // Same gate as vanilla updateChunks: a section built before its light
-        // is ready would bake bad light, and cancelRebuild below means nothing
-        // re-flags it afterwards.
+        // Same light gate vanilla applies before a rebuild, in BuiltChunk.shouldBuild
+        // since 1.21.4: a section built before its light is ready would bake bad
+        // light, and cancelRebuild below means nothing re-flags it afterwards.
         LightingProvider lightingProvider = world.getLightingProvider();
 
         ArrayList<ChunkBuilder.BuiltChunk> loadedSections = new ArrayList<>();
@@ -435,7 +434,6 @@ public abstract class WorldRendererMixin
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
-            LightmapTextureManager lightmapTextureManager,
             Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
             CallbackInfo ci) {
@@ -461,7 +459,6 @@ public abstract class WorldRendererMixin
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
-            LightmapTextureManager lightmapTextureManager,
             Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
             CallbackInfo ci) {
@@ -500,19 +497,22 @@ public abstract class WorldRendererMixin
     }
 
     // 1.21.2: the particle draw runs in the particles render pass's lambda (method_62213).
+    // 1.21.4: it writes into the shared entity vertex consumers and flushes them itself.
+    // Skipping it is state-neutral: the main pass left that provider empty, and vanilla
+    // draws nothing here either when no particle is alive.
     @Redirect(
             method = "method_62213",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/client/render/LightmapTextureManager;Lnet/minecraft/client/render/Camera;F)V"
+                    target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/client/render/Camera;FLnet/minecraft/client/render/VertexConsumerProvider$Immediate;)V"
             ))
     private void rtxremix$skipVanillaParticleDraw(
             ParticleManager particleManager,
-            LightmapTextureManager lightmapTextureManager,
             Camera camera,
-            float tickDelta) {
+            float tickDelta,
+            VertexConsumerProvider.Immediate vertexConsumers) {
         if (!RtxRemixMod.isRemixWorldRendering()) {
-            particleManager.renderParticles(lightmapTextureManager, camera, tickDelta);
+            particleManager.renderParticles(camera, tickDelta, vertexConsumers);
         }
     }
 

@@ -25,9 +25,9 @@ import org.spongepowered.asm.mixin.Mixin;
  * identity one so the geometry stays block-local. When Remix declines, vanilla renders
  * as usual.
  *
- * <p>{@code renderEntity}, which held items reach through {@code BuiltinModelItemRenderer},
- * is not wrapped: a block entity rendered inside an entity capture arrives through that
- * entity's provider and becomes that entity's parts.
+ * <p>Held items never reach this method. Since 1.21.4 an item that looks like a block
+ * entity, a chest or a banner, is drawn by its special model renderer, which writes into
+ * the provider of the entity capture it is rendered inside and becomes that entity's parts.
  */
 @Mixin(BlockEntityRenderDispatcher.class)
 public abstract class BlockEntityRenderDispatcherMixin {

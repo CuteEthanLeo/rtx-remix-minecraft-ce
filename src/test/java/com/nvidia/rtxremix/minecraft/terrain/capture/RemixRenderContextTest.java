@@ -7,7 +7,7 @@ package com.nvidia.rtxremix.minecraft.terrain.capture;
 import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.impl.client.indigo.renderer.IndigoRenderer;
-import net.fabricmc.fabric.impl.client.indigo.renderer.mesh.MeshBuilderImpl;
+import net.fabricmc.fabric.impl.client.indigo.renderer.mesh.MutableMeshImpl;
 import net.minecraft.Bootstrap;
 import net.minecraft.SharedConstants;
 import net.minecraft.util.math.BlockPos;
@@ -15,8 +15,6 @@ import net.minecraft.util.math.Direction;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SuppressWarnings("deprecation")
 @Tag("fabric")
 class RemixRenderContextTest {
 
@@ -35,11 +32,10 @@ class RemixRenderContextTest {
         Bootstrap.initialize();
     }
 
-    @ParameterizedTest
-    @EnumSource(MeshOutput.class)
-    void consumesIndigoMeshThroughCaptureEmitterWithVertexDataIntact(MeshOutput output) {
-        MeshBuilderImpl builder = new MeshBuilderImpl();
-        QuadEmitter emitter = builder.getEmitter();
+    @Test
+    void consumesIndigoMeshThroughCaptureEmitterWithVertexDataIntact() {
+        MutableMeshImpl builder = new MutableMeshImpl();
+        QuadEmitter emitter = builder.emitter();
         emitter.square(Direction.UP, 0, 0, 1, 1, 0);
         for (int vertex = 0; vertex < 4; vertex++) {
             emitter.color(vertex, 0xFF123456 + vertex);
@@ -47,16 +43,16 @@ class RemixRenderContextTest {
             emitter.lightmap(vertex, 0x00F000A0 + vertex);
             emitter.normal(vertex, 0, 1, 0);
         }
-        emitter.colorIndex(3).tag(42).emit();
-        Mesh mesh = builder.build();
+        emitter.tintIndex(3).tag(42).emit();
+        Mesh mesh = builder.immutableCopy();
         RemixRenderContext context = context();
         int[] visits = {0};
         context.pushTransform(quad -> {
             visits[0]++;
-            assertSame(IndigoRenderer.MATERIAL_STANDARD, quad.material());
+            assertSame(IndigoRenderer.STANDARD_MATERIAL, quad.material());
             assertEquals(Direction.UP, quad.cullFace());
             assertEquals(Direction.UP, quad.nominalFace());
-            assertEquals(3, quad.colorIndex());
+            assertEquals(3, quad.tintIndex());
             assertEquals(42, quad.tag());
             for (int vertex = 0; vertex < 4; vertex++) {
                 assertEquals(0xFF123456 + vertex, quad.color(vertex));
@@ -67,7 +63,7 @@ class RemixRenderContextTest {
             return true;
         });
 
-        output.accept(mesh, context);
+        mesh.outputTo(context.getEmitter());
 
         assertEquals(1, visits[0]);
         assertEquals(1, context.harvest().size());
@@ -80,15 +76,14 @@ class RemixRenderContextTest {
         assertEquals(1.0f, captured.ny());
     }
 
-    @ParameterizedTest
-    @EnumSource(MeshOutput.class)
-    void meshQuadsFollowTransformStackFilteringAndFaceCulling(MeshOutput output) {
-        MeshBuilderImpl builder = new MeshBuilderImpl();
-        QuadEmitter emitter = builder.getEmitter();
+    @Test
+    void meshQuadsFollowTransformStackFilteringAndFaceCulling() {
+        MutableMeshImpl builder = new MutableMeshImpl();
+        QuadEmitter emitter = builder.emitter();
         for (int tag = 0; tag < 3; tag++) {
             emitter.square(Direction.UP, 0, 0, 1, 1, 0).tag(tag).emit();
         }
-        Mesh mesh = builder.build();
+        Mesh mesh = builder.immutableCopy();
         RemixRenderContext context = context();
         context.prepare(null, null, BlockPos.ORIGIN, face -> face == Direction.NORTH);
         context.pushTransform(quad -> {
@@ -104,7 +99,7 @@ class RemixRenderContextTest {
         });
         context.pushTransform(quad -> quad.tag() != 0);
 
-        output.accept(mesh, context);
+        mesh.outputTo(context.getEmitter());
 
         assertEquals(1, context.harvest().size());
         assertEquals(2.0f, context.harvest().getFirst().positions()[0]);
@@ -113,12 +108,11 @@ class RemixRenderContextTest {
         assertFalse(context.hasTransform());
     }
 
-    @ParameterizedTest
-    @EnumSource(MeshOutput.class)
-    void repeatedMeshConsumptionClearsStaleEmitterStateAndKeepsEarlierCaptures(MeshOutput output) {
-        MeshBuilderImpl builder = new MeshBuilderImpl();
-        builder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).emit();
-        Mesh mesh = builder.build();
+    @Test
+    void repeatedMeshConsumptionClearsStaleEmitterStateAndKeepsEarlierCaptures() {
+        MutableMeshImpl builder = new MutableMeshImpl();
+        builder.emitter().square(Direction.UP, 0, 0, 1, 1, 0).emit();
+        Mesh mesh = builder.immutableCopy();
         RemixRenderContext context = context();
         context.getEmitter().normal(0, 1, 0, 0).tag(99);
         context.pushTransform(quad -> {
@@ -127,21 +121,21 @@ class RemixRenderContextTest {
             return true;
         });
 
-        output.accept(mesh, context);
-        output.accept(mesh, context);
+        mesh.outputTo(context.getEmitter());
+        mesh.outputTo(context.getEmitter());
 
         assertEquals(2, context.harvest().size());
         context.prepare(null, null, BlockPos.ORIGIN, null);
-        output.accept(mesh, context);
+        mesh.outputTo(context.getEmitter());
         assertEquals(1, context.harvest().size());
         assertFalse(context.hasTransform());
     }
 
     @Test
     void meshOutputReplacesStaleNormalsOnTheSameEmitter() {
-        MeshBuilderImpl builder = new MeshBuilderImpl();
-        builder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).normal(1, 0, 1, 0).emit();
-        Mesh mesh = builder.build();
+        MutableMeshImpl builder = new MutableMeshImpl();
+        builder.emitter().square(Direction.UP, 0, 0, 1, 1, 0).normal(1, 0, 1, 0).emit();
+        Mesh mesh = builder.immutableCopy();
         RemixRenderContext context = context();
         QuadEmitter emitter = context.getEmitter();
         for (int vertex = 0; vertex < 4; vertex++) {
@@ -177,10 +171,9 @@ class RemixRenderContextTest {
         assertEquals(1, context.harvest().size());
     }
 
-    @ParameterizedTest
-    @EnumSource(MeshOutput.class)
-    void emptyMeshDoesNotEmitAndClearsStaleEmitterState(MeshOutput output) {
-        Mesh empty = new MeshBuilderImpl().build();
+    @Test
+    void emptyMeshDoesNotEmitAndClearsStaleEmitterState() {
+        Mesh empty = new MutableMeshImpl().immutableCopy();
         RemixRenderContext context = context();
         QuadEmitter emitter = context.getEmitter().normal(0, 1, 0, 0).tag(99);
         context.pushTransform(quad -> {
@@ -189,7 +182,7 @@ class RemixRenderContextTest {
             return true;
         });
 
-        output.accept(empty, context);
+        empty.outputTo(context.getEmitter());
 
         assertTrue(context.harvest().isEmpty());
         emitter.square(Direction.UP, 0, 0, 1, 1, 0).emit();
@@ -198,18 +191,18 @@ class RemixRenderContextTest {
 
     @Test
     void outputToIndigoEmitterPreservesQuadsAndClearsEmitter() {
-        MeshBuilderImpl source = new MeshBuilderImpl();
-        source.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(42).emit();
-        source.getEmitter().square(Direction.NORTH, 0, 0, 1, 1, 0).tag(43).emit();
-        MeshBuilderImpl target = new MeshBuilderImpl();
-        QuadEmitter emitter = target.getEmitter().normal(0, 1, 0, 0).tag(99);
+        MutableMeshImpl source = new MutableMeshImpl();
+        source.emitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(42).emit();
+        source.emitter().square(Direction.NORTH, 0, 0, 1, 1, 0).tag(43).emit();
+        MutableMeshImpl target = new MutableMeshImpl();
+        QuadEmitter emitter = target.emitter().normal(0, 1, 0, 0).tag(99);
 
-        source.build().outputTo(emitter);
+        source.immutableCopy().outputTo(emitter);
 
         assertEquals(0, emitter.tag());
         assertFalse(emitter.hasNormal(0));
         int[] visits = {0};
-        target.build().forEach(quad -> {
+        target.immutableCopy().forEach(quad -> {
             assertEquals(42 + visits[0], quad.tag());
             assertEquals(visits[0] == 0 ? Direction.UP : Direction.NORTH, quad.cullFace());
             assertFalse(quad.hasNormal(0));
@@ -220,12 +213,12 @@ class RemixRenderContextTest {
 
     @Test
     void nestedMeshOutputRestoresTheOuterEmitter() {
-        MeshBuilderImpl outerBuilder = new MeshBuilderImpl();
-        outerBuilder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(1).emit();
-        outerBuilder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(2).emit();
-        MeshBuilderImpl innerBuilder = new MeshBuilderImpl();
-        innerBuilder.getEmitter().square(Direction.NORTH, 0, 0, 1, 1, 0).emit();
-        Mesh innerMesh = innerBuilder.build();
+        MutableMeshImpl outerBuilder = new MutableMeshImpl();
+        outerBuilder.emitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(1).emit();
+        outerBuilder.emitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(2).emit();
+        MutableMeshImpl innerBuilder = new MutableMeshImpl();
+        innerBuilder.emitter().square(Direction.NORTH, 0, 0, 1, 1, 0).emit();
+        Mesh innerMesh = innerBuilder.immutableCopy();
         RemixRenderContext outer = context();
         RemixRenderContext inner = context();
         outer.pushTransform(quad -> {
@@ -235,7 +228,7 @@ class RemixRenderContextTest {
             return true;
         });
 
-        outerBuilder.build().outputTo(outer.getEmitter());
+        outerBuilder.immutableCopy().outputTo(outer.getEmitter());
 
         assertEquals(2, outer.harvest().size());
         assertEquals(1, inner.harvest().size());
@@ -247,18 +240,5 @@ class RemixRenderContextTest {
         RemixRenderContext context = new RemixRenderContext();
         context.prepare(null, null, BlockPos.ORIGIN, null);
         return context;
-    }
-
-    enum MeshOutput {
-        DIRECT,
-        DEPRECATED;
-
-        void accept(Mesh mesh, RemixRenderContext context) {
-            if (this == DIRECT) {
-                mesh.outputTo(context.getEmitter());
-            } else {
-                context.meshConsumer().accept(mesh);
-            }
-        }
     }
 }

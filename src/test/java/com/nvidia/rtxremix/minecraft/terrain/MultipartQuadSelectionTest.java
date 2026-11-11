@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Runs {@code MultipartBakedModelMixin}'s part selection under Fabric Loader, with the mixin
- * applied. Its components field is a generic list, so a component type that no longer matches
+ * applied. Its selectors field is a generic list, so a selector type that no longer matches
  * the targeted Minecraft version compiles and passes {@code MixinTargetsApplyTest}, then throws
  * {@code ClassCastException} on the first fence or wall a section build meets.
  */
@@ -79,7 +79,7 @@ class MultipartQuadSelectionTest {
         assertTrue(model.getQuads(null, Direction.UP, Random.create(1L)).isEmpty());
     }
 
-    private static MultipartBakedModel.class_10204 part(
+    private static MultipartBakedModel.Selector part(
             Predicate<BlockState> condition, List<BakedQuad> quads, List<Long> draws) {
         InvocationHandler handler = (proxy, method, args) -> {
             if (method.getName().equals("getQuads")) {
@@ -94,7 +94,7 @@ class MultipartQuadSelectionTest {
         };
         BakedModel part = (BakedModel) Proxy.newProxyInstance(
                 BakedModel.class.getClassLoader(), new Class<?>[] {BakedModel.class}, handler);
-        return new MultipartBakedModel.class_10204(condition, part);
+        return new MultipartBakedModel.Selector(condition, part);
     }
 
     private static List<BakedQuad> quads(int count) {
