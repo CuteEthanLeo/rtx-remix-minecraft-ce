@@ -9,14 +9,31 @@
 > **RTX Remix for Minecraft 社区版（非官方）**，基于上方官方仓库的衍生版本，与 NVIDIA 无关联。
 > 改动与维护方式见 [COMMUNITY.md](COMMUNITY.md)。
 >
-> **Downloads / 下载**: every supported Minecraft version has its own full installer package on
-> [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases), tagged
-> `v<mod version>+mc<Minecraft version>`. The `main` branch targets the newest supported
-> Minecraft version; older versions live on `mc/<version>` branches.
-> 每个支持的 Minecraft 版本在 Releases 中都有独立的完整安装包。
+> **Downloads / 下载**: each Minecraft version has its own installer package on
+> [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases), tagged `v<mod version>+mc<Minecraft version>`. Download the `…-win64.zip`
+> whose tag ends in your Minecraft version, extract it, and run `install.bat`. A package only
+> works with the Minecraft version in its tag.
+>
+> 每个 Minecraft 版本有独立的安装包，发布标签以 `+mc<Minecraft 版本>` 结尾。下载标签与你的
+> Minecraft 版本一致的 `…-win64.zip`，解压后运行 `install.bat`。安装包只适用于标签里的那个
+> Minecraft 版本，不能混用。
+>
+> | Minecraft | Branch / 分支 | Download / 下载 |
+> |---|---|---|
+> | 1.21.1 | `main`, `mc/1.21.1` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.1`, such as [`v0.1.0-ce.7+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.7%2Bmc1.21.1) |
+> | 1.21.2 | `mc/1.21.2` | No package yet, build from source / 暂无安装包，需从源码构建 |
+> | 1.21.11 | `mc/1.21.11` | No package yet, build from source / 暂无安装包，需从源码构建 |
+> | 26.2 | `mc/26.2` | No package yet, build from source / 暂无安装包，需从源码构建 |
+>
+> To build a version that has no package, check out its branch and run
+> `.\gradlew.bat releaseArchive -Parch=win64`; the ZIP is written to `build/distributions/`.
+> [Getting Started](docs/GETTING_STARTED.md) lists what the build needs.
+>
+> 没有安装包的版本：检出对应分支，运行 `.\gradlew.bat releaseArchive -Parch=win64`，
+> ZIP 生成在 `build/distributions/`。构建所需环境见 [Getting Started](docs/GETTING_STARTED.md)。
 
 
-Play Minecraft Java Edition 1.21.1 with real-time path tracing on a GeForce RTX
+Play Minecraft Java Edition 26.2 with real-time path tracing on a GeForce RTX
 GPU, powered by NVIDIA RTX Remix.
 
 ## What To Expect
@@ -47,8 +64,9 @@ We hope the community helps fill it out. If something breaks,
 
 ## Download
 
-Download the release archive from the
-[Releases page](https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/releases/latest).
+Download the Community Edition archive for your Minecraft version from the
+[Releases page](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases). The table at the top of this page says which archive
+that is.
 
 ## Install in three steps
 

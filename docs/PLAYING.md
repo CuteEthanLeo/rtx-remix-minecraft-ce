@@ -36,9 +36,9 @@ fixed.
 
 ## Download
 
-Download the release archive from the
-[Releases page](https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/releases/latest)
-and extract it.
+Download the release archive for your Minecraft version from the
+[Releases page](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases) and extract it. Each archive's tag ends in
+`+mc<Minecraft version>`, and an archive only works with that version.
 
 ## Which Launcher
 
