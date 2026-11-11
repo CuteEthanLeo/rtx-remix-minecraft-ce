@@ -11,6 +11,11 @@ also part of every mod file name.
 
 ## Community Edition 0.1.0-ce.9 - 2026-11-11
 
+### Added
+
+- A package for Minecraft 1.20.6, ported back from 1.21.1 with every feature
+  kept.
+
 ### Changed
 
 - Every supported Minecraft version now carries the same Community Edition
