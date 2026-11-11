@@ -11,6 +11,17 @@ also part of every mod file name.
 
 ## Community Edition 0.1.0-ce.8 - Unreleased
 
+### Added
+
+- Frame Generation Pacing, on by default under Settings → Performance →
+  Framerate: while DLSS frame generation is on, real frames are held to a
+  steady interval just above what each frame needs, so generated frames land
+  evenly. Without it the frame-time graph was a dense saw-tooth at any frame
+  rate, because frame generation spaces each generated frame by the previous
+  real-frame interval and Minecraft's real frames vary. It costs a few percent
+  of the real frame rate and applies Max Framerate with a precise wait while
+  it is on. `-Drtxremix.frameGenPacing=false` turns it off.
+
 ### Fixed
 
 - Joining a server no longer crashes the game in the NVIDIA OpenGL driver.

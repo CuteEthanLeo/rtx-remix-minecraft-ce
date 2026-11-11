@@ -34,6 +34,7 @@ import com.nvidia.rtxremix.minecraft.settings.FrameGenerationProbe;
 import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
 import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
+import com.nvidia.rtxremix.minecraft.community.pacing.FrameGenPacing;
 import com.nvidia.rtxremix.minecraft.community.perf.PresentWaitPolicy;
 import com.nvidia.rtxremix.minecraft.community.perf.SubmitOverlapGuard;
 import com.nvidia.rtxremix.minecraft.community.perf.TopOptimization;
@@ -145,6 +146,8 @@ public class RemixRenderer {
     /** Whether the last present followed a main-path world submit. */
     private boolean lastPresentWorldFrame;
     private long lastPresentNanos;
+    // Community Edition: holds real frames steady while DLSS frame generation is on.
+    private final FrameGenPacing frameGenPacing = new FrameGenPacing();
     private long lastFrameEndNanos;
     private boolean lastFrameEndWasWorld;
     private boolean firstPipelinedPresentLogged;
@@ -480,7 +483,10 @@ public class RemixRenderer {
             cntParticleCapacityGrows = perfTimer.registerCounter("Ptcl.CapacityGrows");
             cntParticleCapacity = perfTimer.registerCounter("Ptcl.Capacity");
             cntParticleMeshUpdates = perfTimer.registerCounter("Ptcl.MeshUpdates");
-            perfTimer.setReportAppendix(this::appendTopOptimizationReport);
+            perfTimer.setReportAppendix(sb -> {
+                appendTopOptimizationReport(sb);
+                frameGenPacing.appendReport(sb);
+            });
             overlapSubmitInfo.interopFlags = SubmitInfo.DISABLE_CPU_WAIT_FOR_VK_SUBMIT;
             LOGGER.info("Top Optimization: {}", TopOptimization.get().describe());
 
@@ -1826,6 +1832,7 @@ public class RemixRenderer {
         joinInFlightParticleRenderTask();
         discardPendingParticleFrame();
         presentPolicy.discontinuity();
+        frameGenPacing.reset();
         submitOverlapGuard.reset();
         lastSubmittedWorld = null;
 
@@ -2023,6 +2030,30 @@ public class RemixRenderer {
 
     public BenchmarkController getBenchmarkController() {
         return benchmarkController;
+    }
+
+    /**
+     * Community Edition: called right after Present returns, where vanilla's frame limiter
+     * runs. While frame generation is on, holds real frames to a steady interval; see
+     * {@link FrameGenPacing}. The probe itself is polled with the camera each frame.
+     * Render thread only.
+     */
+    public void onAfterPresentForPacing() {
+        if (!initialized) {
+            return;
+        }
+        boolean active = frameGenerationProbe.isEnabled()
+                && MinecraftClient.getInstance().isWindowFocused()
+                && (benchmarkController == null || !benchmarkController.isRunning());
+        frameGenPacing.afterPresent(active);
+    }
+
+    /**
+     * Community Edition: whether vanilla's Max Framerate limiter should run this frame. While
+     * frame generation pacing is engaged it takes the cap over instead.
+     */
+    public boolean shouldRunVanillaFrameLimiter(int framerateLimit) {
+        return frameGenPacing.shouldRunVanillaLimiter(framerateLimit);
     }
 
     public CameraController getCameraController() {

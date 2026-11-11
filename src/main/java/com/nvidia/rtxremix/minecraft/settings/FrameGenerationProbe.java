@@ -10,8 +10,9 @@ import org.slf4j.LoggerFactory;
 import java.util.function.ToIntBiFunction;
 
 /**
- * Follows whether Remix's DLSS frame generation is on, so {@link CameraEffectsSettings} can
- * adapt motion blur to it.
+ * Follows whether Remix's DLSS frame generation is on, so the mod can adapt to it: real frames
+ * are held to a steady interval ({@code FrameGenPacing}), and where the branch has it, motion
+ * blur adapts to generated frames.
  *
  * <p>The player turns frame generation on and off in Remix's own graphics menu, so the mod
  * never writes {@code rtx.dlfg.enable} and must read it back. The read is cheap but not free,
@@ -21,7 +22,8 @@ import java.util.function.ToIntBiFunction;
  * buffer this probe owns, so polling allocates nothing.
  *
  * <p>A failed read keeps the last value and logs once per run of failures: the runtime rejects
- * reads only in states it recovers from, and blur that keeps its last adaptation is harmless.
+ * reads only in states it recovers from, and pacing or blur that keeps its last adaptation is
+ * harmless.
  */
 public final class FrameGenerationProbe {
 
@@ -88,7 +90,7 @@ public final class FrameGenerationProbe {
             size = configReader.applyAsInt(FRAME_GENERATION_OPTION, resolvedValue);
         } catch (RuntimeException e) {
             if (!readFailureLogged) {
-                LOGGER.warn("Failed to read {}, so motion blur keeps its frame-generation state ({})"
+                LOGGER.warn("Failed to read {}, so the mod keeps its frame-generation state ({})"
                         + " until a read succeeds", FRAME_GENERATION_OPTION, enabled, e);
                 readFailureLogged = true;
             }
@@ -97,8 +99,7 @@ public final class FrameGenerationProbe {
         readFailureLogged = false;
         boolean value = parseEnabled(resolvedValue, size);
         if (value != enabled) {
-            LOGGER.info("Remix frame generation is {}; motion blur {}", value ? "on" : "off",
-                    value ? "adapts to it" : "follows the shutter time again");
+            LOGGER.info("Remix frame generation is {}", value ? "on" : "off");
             enabled = value;
         }
         return enabled;
