@@ -357,7 +357,7 @@ public final class BlockLightRuleManager {
     }
 
     static Identifier id(String namespace, String path) {
-        return Identifier.of(namespace, RESOURCE_PATH + "/" + path);
+        return new Identifier(namespace, RESOURCE_PATH + "/" + path);
     }
 
     static BlockLightKey key(BlockPos pos, Identifier ruleId, int index) {
@@ -451,9 +451,9 @@ public final class BlockLightRuleManager {
             for (JsonElement element : blockArray) {
                 String value = element.getAsString();
                 if (value.startsWith("#")) {
-                    tags.add(TagKey.of(RegistryKeys.BLOCK, Identifier.of(value.substring(1))));
+                    tags.add(TagKey.of(RegistryKeys.BLOCK, new Identifier(value.substring(1))));
                 } else {
-                    Identifier blockId = Identifier.of(value);
+                    Identifier blockId = new Identifier(value);
                     blocks.add(blockId);
                 }
             }

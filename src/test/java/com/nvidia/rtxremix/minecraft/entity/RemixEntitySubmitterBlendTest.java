@@ -33,9 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class RemixEntitySubmitterBlendTest {
 
     private static final Identifier BANNER_ATLAS =
-            Identifier.of("minecraft", "textures/atlas/banner_patterns.png");
+            new Identifier("minecraft", "textures/atlas/banner_patterns.png");
     private static final Identifier CREEPER =
-            Identifier.of("minecraft", "textures/entity/creeper/creeper.png");
+            new Identifier("minecraft", "textures/entity/creeper/creeper.png");
     private static final int WHITE = 0xFFFFFFFF;
     private static final int TINT = 0xFF3366CC;
 

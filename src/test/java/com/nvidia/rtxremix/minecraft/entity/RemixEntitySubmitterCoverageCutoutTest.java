@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RemixEntitySubmitterCoverageCutoutTest {
 
-    private static final Identifier MAP_TEXTURE = Identifier.of("minecraft", "dynamic/map/42_1");
+    private static final Identifier MAP_TEXTURE = new Identifier("minecraft", "dynamic/map/42_1");
 
     @Test
     void dynamicMapsCutAtHalfCoverage() {
@@ -30,14 +30,14 @@ class RemixEntitySubmitterCoverageCutoutTest {
     @Test
     void mapDecorationsCutAtHalfCoverage() {
         assertEquals(128, RemixEntitySubmitter.cutoutAlphaReferenceValue(
-                Identifier.of("minecraft", "textures/atlas/map_decorations.png")));
+                new Identifier("minecraft", "textures/atlas/map_decorations.png")));
     }
 
     @Test
     void mapDecorationsAreAlreadyOffsetDecals() {
         assertEquals(InstanceCategoryBit.DECAL_NO_OFFSET,
                 RemixEntitySubmitter.additionalCategoryFlagsForTexture(
-                        Identifier.of("minecraft", "textures/atlas/map_decorations.png")));
+                        new Identifier("minecraft", "textures/atlas/map_decorations.png")));
         assertEquals(0, RemixEntitySubmitter.additionalCategoryFlagsForTexture(MAP_TEXTURE));
     }
 
@@ -45,12 +45,12 @@ class RemixEntitySubmitterCoverageCutoutTest {
     void particleAtlasPartsAreParticles() {
         assertEquals(InstanceCategoryBit.PARTICLE,
                 RemixEntitySubmitter.additionalCategoryFlagsForTexture(
-                        Identifier.of("minecraft", "textures/atlas/particles.png")));
+                        new Identifier("minecraft", "textures/atlas/particles.png")));
     }
 
     @Test
     void glyphPagesCutAtHalfCoverage() {
-        Identifier page = Identifier.of("minecraft", "default/7");
+        Identifier page = new Identifier("minecraft", "default/7");
         DynamicTextureCache.onRegisterGlyphPage(page, new GlyphPageMirror(false));
 
         assertEquals(128, RemixEntitySubmitter.cutoutAlphaReferenceValue(page));
@@ -67,8 +67,8 @@ class RemixEntitySubmitterCoverageCutoutTest {
     @Test
     void otherTexturesShowAnyTexelWithAlpha() {
         assertEquals(1, RemixEntitySubmitter.cutoutAlphaReferenceValue(
-                Identifier.of("minecraft", "textures/entity/slime/slime.png")));
+                new Identifier("minecraft", "textures/entity/slime/slime.png")));
         assertEquals(1, RemixEntitySubmitter.cutoutAlphaReferenceValue(
-                Identifier.of("example", "dynamic/map/42_1")));
+                new Identifier("example", "dynamic/map/42_1")));
     }
 }

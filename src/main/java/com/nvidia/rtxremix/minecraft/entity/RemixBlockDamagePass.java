@@ -170,9 +170,8 @@ public final class RemixBlockDamagePass {
      * rotated into the frame of the face its normal selects, is the texture coordinate,
      * and the model's own atlas coordinates and shaded colour are discarded.
      *
-     * <p>Vanilla's consumer is not reused because it hands its delegate the normal before
-     * the texture coordinate, and {@link RemixCapturingConsumer} closes a vertex at its
-     * normal. This one delivers the coordinate first.
+     * <p>Vanilla's consumer is not reused because it allocates for every vertex; this one
+     * projects into its own scratch.
      */
     static final class CrackProjector implements VertexConsumer {
         private final Quaternionf[] faceRotations = new Quaternionf[Direction.values().length];
@@ -193,10 +192,10 @@ public final class RemixBlockDamagePass {
         }
 
         @Override
-        public VertexConsumer vertex(float x, float y, float z) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
+        public VertexConsumer vertex(double x, double y, double z) {
+            this.x = (float) x;
+            this.y = (float) y;
+            this.z = (float) z;
             target.vertex(x, y, z);
             return this;
         }
@@ -234,6 +233,20 @@ public final class RemixBlockDamagePass {
             target.texture(-projected.x, -projected.y);
             target.normal(x, y, z);
             return this;
+        }
+
+        @Override
+        public void next() {
+            target.next();
+        }
+
+        /** The crack is drawn white whatever colour the model's quads carry. */
+        @Override
+        public void fixedColor(int red, int green, int blue, int alpha) {
+        }
+
+        @Override
+        public void unfixColor() {
         }
     }
 }

@@ -51,7 +51,7 @@ import java.util.function.Supplier;
 
 /**
  * Per-block mesh emission for RTX Remix, designed to be driven from
- * {@link com.nvidia.rtxremix.minecraft.mixin.SectionBuilderMixin} redirects
+ * {@link com.nvidia.rtxremix.minecraft.mixin.RebuildTaskCaptureMixin} redirects
  * that piggyback on MC's own block iteration loop.
  *
  * <p>Lifecycle per section:
@@ -195,7 +195,7 @@ public final class BlockQuadEmitter {
 
     /**
      * Initialises emission state for a new section. Called from the
-     * SectionBuilderMixin HEAD inject before MC's block loop starts.
+     * RebuildTaskCaptureMixin HEAD inject before MC's block loop starts.
      */
     public void beginSection(ChunkSectionPos sectionPos,
                              BlockTextureManager tex,
@@ -469,8 +469,8 @@ public final class BlockQuadEmitter {
                 spriteId, su0, sv0, su1, sv1, layerName);
     }
 
-    private static final Identifier WATER_STILL_SPRITE = Identifier.ofVanilla("block/water_still");
-    private static final Identifier WATER_FLOW_SPRITE = Identifier.ofVanilla("block/water_flow");
+    private static final Identifier WATER_STILL_SPRITE = new Identifier("block/water_still");
+    private static final Identifier WATER_FLOW_SPRITE = new Identifier("block/water_flow");
 
     /** A block-model face painted with the water texture: the cauldron's water level is the vanilla case. */
     static boolean isWaterSprite(Identifier spriteId) {

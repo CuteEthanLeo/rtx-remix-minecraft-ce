@@ -530,7 +530,7 @@ class TerrainStateTest {
     }
 
     private static BlockLightKey lightKey(String path) {
-        return new BlockLightKey(BlockPos.ORIGIN, Identifier.of("test", path), 0);
+        return new BlockLightKey(BlockPos.ORIGIN, new Identifier("test", path), 0);
     }
 
     private static void addSection(TerrainState terrain, int cx, int sy, int cz,

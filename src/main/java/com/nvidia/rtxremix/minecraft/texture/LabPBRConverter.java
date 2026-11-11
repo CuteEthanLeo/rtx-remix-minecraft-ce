@@ -752,7 +752,7 @@ public final class LabPBRConverter {
     }
 
     private static Identifier variantId(Identifier spriteId, String suffix) {
-        return Identifier.of(spriteId.getNamespace(), "textures/" + spriteId.getPath() + suffix + ".png");
+        return new Identifier(spriteId.getNamespace(), "textures/" + spriteId.getPath() + suffix + ".png");
     }
 
     /**

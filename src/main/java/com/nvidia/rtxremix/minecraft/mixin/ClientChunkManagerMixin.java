@@ -40,7 +40,7 @@ public abstract class ClientChunkManagerMixin {
      * the section builder captures every section for Remix and reports its blocks invisible
      * to vanilla, so vanilla's section buffers are empty and Remix terrain carries no baked
      * light; the rebuild would only recapture identical geometry, publish an identical page,
-     * and retire the old one. The gate is the capture gate SectionBuilderMixin latches, not
+     * and retire the old one. The gate is the capture gate RebuildTaskCaptureMixin latches, not
      * whether Remix is drawing the world: vanilla has no terrain geometry to relight whenever
      * capture is on, including with world rendering toggled off or the renderer
      * uninitialized. Toggling RTX off reloads the world renderer, which rebuilds every

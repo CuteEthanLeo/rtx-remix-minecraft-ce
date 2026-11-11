@@ -13,12 +13,12 @@ import com.nvidia.rtxremix.Transform;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.util.Hand;
@@ -333,17 +333,17 @@ public final class RemixFirstPersonPass implements AutoCloseable {
      */
     private static final class CapturingImmediate extends VertexConsumerProvider.Immediate
             implements AutoCloseable {
-        private final BufferAllocator ownedAllocator;
+        private final BufferBuilder ownedBuffer;
         private final RemixVertexConsumerProvider captureProvider;
 
         private CapturingImmediate(RemixVertexConsumerProvider captureProvider) {
-            this(new BufferAllocator(256), captureProvider);
+            this(new BufferBuilder(256), captureProvider);
         }
 
-        private CapturingImmediate(BufferAllocator allocator,
+        private CapturingImmediate(BufferBuilder buffer,
                                    RemixVertexConsumerProvider captureProvider) {
-            super(allocator, new LinkedHashMap<>());
-            this.ownedAllocator = allocator;
+            super(buffer, new LinkedHashMap<>());
+            this.ownedBuffer = buffer;
             this.captureProvider = captureProvider;
         }
 
@@ -366,7 +366,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
 
         @Override
         public void close() {
-            ownedAllocator.close();
+            ownedBuffer.close();
         }
     }
 }

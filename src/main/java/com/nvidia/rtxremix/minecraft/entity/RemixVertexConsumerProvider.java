@@ -173,11 +173,14 @@ public class RemixVertexConsumerProvider implements VertexConsumerProvider {
 
     private static class NoOpVertexConsumer implements VertexConsumer {
         static final NoOpVertexConsumer INSTANCE = new NoOpVertexConsumer();
-        @Override public VertexConsumer vertex(float x, float y, float z) { return this; }
+        @Override public VertexConsumer vertex(double x, double y, double z) { return this; }
         @Override public VertexConsumer color(int r, int g, int b, int a) { return this; }
         @Override public VertexConsumer texture(float u, float v) { return this; }
         @Override public VertexConsumer overlay(int u, int v) { return this; }
         @Override public VertexConsumer light(int u, int v) { return this; }
         @Override public VertexConsumer normal(float x, float y, float z) { return this; }
+        @Override public void next() { }
+        @Override public void fixedColor(int r, int g, int b, int a) { }
+        @Override public void unfixColor() { }
     }
 }

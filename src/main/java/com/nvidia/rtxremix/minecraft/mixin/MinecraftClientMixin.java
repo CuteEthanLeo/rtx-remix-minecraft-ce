@@ -46,7 +46,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/RenderTickCounter$Dynamic;beginRenderTick(JZ)I"
+            target = "Lnet/minecraft/client/render/RenderTickCounter;beginRenderTick(J)I"
         ),
         require = 0
     )
@@ -59,7 +59,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/RenderTickCounter$Dynamic;beginRenderTick(JZ)I",
+            target = "Lnet/minecraft/client/render/RenderTickCounter;beginRenderTick(J)I",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -172,7 +172,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;render(Lnet/minecraft/client/render/RenderTickCounter;Z)V"
+            target = "Lnet/minecraft/client/render/GameRenderer;render(FJZ)V"
         )
     )
     private void rtxremix$beforeGameRenderer(boolean tick, CallbackInfo ci) {
@@ -197,7 +197,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;render(Lnet/minecraft/client/render/RenderTickCounter;Z)V",
+            target = "Lnet/minecraft/client/render/GameRenderer;render(FJZ)V",
             shift = At.Shift.AFTER
         )
     )

@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RigidMeshKeyTest {
 
-    private static final Identifier TEX_A = Identifier.of("minecraft", "a");
-    private static final Identifier TEX_B = Identifier.of("minecraft", "b");
+    private static final Identifier TEX_A = new Identifier("minecraft", "a");
+    private static final Identifier TEX_B = new Identifier("minecraft", "b");
 
     private static RemixEntitySubmitter.CuboidMeshKey key(
             Identifier tex, int shellLayer, ModelPart.Quad[] sides) {

@@ -6,6 +6,8 @@ package com.nvidia.rtxremix.minecraft.entity;
 
 import com.nvidia.rtxremix.minecraft.light.HeldLightState;
 import com.nvidia.rtxremix.minecraft.particle.ParticleTint;
+import com.nvidia.rtxremix.minecraft.CameraFacing;
+import com.nvidia.rtxremix.minecraft.ClientTickDelta;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.mixin.ParticleManagerAccessor;
 import net.minecraft.client.MinecraftClient;
@@ -27,6 +29,7 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.particle.SimpleParticleType;
 import net.minecraft.registry.Registries;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -62,6 +65,7 @@ public final class HeldItemEffectsRenderer {
     private static final int SMOKE_GREY = Math.round(ParticleTint.SOOT_GREY * 255.0f);
 
     private static final Matrix4f scratchPose = new Matrix4f();
+    private static final Quaternionf scratchFacing = new Quaternionf();
     private static final Vector3f scratchAnchor = new Vector3f();
     private static final Vector3f scratchScale = new Vector3f();
     private static final HeldItemSmoke.Puff[] scratchPuffs = new HeldItemSmoke.Puff[HeldItemSmoke.SLOTS];
@@ -101,9 +105,9 @@ public final class HeldItemEffectsRenderer {
         SpriteProvider smokeSprites = spriteProvider(client, ParticleTypes.SMOKE);
         if (flameSprites == null || smokeSprites == null) return;
 
-        Quaternionfc facing = client.gameRenderer.getCamera().getRotation();
+        Quaternionfc facing = CameraFacing.get(client.gameRenderer.getCamera(), scratchFacing);
         Quaternionfc frame = HeldItemFlame.riseFrame(mode, facing);
-        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickDelta(false);
+        double ticks = client.world.getTime() + ClientTickDelta.ticking(client);
         float phase = mode.ordinal();
         float cameraOffset = HeldItemFlame.cameraOffset(mode);
         // Null when the capture does not know where the eye is; the poses then stay at depth 1.
@@ -174,6 +178,7 @@ public final class HeldItemEffectsRenderer {
                 .texture(u, v)
                 .overlay(OverlayTexture.DEFAULT_UV)
                 .light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0.0f, 0.0f, 1.0f);
+                .normal(entry, 0.0f, 0.0f, 1.0f)
+                .next();
     }
 }

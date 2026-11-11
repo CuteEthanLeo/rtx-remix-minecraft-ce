@@ -176,7 +176,7 @@ public class RtxRemixMod implements ClientModInitializer {
         return Text.literal("Remix graphics preset '" + name + "' applied for this session");
     }
     
-    // Volatile: read off the render thread by SectionBuilderMixin's chunk-builder
+    // Volatile: read off the render thread by RebuildTaskCaptureMixin's chunk-builder
     // workers and by ChunkDataSenderMixin on the integrated-server thread.
     private static volatile boolean rtxEnabled = true;
     private static boolean entitiesEnabled = true;
@@ -586,7 +586,7 @@ public class RtxRemixMod implements ClientModInitializer {
                 .registerReloadListener(new SimpleSynchronousResourceReloadListener() {
                     @Override
                     public Identifier getFabricId() {
-                        return Identifier.of(RtxRemixCommonMod.MOD_ID, "atlas_reload");
+                        return new Identifier(RtxRemixCommonMod.MOD_ID, "atlas_reload");
                     }
                     @Override
                     public void reload(ResourceManager manager) {

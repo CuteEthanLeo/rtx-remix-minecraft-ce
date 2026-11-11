@@ -4,6 +4,8 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain;
 
+import net.minecraft.client.render.chunk.ChunkBuilder;
+
 /**
  * Reports whether a built chunk's latest chunk data contained any block
  * entities, recorded by {@code BuiltChunkMixin} as the data is published.
@@ -13,4 +15,10 @@ package com.nvidia.rtxremix.minecraft.terrain;
  */
 public interface ChunkBuilderBlockEntityAccess {
     boolean rtxremix$hasBlockEntities();
+
+    /**
+     * Called as a finished rebuild publishes {@code chunkData} to this built chunk, on
+     * whichever thread completes the build's uploads.
+     */
+    void rtxremix$onChunkDataPublished(ChunkBuilder.ChunkData chunkData);
 }

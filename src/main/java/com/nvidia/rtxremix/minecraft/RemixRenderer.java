@@ -63,7 +63,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.enums.CameraSubmersionType;
+import net.minecraft.client.render.CameraSubmersionType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -918,7 +918,7 @@ public class RemixRenderer {
             }
 
             Camera camera = client.gameRenderer.getCamera();
-            float tickDelta = client.getRenderTickCounter().getTickDelta(true);
+            float tickDelta = ClientTickDelta.frame(client);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());
 
             perfTimer.begin(perfCamera);

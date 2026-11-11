@@ -46,7 +46,7 @@ public final class CopperBeaconScreenHandler extends ScreenHandler {
     public static void register() {
         Registry.register(
                 Registries.SCREEN_HANDLER,
-                Identifier.of(RtxRemixCommonMod.MOD_ID, CopperBeaconBlock.ID),
+                new Identifier(RtxRemixCommonMod.MOD_ID, CopperBeaconBlock.ID),
                 TYPE);
     }
 

@@ -10,7 +10,6 @@ import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -73,7 +72,8 @@ public abstract class GameRendererMixin {
      */
     @Inject(method = "renderWorld", at = @At("TAIL"))
     private void rtxremix$submitAtRenderWorldTail(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long limitTime,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }
@@ -94,7 +94,8 @@ public abstract class GameRendererMixin {
                     target = "Lnet/minecraft/util/profiler/Profiler;swap(Ljava/lang/String;)V"
             ))
     private void rtxremix$beginGuiScope(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long startTime,
             boolean tick,
             CallbackInfo ci) {
         rtxremix$closeGuiScope();
@@ -107,7 +108,8 @@ public abstract class GameRendererMixin {
     /** Before any screen draws, so the frame's hover state already matches input capture. */
     @Inject(method = "render", at = @At("HEAD"))
     private void rtxremix$followRemixMenuVisibility(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long startTime,
             boolean tick,
             CallbackInfo ci) {
         RtxRemixMod.followRemixMenuVisibility();
@@ -115,7 +117,8 @@ public abstract class GameRendererMixin {
 
     @Inject(method = "render", at = @At("RETURN"))
     private void rtxremix$endGuiScope(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long startTime,
             boolean tick,
             CallbackInfo ci) {
         rtxremix$closeGuiScope();

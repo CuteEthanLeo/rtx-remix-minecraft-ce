@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AutoPbrTest {
 
     private static AutoPbr.Surface surface(String name) {
-        return AutoPbr.surface(Identifier.ofVanilla("block/" + name));
+        return AutoPbr.surface(new Identifier("block/" + name));
     }
 
     @Test

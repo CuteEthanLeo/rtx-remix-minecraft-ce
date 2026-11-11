@@ -131,14 +131,14 @@ public class RemixEntitySubmitter {
     private static final int DEFAULT_CUTOUT_ALPHA_REFERENCE = 1;
     private static final int COVERAGE_ALPHA_REFERENCE = 128;
     private static final Identifier BANNER_PATTERNS_ATLAS_TEXTURE =
-            Identifier.of("minecraft", "textures/atlas/banner_patterns.png");
+            new Identifier("minecraft", "textures/atlas/banner_patterns.png");
     private static final Identifier SHIELD_PATTERNS_ATLAS_TEXTURE =
-            Identifier.of("minecraft", "textures/atlas/shield_patterns.png");
+            new Identifier("minecraft", "textures/atlas/shield_patterns.png");
     private static final Identifier PARTICLE_ATLAS_ID = SpriteAtlasTexture.PARTICLE_ATLAS_TEXTURE;
     private static final Identifier BEDS_ATLAS_TEXTURE =
-            Identifier.of("minecraft", "textures/atlas/beds.png");
+            new Identifier("minecraft", "textures/atlas/beds.png");
     private static final Identifier MAP_DECORATIONS_ATLAS_TEXTURE =
-            Identifier.of("minecraft", "textures/atlas/map_decorations.png");
+            new Identifier("minecraft", "textures/atlas/map_decorations.png");
     private static final String DYNAMIC_MAP_TEXTURE_PREFIX = "dynamic/map/";
     private static final EntityMaterialKey BEDS_ATLAS_MATERIAL_KEY =
             new EntityMaterialKey(BEDS_ATLAS_TEXTURE, RenderLayerUtils.SurfaceMode.OPAQUE);
@@ -2844,7 +2844,7 @@ public class RemixEntitySubmitter {
     static Identifier deriveLabPBRSpriteId(Identifier textureId) {
         String path = textureId.getPath();
         if (path.startsWith("textures/") && path.endsWith(".png")) {
-            return Identifier.of(textureId.getNamespace(),
+            return new Identifier(textureId.getNamespace(),
                     path.substring("textures/".length(), path.length() - ".png".length()));
         }
         // Downloaded player skins use minecraft:skins/<content-hash>. Packs can

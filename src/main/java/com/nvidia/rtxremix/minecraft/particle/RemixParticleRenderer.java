@@ -18,6 +18,7 @@ import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.texture.ParticleAtlasManager;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
+import com.nvidia.rtxremix.minecraft.CameraFacing;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.mixin.BillboardParticleAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.ParticleAccessor;
@@ -32,6 +33,7 @@ import net.minecraft.client.particle.ParticleTextureSheet;
 import net.minecraft.client.particle.SpriteBillboardParticle;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.math.MathHelper;
+import org.joml.Quaternionf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +74,8 @@ public class RemixParticleRenderer {
     private final RemixRenderer renderer;
     private final ParticleAtlasManager atlasManager;
     private final HashMap<BucketKey, DynamicBucket> buckets = new HashMap<>();
+    /** Scratch for the one preparation that runs at a time. */
+    private final Quaternionf cameraFacing = new Quaternionf();
 
     private InstanceInfoBlendEXT blendExt;
     private long pNext;
@@ -127,7 +131,7 @@ public class RemixParticleRenderer {
         }
 
         BlockTextureManager blockTexMgr = renderer.getTextureManager();
-        var camRot = client.gameRenderer.getCamera().getRotation();
+        Quaternionf camRot = CameraFacing.get(client.gameRenderer.getCamera(), cameraFacing);
         float qx = camRot.x, qy = camRot.y, qz = camRot.z, qw = camRot.w;
         ParticleBillboardBasis billboardBasis = ParticleBillboardBasis.fromCamera(qx, qy, qz, qw);
 

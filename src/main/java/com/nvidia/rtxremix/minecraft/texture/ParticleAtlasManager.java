@@ -119,7 +119,7 @@ public class ParticleAtlasManager {
                 int pixW = sprite.getContents().getWidth();
                 int pixH = sprite.getContents().getHeight();
 
-                Identifier texId = Identifier.of(spriteId.getNamespace(),
+                Identifier texId = new Identifier(spriteId.getNamespace(),
                         "particle/" + spriteId.getPath());
                 NativeImage nImg = labPBRVariants.loadVariant(texId, "_n");
                 NativeImage sImg = labPBRVariants.loadVariant(texId, "_s");

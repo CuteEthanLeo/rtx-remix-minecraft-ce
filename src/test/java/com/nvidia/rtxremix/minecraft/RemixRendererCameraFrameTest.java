@@ -5,7 +5,7 @@
 package com.nvidia.rtxremix.minecraft;
 
 import com.nvidia.rtxremix.RemixException;
-import net.minecraft.block.enums.CameraSubmersionType;
+import net.minecraft.client.render.CameraSubmersionType;
 import net.minecraft.client.render.Camera;
 import net.minecraft.util.math.Vec3d;
 

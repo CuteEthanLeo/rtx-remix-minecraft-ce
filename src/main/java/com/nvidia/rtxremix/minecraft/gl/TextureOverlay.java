@@ -90,13 +90,13 @@ public class TextureOverlay {
         // Standard GL UVs, with (0,0) at the top left: the interop blit already
         // corrects the Vulkan image's orientation.
         Matrix4f identity = new Matrix4f();
-        BufferBuilder bufferBuilder = Tessellator.getInstance()
-            .begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
+        bufferBuilder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
 
-        bufferBuilder.vertex(identity, 0,     0,      0).texture(0.0f, 0.0f);
-        bufferBuilder.vertex(identity, 0,     height, 0).texture(0.0f, 1.0f);
-        bufferBuilder.vertex(identity, width, height, 0).texture(1.0f, 1.0f);
-        bufferBuilder.vertex(identity, width, 0,      0).texture(1.0f, 0.0f);
+        bufferBuilder.vertex(identity, 0,     0,      0).texture(0.0f, 0.0f).next();
+        bufferBuilder.vertex(identity, 0,     height, 0).texture(0.0f, 1.0f).next();
+        bufferBuilder.vertex(identity, width, height, 0).texture(1.0f, 1.0f).next();
+        bufferBuilder.vertex(identity, width, 0,      0).texture(1.0f, 0.0f).next();
 
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
 

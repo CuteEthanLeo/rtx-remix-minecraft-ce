@@ -168,12 +168,12 @@ class RemixCapturingConsumerTest {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) image.setColor(x, y, rows[y].charAt(x) == '#' ? 0xFF808080 : 0);
         }
-        return new SpriteContents(Identifier.of("minecraft", id), new SpriteDimensions(8, 8), image,
+        return new SpriteContents(new Identifier("minecraft", id), new SpriteDimensions(8, 8), image,
                 ResourceMetadata.NONE);
     }
 
     private static Sprite atlasSprite(SpriteContents contents) {
-        return new Sprite(Identifier.of("minecraft", "textures/atlas/blocks.png"), contents, 64, 64, 16, 32) {};
+        return new Sprite(new Identifier("minecraft", "textures/atlas/blocks.png"), contents, 64, 64, 16, 32) {};
     }
 
     /** Renders both full faces of an item card, as ItemRenderer does for a flat item. */
@@ -531,6 +531,7 @@ class RemixCapturingConsumerTest {
         consumer.vertex(0.0f, 0.0f, 0.0f);
         consumer.color(0x11, 0x22, 0x33, 0xFF);
         consumer.normal(0.0f, 0.0f, 1.0f);
+        consumer.next();
 
         assertEquals(0xFF112233, consumer.getColors()[0]);
     }
@@ -541,11 +542,13 @@ class RemixCapturingConsumerTest {
         channels.vertex(0.0f, 0.0f, 0.0f);
         channels.color(0x11, 0x22, 0x33, 0xFF);
         channels.normal(0.0f, 0.0f, 1.0f);
+        channels.next();
 
         RemixCapturingConsumer packed = new RemixCapturingConsumer(null, true);
         packed.vertex(0.0f, 0.0f, 0.0f);
         packed.color(0xFF112233);
         packed.normal(0.0f, 0.0f, 1.0f);
+        packed.next();
 
         assertEquals(packed.getColors()[0], channels.getColors()[0]);
     }
@@ -719,6 +722,7 @@ class RemixCapturingConsumerTest {
         consumer.color(0xFFFFFFFF);
         consumer.overlay(OverlayTexture.getUv(0.0f, true));
         consumer.normal(0.0f, 1.0f, 0.0f);
+        consumer.next();
 
         assertEquals(0xFFFFB2B2, consumer.getColors()[0]);
     }

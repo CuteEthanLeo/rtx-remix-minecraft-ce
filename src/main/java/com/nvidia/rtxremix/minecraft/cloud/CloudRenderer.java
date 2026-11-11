@@ -59,7 +59,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public final class CloudRenderer {
     private static final Identifier VANILLA_CLOUD_TEXTURE =
-            Identifier.ofVanilla("textures/environment/clouds.png");
+            new Identifier("textures/environment/clouds.png");
     static final int PALETTE_SIZE = 32;
     static final long PALETTE_SEED = 0x434C_4F55_4450_5546L;
     private static final long MAINTENANCE_INTERVAL_TICKS = 40L;

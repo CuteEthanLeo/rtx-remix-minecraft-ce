@@ -14,6 +14,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.DyeItem;
+import net.minecraft.util.DyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
@@ -102,7 +103,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     static void register() {
         Registry.register(
                 Registries.BLOCK_ENTITY_TYPE,
-                Identifier.of(RtxRemixCommonMod.MOD_ID, CopperBeaconBlock.ID),
+                new Identifier(RtxRemixCommonMod.MOD_ID, CopperBeaconBlock.ID),
                 TYPE);
     }
 
@@ -209,8 +210,20 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     public int getLensTint() {
         return dye.getItem() instanceof DyeItem dyeItem
                 ? CopperBeaconState.applySaturation(
-                        dyeItem.getColor().getEntityColor(), saturation)
+                        entityColor(dyeItem.getColor()), saturation)
                 : 0xFFFFFFFF;
+    }
+
+    /**
+     * A dye's entity colour as opaque ARGB. Vanilla keeps it as its three bytes divided by
+     * 255, which rounding recovers exactly.
+     */
+    private static int entityColor(DyeColor dye) {
+        float[] rgb = dye.getColorComponents();
+        return 0xFF000000
+                | Math.round(rgb[0] * 255.0f) << 16
+                | Math.round(rgb[1] * 255.0f) << 8
+                | Math.round(rgb[2] * 255.0f);
     }
 
     public boolean isRedstoneControlled() {

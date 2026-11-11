@@ -1,13 +1,13 @@
 # RTX Remix for Minecraft
 
-This archive installs a Fabric mod that renders Minecraft Java Edition 1.21.1
+This archive installs a Fabric mod that renders Minecraft Java Edition 1.20.6
 through NVIDIA RTX Remix. It sets up a launcher, Java,
 Fabric, the mod, and the RTX Remix runtime for you.
 
 ## What You Need
 
 - Windows 10 or 11, x64 or ARM64.
-- Minecraft Java Edition 1.21.1, on a Microsoft account that owns the game.
+- Minecraft Java Edition 1.20.6, on a Microsoft account that owns the game.
 - A GeForce RTX 30-series or newer GPU with NVIDIA driver 616.92 or newer.
 - About 5 GB of free disk space while installing; about 3 GB stays in use.
 - An internet connection while the installer runs.
@@ -52,7 +52,7 @@ one showcase world, built for this project by BlockWorks
 looks and runs best. It ships with known issues, tracked at
 <https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/issues>, and there are
 bugs yet to be found. It has had limited testing alongside other
-mods, it targets Minecraft 1.21.1 only, and blocks, mobs, dimensions, and
+mods, it targets Minecraft 1.20.6 only, and blocks, mobs, dimensions, and
 situations the showcase never reaches have had less care. When something
 breaks, report it (see below); that is how it gets fixed.
 

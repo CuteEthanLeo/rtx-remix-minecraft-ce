@@ -49,14 +49,14 @@ class BuiltinEmissionTest {
 
     @Test
     void onlyListedSpritesGetAMask() {
-        assertSame(BuiltinEmission.SEA_PICKLE, BuiltinEmission.mask(Identifier.ofVanilla("block/sea_pickle")));
-        assertNull(BuiltinEmission.mask(Identifier.ofVanilla("block/lantern")));
+        assertSame(BuiltinEmission.SEA_PICKLE, BuiltinEmission.mask(new Identifier("block/sea_pickle")));
+        assertNull(BuiltinEmission.mask(new Identifier("block/lantern")));
     }
 
     @Test
     void gainAppliesToLanternsOnly() {
-        assertEquals(2.5f, BuiltinEmission.gain(Identifier.ofVanilla("block/lantern")));
-        assertEquals(2.5f, BuiltinEmission.gain(Identifier.ofVanilla("block/soul_lantern")));
-        assertEquals(1.0f, BuiltinEmission.gain(Identifier.ofVanilla("block/torch")));
+        assertEquals(2.5f, BuiltinEmission.gain(new Identifier("block/lantern")));
+        assertEquals(2.5f, BuiltinEmission.gain(new Identifier("block/soul_lantern")));
+        assertEquals(1.0f, BuiltinEmission.gain(new Identifier("block/torch")));
     }
 }

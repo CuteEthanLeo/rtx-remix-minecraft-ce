@@ -33,16 +33,16 @@ import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.particle.ParticleManager;
-import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BuiltChunkStorage;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormatElement;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.chunk.ChunkBuilder;
@@ -51,7 +51,7 @@ import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.BlockBreakingInfo;
+import net.minecraft.client.render.BlockBreakingInfo;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -166,13 +166,16 @@ public abstract class WorldRendererMixin
         return ticks;
     }
 
-    @Inject(method = "buildStarsBuffer", at = @At("RETURN"))
+    @Inject(
+            method = "renderStars(Lnet/minecraft/client/render/BufferBuilder;)"
+                    + "Lnet/minecraft/client/render/BufferBuilder$BuiltBuffer;",
+            at = @At("RETURN"))
     private void rtxremix$captureStarVertices(
-            Tessellator tessellator,
-            CallbackInfoReturnable<BuiltBuffer> cir) {
-        BuiltBuffer builtBuffer = cir.getReturnValue();
-        BuiltBuffer.DrawParameters parameters = builtBuffer.getDrawParameters();
-        int positionOffset = parameters.format().getOffset(VertexFormatElement.POSITION);
+            BufferBuilder buffer,
+            CallbackInfoReturnable<BufferBuilder.BuiltBuffer> cir) {
+        BufferBuilder.BuiltBuffer builtBuffer = cir.getReturnValue();
+        BufferBuilder.DrawParameters parameters = builtBuffer.getParameters();
+        int positionOffset = rtxremix$positionOffset(parameters.format());
         if (positionOffset < 0) {
             rtxremix$starVertices = new float[0];
             return;
@@ -180,7 +183,7 @@ public abstract class WorldRendererMixin
 
         int vertexCount = parameters.vertexCount();
         int stride = parameters.format().getVertexSizeByte();
-        ByteBuffer vertices = builtBuffer.getBuffer().duplicate().order(ByteOrder.nativeOrder());
+        ByteBuffer vertices = builtBuffer.getVertexBuffer().duplicate().order(ByteOrder.nativeOrder());
         float[] positions = new float[vertexCount * 3];
         for (int vertex = 0; vertex < vertexCount; vertex++) {
             int source = vertex * stride + positionOffset;
@@ -190,6 +193,18 @@ public abstract class WorldRendererMixin
             positions[destination + 2] = vertices.getFloat(source + 2 * Float.BYTES);
         }
         rtxremix$starVertices = positions;
+    }
+
+    /** Byte offset of the position element within a vertex of {@code format}, or -1 without one. */
+    private static int rtxremix$positionOffset(VertexFormat format) {
+        int offset = 0;
+        for (VertexFormatElement element : format.getElements()) {
+            if (element.isPosition()) {
+                return offset;
+            }
+            offset += element.getByteLength();
+        }
+        return -1;
     }
 
     @Override
@@ -291,7 +306,7 @@ public abstract class WorldRendererMixin
                 continue;
             }
             WorldChunk worldChunk = world.getChunkManager().getWorldChunk(cx, cz, false);
-            if (worldChunk != null && !worldChunk.isSectionEmpty(sy)
+            if (worldChunk != null && !worldChunk.getSection(worldChunk.sectionCoordToIndex(sy)).isEmpty()
                     && lightingProvider.isLightingEnabled(ChunkSectionPos.from(cx, sy, cz))) {
                 loadedSections.add(builtChunk);
             }
@@ -451,7 +466,8 @@ public abstract class WorldRendererMixin
 
     @Inject(method = "render", at = @At("HEAD"))
     private void rtxremix$renderHead(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long limitTime,
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
@@ -476,7 +492,8 @@ public abstract class WorldRendererMixin
 
     @Inject(method = "render", at = @At("RETURN"))
     private void rtxremix$renderReturn(
-            RenderTickCounter tickCounter,
+            float tickDelta,
+            long limitTime,
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
@@ -589,18 +606,18 @@ public abstract class WorldRendererMixin
             method = "renderWeather",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/BufferRenderer;drawWithGlobalProgram(Lnet/minecraft/client/render/BuiltBuffer;)V"
+                    target = "Lnet/minecraft/client/render/Tessellator;draw()V"
             ))
     private void rtxremix$captureWeatherDraw(
-            BuiltBuffer buffer,
+            Tessellator tessellator,
             Operation<Void> original) {
         if (rtxremix$weatherRenderer == null) {
-            original.call(buffer);
+            original.call(tessellator);
             return;
         }
 
         rtxremix$weatherRenderer.capture(
-                buffer,
+                tessellator.getBuffer().end(),
                 rtxremix$weatherTexture);
     }
 

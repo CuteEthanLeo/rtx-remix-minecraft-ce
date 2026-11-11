@@ -14,7 +14,7 @@ import net.minecraft.util.Identifier;
 /** Real {@link Sprite}s for key and UV-remap tests, with the atlas rectangle chosen by the test. */
 final class SpriteFixtures {
 
-    private static final Identifier ATLAS = Identifier.of("minecraft", "textures/atlas/test.png");
+    private static final Identifier ATLAS = new Identifier("minecraft", "textures/atlas/test.png");
 
     private SpriteFixtures() {}
 
@@ -25,7 +25,7 @@ final class SpriteFixtures {
      */
     static Sprite sprite(int x, int y, int size, int atlasSize) {
         SpriteContents contents = new SpriteContents(
-                Identifier.of("minecraft", "test/" + x + "_" + y),
+                new Identifier("minecraft", "test/" + x + "_" + y),
                 new SpriteDimensions(size, size),
                 new NativeImage(size, size, false),
                 ResourceMetadata.NONE);

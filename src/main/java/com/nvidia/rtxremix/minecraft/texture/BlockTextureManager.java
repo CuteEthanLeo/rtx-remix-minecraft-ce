@@ -66,7 +66,7 @@ import java.util.Set;
 public class BlockTextureManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BlockTextureManager.class);
-    public static final Identifier BLOCK_ATLAS_ID = Identifier.of("minecraft", "textures/atlas/blocks.png");
+    public static final Identifier BLOCK_ATLAS_ID = new Identifier("minecraft", "textures/atlas/blocks.png");
     /** Blend state for draw calls using the atlas cutout material, which sets useDrawCallAlphaState=true. */
     public static final InstanceInfoBlendEXT ATLAS_CUTOUT_BLEND =
             InstanceInfoBlendEXT.textureTimesVertexColorAlphaTest(128);

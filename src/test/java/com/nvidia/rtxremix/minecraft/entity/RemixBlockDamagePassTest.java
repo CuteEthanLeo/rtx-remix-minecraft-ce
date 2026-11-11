@@ -143,7 +143,12 @@ class RemixBlockDamagePassTest {
                     .add(new Vector3f(tangent).mul(0.5f * corners[i][0]))
                     .add(new Vector3f(bitangent).mul(0.5f * corners[i][1]));
             int shadedTint = 0xFF3080C0 - i;
-            consumer.vertex(p.x, p.y, p.z, shadedTint, 0.25f + 0.1f * i, 0.75f,
+            consumer.vertex(p.x, p.y, p.z,
+                    ((shadedTint >> 16) & 0xFF) / 255.0f,
+                    ((shadedTint >> 8) & 0xFF) / 255.0f,
+                    (shadedTint & 0xFF) / 255.0f,
+                    1.0f,
+                    0.25f + 0.1f * i, 0.75f,
                     OVERLAY, LIGHT, n.x, n.y, n.z);
         }
     }
@@ -171,10 +176,10 @@ class RemixBlockDamagePassTest {
         }
 
         @Override
-        public VertexConsumer vertex(float x, float y, float z) {
+        public VertexConsumer vertex(double x, double y, double z) {
             flush();
             open = true;
-            this.x = x; this.y = y; this.z = z;
+            this.x = (float) x; this.y = (float) y; this.z = (float) z;
             color = 0;
             u = 0; v = 0;
             nx = 0; ny = 0; nz = 0;
@@ -201,5 +206,13 @@ class RemixBlockDamagePassTest {
             nx = x; ny = y; nz = z;
             return this;
         }
+
+        @Override
+        public void next() {
+            flush();
+        }
+
+        @Override public void fixedColor(int red, int green, int blue, int alpha) { }
+        @Override public void unfixColor() { }
     }
 }

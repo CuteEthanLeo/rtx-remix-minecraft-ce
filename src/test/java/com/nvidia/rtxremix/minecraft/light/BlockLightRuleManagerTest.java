@@ -51,7 +51,7 @@ class BlockLightRuleManagerTest {
 
     @Test
     void parseJsonRulePreservesTheAuthoredRectSpec() throws Exception {
-        Identifier id = Identifier.of("custom", "rtx_remix/block_lights/daylight_panel.json");
+        Identifier id = new Identifier("custom", "rtx_remix/block_lights/daylight_panel.json");
         BlockLightRuleManager.Rule rule = BlockLightRuleManager.parseJsonRule(id, JsonParser.parseString("""
                 {
                   "blocks": ["minecraft:daylight_detector"],
@@ -106,7 +106,7 @@ class BlockLightRuleManagerTest {
 
     @Test
     void parseJsonRuleRejectsAnInvalidRadius() {
-        Identifier id = Identifier.of("custom", "rtx_remix/block_lights/bad.json");
+        Identifier id = new Identifier("custom", "rtx_remix/block_lights/bad.json");
 
         assertThrows(RuntimeException.class, () -> BlockLightRuleManager.parseJsonRule(id, JsonParser.parseString("""
                 {
@@ -121,7 +121,7 @@ class BlockLightRuleManagerTest {
 
     @Test
     void loadRulesReplacesASamePathResourceInPackOrder() throws Exception {
-        Identifier ruleId = Identifier.of("custom", "rtx_remix/block_lights/replaced.json");
+        Identifier ruleId = new Identifier("custom", "rtx_remix/block_lights/replaced.json");
         Resource lowPriority = jsonResource("low", """
                 {
                   "blocks": ["minecraft:torch"],
@@ -138,7 +138,7 @@ class BlockLightRuleManagerTest {
 
         BlockLightRuleManager.Rule rule = BlockLightRuleManager.loadRules(manager, Map.of()).get(ruleId);
 
-        assertEquals(Set.of(Identifier.of("minecraft", "lantern")), parsedBlockIds(rule));
+        assertEquals(Set.of(new Identifier("minecraft", "lantern")), parsedBlockIds(rule));
     }
 
     @Test
@@ -218,7 +218,7 @@ class BlockLightRuleManagerTest {
         Future<?> reload = null;
         try {
             Object oldCatalog = activeCatalogField.get(null);
-            Identifier newRuleId = Identifier.of("test", "new-rule");
+            Identifier newRuleId = new Identifier("test", "new-rule");
             BlockLightRuleManager.Rule newRule = BlockLightRuleManager.rule(
                     newRuleId, state -> false, (id, state, pos, sampler) -> List.of());
 

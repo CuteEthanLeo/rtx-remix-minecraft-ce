@@ -31,7 +31,7 @@ class BlockLightIntensityControlsTest {
         BlockLightIntensityControls.Control control =
                 BlockLightIntensityControls.controls().getFirst();
         Identifier externalRule =
-                Identifier.of("example", "rtx_remix/block_lights/custom.json");
+                new Identifier("example", "rtx_remix/block_lights/custom.json");
         try {
             assertEquals(4.0f, BlockLightIntensityControls.apply(control.ruleId(), 4.0f));
 

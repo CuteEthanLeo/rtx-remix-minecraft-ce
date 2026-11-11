@@ -15,7 +15,7 @@ import net.minecraft.network.packet.s2c.play.UnloadChunkS2CPacket;
 import net.minecraft.server.network.ChunkDataSender;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerChunkLoadingManager;
+import net.minecraft.server.world.ThreadedAnvilChunkStorage;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.WorldChunk;
@@ -40,7 +40,7 @@ import java.util.function.LongConsumer;
  * {@link LocalChunkBatchPacing} from the render thread's measured apply cost.
  *
  * <p>Holding a chunk pending for a few ticks is the state vanilla keeps every
- * remote player's chunks in: {@code ServerChunkLoadingManager.isTracked} treats a
+ * remote player's chunks in: {@code ThreadedAnvilChunkStorage.isTracked} treats a
  * chunk still in the sender's next batch as untracked, so block updates for it
  * are not sent to that player ({@code ChunkHolder.flushUpdates} skips them; the
  * payload serialized at send time carries the result) and entity tracking for it
@@ -70,7 +70,7 @@ import java.util.function.LongConsumer;
  * the unloads still queued join vanilla's own class of stale columns from the old filter.
  *
  * <p>The gate is {@code RtxRemixMod.isRtxEnabled()} alone, the same master flag
- * {@code SectionBuilderMixin} and {@code ClientLightSnapshotPolicy} use, read here
+ * {@code RebuildTaskCaptureMixin} and {@code ClientLightSnapshotPolicy} use, read here
  * from the integrated-server thread (the field is volatile for that). It does not
  * consult the renderer: chunk deserialization is render-thread work whether or not
  * Remix came up. Toggling RTX off mid-backlog hands whatever is still pending to
@@ -93,7 +93,7 @@ public abstract class ChunkDataSenderMixin {
     private final PacedUnloadQueue rtxremix$unloads = new PacedUnloadQueue();
 
     @Inject(method = "makeBatch", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$paceLocalBatch(ServerChunkLoadingManager chunkLoadingManager, ChunkPos playerPos,
+    private void rtxremix$paceLocalBatch(ThreadedAnvilChunkStorage chunkLoadingManager, ChunkPos playerPos,
                                          CallbackInfoReturnable<List<WorldChunk>> cir) {
         if (!local || !LocalChunkBatchPacing.ENABLED || !RtxRemixMod.isRtxEnabled()) {
             return;
@@ -184,7 +184,9 @@ public abstract class ChunkDataSenderMixin {
         int ringRadius = LocalChunkBatchPacing.clientRingRadius(player.server.getPlayerManager().getViewDistance());
         int sent = rtxremix$unloads.drain(
                 LocalChunkBatchPacing.unloadBatchSize(rtxremix$unloads.size()),
-                key -> centre.getChebyshevDistance(ChunkPos.getPackedX(key), ChunkPos.getPackedZ(key)) >= ringRadius,
+                key -> Math.max(
+                        Math.abs(centre.x - ChunkPos.getPackedX(key)),
+                        Math.abs(centre.z - ChunkPos.getPackedZ(key))) >= ringRadius,
                 send);
         LocalChunkBatchPacing.recordUnloadBatch(sent, rtxremix$unloads.size());
     }

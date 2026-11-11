@@ -91,9 +91,9 @@ public class SkyRenderer {
     /** Share of the previous cloud-dome mean kept per readback (about 10 a second). */
     private static final float CLOUD_MEAN_KEEP = 0.8f;
     private static final Identifier SUN_TEXTURE =
-            Identifier.ofVanilla("textures/environment/sun.png");
+            new Identifier("textures/environment/sun.png");
     private static final Identifier MOON_PHASES_TEXTURE =
-            Identifier.ofVanilla("textures/environment/moon_phases.png");
+            new Identifier("textures/environment/moon_phases.png");
     private static final float CELESTIAL_DISTANCE = 100.0f;
     private static final float SUN_HALF_SIZE = 30.0f;
     private static final float MOON_HALF_SIZE = 20.0f;

@@ -32,11 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RemixEntitySubmitterPatternCanvasTest {
 
     private static final Identifier BANNER_ATLAS =
-            Identifier.of("minecraft", "textures/atlas/banner_patterns.png");
+            new Identifier("minecraft", "textures/atlas/banner_patterns.png");
     private static final Identifier SHIELD_ATLAS =
-            Identifier.of("minecraft", "textures/atlas/shield_patterns.png");
+            new Identifier("minecraft", "textures/atlas/shield_patterns.png");
     private static final Identifier CREEPER =
-            Identifier.of("minecraft", "textures/entity/creeper/creeper.png");
+            new Identifier("minecraft", "textures/entity/creeper/creeper.png");
     private static final int WHITE = 0xFFFFFFFF;
 
     // Bones as a capture records them: every cuboid render pushes its own, so the

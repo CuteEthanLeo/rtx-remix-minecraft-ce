@@ -13,17 +13,19 @@ import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.chunk.BlockBufferBuilderStorage;
+import net.minecraft.client.render.chunk.ChunkBuilder;
 import net.minecraft.client.render.chunk.ChunkRendererRegion;
-import net.minecraft.client.render.chunk.BlockBufferAllocatorStorage;
-import net.minecraft.client.render.chunk.SectionBuilder;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.BlockRenderView;
 import net.minecraft.world.BlockView;
-import com.mojang.blaze3d.systems.VertexSorter;
+import org.jetbrains.annotations.Nullable;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -49,15 +51,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *       for the render thread.</li>
  * </ul>
  */
-@Mixin(SectionBuilder.class)
-public class SectionBuilderMixin {
+@Mixin(targets = "net.minecraft.client.render.chunk.ChunkBuilder$BuiltChunk$RebuildTask")
+public abstract class RebuildTaskCaptureMixin {
 
     private static final ThreadLocal<ProfileScope> rtxremix$tracyOuter = new ThreadLocal<>();
     private static final ThreadLocal<ProfileScope> rtxremix$tracyBlockLoop = new ThreadLocal<>();
     private static final ThreadLocal<BlockDataQueue.CaptureToken> rtxremix$blockDataCaptureToken = new ThreadLocal<>();
+    /**
+     * The section a capturing build began for. The slot's origin is read once, as vanilla
+     * reads it: the render thread may move the slot while this worker is still building.
+     */
+    private static final ThreadLocal<ChunkSectionPos> rtxremix$capturedSection = new ThreadLocal<>();
 
     /**
-     * Whether this build() is capturing for Remix, latched once at HEAD.
+     * Whether this render() is capturing for Remix, latched once at HEAD.
      *
      * <p>{@code rtxEnabled} is volatile so worker threads see a toggle promptly,
      * which means every redirect below would otherwise read it independently and
@@ -79,29 +86,37 @@ public class SectionBuilderMixin {
         return rtxremix$captureForBuild.get();
     }
 
+    /** The snapshot render() takes and clears; null for an empty section. */
     @Shadow
-    private BlockRenderManager blockRenderManager;
+    @Nullable
+    protected ChunkRendererRegion region;
+
+    /** The enclosing {@code BuiltChunk}, whose origin names the section being built. */
+    @Shadow
+    @Final
+    ChunkBuilder.BuiltChunk field_20839;
 
     // HEAD: init per-section emission state
-    @Inject(method = "build", at = @At("HEAD"))
+    @Inject(method = "render", at = @At("HEAD"))
     private void rtxremix$onBuildHead(
-            ChunkSectionPos sectionPos,
-            ChunkRendererRegion renderRegion,
-            VertexSorter vertexSorter,
-            BlockBufferAllocatorStorage allocatorStorage,
-            CallbackInfoReturnable<SectionBuilder.RenderData> cir) {
+            float cameraX,
+            float cameraY,
+            float cameraZ,
+            BlockBufferBuilderStorage storage,
+            CallbackInfoReturnable<?> cir) {
 
         // Latched before any early return below, and unconditionally, so a value
         // left over from this thread's previous build cannot decide this one.
         boolean capturing = VanillaSectionBuilds.beginBuild(RtxRemixMod::isRtxEnabled);
         rtxremix$captureForBuild.set(capturing);
-        if (!capturing) return;
+        // An empty section has no region: vanilla's block loop does not run for it,
+        // so there is nothing to capture.
+        if (!capturing || region == null) return;
 
+        ChunkSectionPos sectionPos = ChunkSectionPos.from(field_20839.getOrigin());
+        rtxremix$capturedSection.set(sectionPos);
         rtxremix$blockDataCaptureToken.set(BlockDataQueue.beginCapture(sectionPos.getX(), sectionPos.getZ()));
         rtxremix$tracyOuter.set(ProfileScope.begin("SectionBuilder"));
-        rtxremix$tracyBlockLoop.set(null);
-
-        if (renderRegion == null) return;
 
         BlockTextureManager tex = null;
         RtxRemixMod mod = RtxRemixMod.getInstance();
@@ -109,12 +124,13 @@ public class SectionBuilderMixin {
             tex = mod.getRenderer().getTextureManager();
         }
 
-        BlockQuadEmitter.threadLocal().beginSection(sectionPos, tex, this.blockRenderManager);
+        BlockRenderManager blockRenderManager = MinecraftClient.getInstance().getBlockRenderManager();
+        BlockQuadEmitter.threadLocal().beginSection(sectionPos, tex, blockRenderManager);
         rtxremix$tracyBlockLoop.set(ProfileScope.begin("block loop"));
     }
 
     // isOpaqueFullCube: capture opacity / face masks / lights / quads
-    @Redirect(method = "build",
+    @Redirect(method = "render",
               at = @At(value = "INVOKE",
                        target = "Lnet/minecraft/block/BlockState;isOpaqueFullCube(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)Z"))
     private boolean rtxremix$captureBlock(BlockState state, BlockView world, BlockPos pos) {
@@ -122,10 +138,10 @@ public class SectionBuilderMixin {
         BlockQuadEmitter emitter = BlockQuadEmitter.current();
         if (emitter != null && emitter.isActive()) {
             emitter.processBlock(state, world, pos, opaque);
-            // Vanilla hands only MODEL blocks to renderBlock; ENTITYBLOCK_ANIMATED blocks
+            // Vanilla's renderBlock draws only MODEL blocks; ENTITYBLOCK_ANIMATED blocks
             // belong to their block-entity renderer.
             if (BlockQuadEmitter.getRenderTypeCached(state) == BlockRenderType.MODEL) {
-                // build() only ever passes its ChunkRendererRegion here.
+                // render() only ever passes its ChunkRendererRegion here.
                 emitter.emitBlock(state, pos, (BlockRenderView) world);
             }
         }
@@ -135,7 +151,7 @@ public class SectionBuilderMixin {
     // While capturing, the block's quads were already emitted above, so vanilla's raster
     // path for it (layer buffer, matrix stack, renderBlock) is dead work. Reporting the
     // block invisible makes vanilla skip all of it.
-    @Redirect(method = "build",
+    @Redirect(method = "render",
               at = @At(value = "INVOKE",
                        target = "Lnet/minecraft/block/BlockState;getRenderType()Lnet/minecraft/block/BlockRenderType;"))
     private BlockRenderType rtxremix$renderTypeForVanilla(BlockState state) {
@@ -145,7 +161,7 @@ public class SectionBuilderMixin {
     }
 
     // renderFluid: emit fluid quads for Remix, skip GL
-    @Redirect(method = "build",
+    @Redirect(method = "render",
               at = @At(value = "INVOKE",
                        target = "Lnet/minecraft/client/render/block/BlockRenderManager;renderFluid(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/BlockRenderView;Lnet/minecraft/client/render/VertexConsumer;Lnet/minecraft/block/BlockState;Lnet/minecraft/fluid/FluidState;)V"))
     private void rtxremix$redirectFluid(BlockRenderManager brm,
@@ -161,13 +177,13 @@ public class SectionBuilderMixin {
     }
 
     // RETURN: finalise mesh data and enqueue
-    @Inject(method = "build", at = @At("RETURN"))
+    @Inject(method = "render", at = @At("RETURN"))
     private void rtxremix$onBuildReturn(
-            ChunkSectionPos sectionPos,
-            ChunkRendererRegion renderRegion,
-            VertexSorter vertexSorter,
-            BlockBufferAllocatorStorage allocatorStorage,
-            CallbackInfoReturnable<SectionBuilder.RenderData> cir) {
+            float cameraX,
+            float cameraY,
+            float cameraZ,
+            BlockBufferBuilderStorage storage,
+            CallbackInfoReturnable<?> cir) {
 
         try {
             BlockQuadEmitter emitter = BlockQuadEmitter.threadLocal();
@@ -176,9 +192,9 @@ public class SectionBuilderMixin {
             ProfileScope blockScope = rtxremix$tracyBlockLoop.get();
             if (blockScope != null) blockScope.close();
 
-            // The token is set at build HEAD before beginSection, so an active emitter
-            // implies one exists.
-            SectionBlockData blockData = emitter.finishSection(sectionPos);
+            // The token and section are set at render HEAD before beginSection, so an
+            // active emitter implies both exist.
+            SectionBlockData blockData = emitter.finishSection(rtxremix$capturedSection.get());
             BlockDataQueue.enqueue(blockData, rtxremix$blockDataCaptureToken.get());
         } finally {
             ProfileScope outerScope = rtxremix$tracyOuter.get();
@@ -186,6 +202,7 @@ public class SectionBuilderMixin {
             rtxremix$tracyOuter.remove();
             rtxremix$tracyBlockLoop.remove();
             rtxremix$blockDataCaptureToken.remove();
+            rtxremix$capturedSection.remove();
             // A build that throws skips this inject and stays counted; vanilla turns a
             // section build exception into a client crash, so the stale count cannot
             // outlive the session.

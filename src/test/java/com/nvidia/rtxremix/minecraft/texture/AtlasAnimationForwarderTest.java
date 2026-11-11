@@ -24,8 +24,8 @@ class AtlasAnimationForwarderTest {
 
     @Test
     void addPatchIgnoresSpritesOutsideTheBlockAtlasAllowList() throws Exception {
-        Identifier blockSprite = Identifier.of("minecraft", "block/lava_still");
-        Identifier guiSprite = Identifier.of("minecraft", "gui/sprites/icon");
+        Identifier blockSprite = new Identifier("minecraft", "block/lava_still");
+        Identifier guiSprite = new Identifier("minecraft", "gui/sprites/icon");
 
         AtlasAnimationForwarder.init(Map.of(), Set.of(blockSprite));
         AtlasAnimationForwarder.beginAtlasUpload(BlockTextureManager.BLOCK_ATLAS_ID);
@@ -43,8 +43,8 @@ class AtlasAnimationForwarderTest {
 
     @Test
     void addPatchIgnoresAllowedSpriteIdsFromOtherAtlases() throws Exception {
-        Identifier blockSprite = Identifier.of("minecraft", "block/lava_still");
-        Identifier particleAtlas = Identifier.of("minecraft", "textures/atlas/particles.png");
+        Identifier blockSprite = new Identifier("minecraft", "block/lava_still");
+        Identifier particleAtlas = new Identifier("minecraft", "textures/atlas/particles.png");
 
         AtlasAnimationForwarder.init(Map.of(), Set.of(blockSprite));
         AtlasAnimationForwarder.beginAtlasUpload(particleAtlas);

@@ -37,7 +37,8 @@ public class CuboidMixin {
 
     @Inject(method = "renderCuboid", at = @At("HEAD"), cancellable = true)
     private void rtxremix$onRenderCuboid(MatrixStack.Entry entry, VertexConsumer vertexConsumer,
-                                          int light, int overlay, int color,
+                                          int light, int overlay,
+                                          float red, float green, float blue, float alpha,
                                           CallbackInfo ci) {
         // Sprite-atlas models (chests, beds, banners, shields, pots) draw through a
         // wrapper whose only behaviour is remapping UVs into the sprite's rectangle.
@@ -68,7 +69,8 @@ public class CuboidMixin {
         // Folded before capture: the tint is an instance property downstream, so a
         // damage or priming flash is a per-instance update, never a new mesh.
         consumer.acceptCuboid(this.sides,
-                RemixCapturingConsumer.applyEntityOverlay(color, overlay),
+                RemixCapturingConsumer.applyEntityOverlay(
+                        RemixCapturingConsumer.packTint(red, green, blue, alpha), overlay),
                 entry.getPositionMatrix(),
                 sprite);
 

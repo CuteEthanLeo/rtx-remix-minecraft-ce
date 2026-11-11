@@ -69,7 +69,7 @@ public abstract class ModelPartMixin {
     }
 
     @WrapOperation(
-            method = "renderCuboids(Lnet/minecraft/client/util/math/MatrixStack$Entry;Lnet/minecraft/client/render/VertexConsumer;III)V",
+            method = "renderCuboids(Lnet/minecraft/client/util/math/MatrixStack$Entry;Lnet/minecraft/client/render/VertexConsumer;IIFFFF)V",
             at = @At(
                     value = "INVOKE",
                     target = "Ljava/util/List;iterator()Ljava/util/Iterator;"))
@@ -80,7 +80,10 @@ public abstract class ModelPartMixin {
             VertexConsumer vertexConsumer,
             int light,
             int overlay,
-            int color) {
+            float red,
+            float green,
+            float blue,
+            float alpha) {
         VertexConsumer target = vertexConsumer instanceof SpriteTexturedVertexConsumer wrapped
                 ? wrapped.delegate
                 : vertexConsumer;

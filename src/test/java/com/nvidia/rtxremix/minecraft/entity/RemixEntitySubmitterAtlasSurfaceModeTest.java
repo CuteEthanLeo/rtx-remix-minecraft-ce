@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class RemixEntitySubmitterAtlasSurfaceModeTest {
 
     private static final Identifier ENTITY_TEXTURE =
-            Identifier.of("minecraft", "textures/entity/creeper/creeper.png");
+            new Identifier("minecraft", "textures/entity/creeper/creeper.png");
 
     @Test
     void aHeldTranslucentBlockKeepsItsTranslucentSurface() {

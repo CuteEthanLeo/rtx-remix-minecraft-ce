@@ -292,7 +292,7 @@ diluting the sampler's candidate pool.
   loop's deadline read, and clock-free `TerrainNativeCallStats` tallies.
   Avoid per-block/per-quad capture allocation and per-frame render allocation.
 - Terrain capture has one path; the pre-`SectionMeshData` paths are gone
-  (`SectionBuilderMixin`).
+  (`RebuildTaskCaptureMixin`).
 - Every retained `SectionMeshData` or render-region reference is released
   exactly once: `SectionMeshData` rejects an over-release, `DirectBufferPool`
   ignores a buffer that is already idle, and `RenderRegionStoragePool` relies

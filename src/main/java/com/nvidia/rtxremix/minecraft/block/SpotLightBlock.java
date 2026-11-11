@@ -71,7 +71,7 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
      * which is private in 1.21.1 and would otherwise need an access-widener entry.
      */
     private static final RegistryKey<ItemGroup> FUNCTIONAL_BLOCKS =
-            RegistryKey.of(RegistryKeys.ITEM_GROUP, Identifier.ofVanilla("functional_blocks"));
+            RegistryKey.of(RegistryKeys.ITEM_GROUP, new Identifier("functional_blocks"));
 
     private final LightEntry.ColorOverride beamColor;
 
@@ -111,7 +111,7 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
 
     /** Registers one variant, its item, and the creative tab entry. */
     private static void register(String path, SpotLightBlock block) {
-        Identifier id = Identifier.of(RtxRemixCommonMod.MOD_ID, path);
+        Identifier id = new Identifier(RtxRemixCommonMod.MOD_ID, path);
         Registry.register(Registries.BLOCK, id, block);
         BlockItem item = Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
         ItemGroupEvents.modifyEntriesEvent(FUNCTIONAL_BLOCKS).register(entries -> entries.add(item));

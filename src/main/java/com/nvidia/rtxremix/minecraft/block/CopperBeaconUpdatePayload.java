@@ -17,7 +17,7 @@ public record CopperBeaconUpdatePayload(int syncId, Field field, float value)
         implements CustomPayload {
 
     public static final Id<CopperBeaconUpdatePayload> ID = new Id<>(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon_update"));
+            new Identifier(RtxRemixCommonMod.MOD_ID, "copper_beacon_update"));
     public static final PacketCodec<RegistryByteBuf, CopperBeaconUpdatePayload> PACKET_CODEC =
             new PacketCodec<>() {
                 @Override

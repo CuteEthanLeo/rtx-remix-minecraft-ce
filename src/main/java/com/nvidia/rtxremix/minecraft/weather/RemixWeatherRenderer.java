@@ -6,12 +6,13 @@ package com.nvidia.rtxremix.minecraft.weather;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.VertexSorter;
+import com.nvidia.rtxremix.minecraft.CameraFacing;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.BufferRenderer;
-import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
@@ -45,9 +46,9 @@ public final class RemixWeatherRenderer {
     private static final float NEAR_PLANE = 0.05f;
     private static final float FAR_PLANE = 1000.0f;
     private static final Identifier RAIN_TEXTURE =
-            Identifier.ofVanilla("textures/environment/rain.png");
+            new Identifier("textures/environment/rain.png");
     private static final Identifier RAIN_SHADER =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "rain_refraction");
+            new Identifier(RtxRemixCommonMod.MOD_ID, "rain_refraction");
 
     private static ShaderProgram rainShader;
 
@@ -77,7 +78,7 @@ public final class RemixWeatherRenderer {
     }
 
     public void updateCamera(Camera camera, float fovYDegrees, float aspect) {
-        Quaternionf cameraRotation = camera.getRotation().conjugate(new Quaternionf());
+        Quaternionf cameraRotation = CameraFacing.get(camera, new Quaternionf()).conjugate();
         modelView = new Matrix4f().rotation(cameraRotation);
         projection = new Matrix4f().perspective(
                 (float) Math.toRadians(fovYDegrees),
@@ -86,12 +87,17 @@ public final class RemixWeatherRenderer {
                 FAR_PLANE);
     }
 
-    public void capture(BuiltBuffer buffer, Identifier texture) {
+    /**
+     * Takes over a batch vanilla built in the shared {@code Tessellator} builder. The batch
+     * stays in that builder, behind whatever else is built there, until this renderer draws
+     * or releases it; the builder recycles its memory only once every batch is released.
+     */
+    public void capture(BufferBuilder.BuiltBuffer buffer, Identifier texture) {
         if (texture == null) {
-            buffer.close();
+            buffer.release();
             throw new IllegalStateException("Weather draw did not bind a texture");
         }
-        capturedQuadCount += buffer.getDrawParameters().vertexCount() / 4;
+        capturedQuadCount += buffer.getParameters().vertexCount() / 4;
         draws.add(new DeferredDraw(buffer, texture, texture.equals(RAIN_TEXTURE)));
     }
 
@@ -268,7 +274,7 @@ public final class RemixWeatherRenderer {
     private void closePendingDraws() {
         for (DeferredDraw draw : draws) {
             if (draw != null) {
-                draw.buffer().close();
+                draw.buffer().release();
             }
         }
         draws.clear();
@@ -290,7 +296,7 @@ public final class RemixWeatherRenderer {
         }
     }
 
-    private record DeferredDraw(BuiltBuffer buffer, Identifier texture, boolean rain) {
+    private record DeferredDraw(BufferBuilder.BuiltBuffer buffer, Identifier texture, boolean rain) {
     }
 
     private static final class DepthSeeder {

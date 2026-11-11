@@ -132,7 +132,7 @@ public final class BlockDataQueue {
     }
 
     /**
-     * Called with the identity captured at SectionBuilder.build HEAD. Takes over
+     * Called with the identity captured at RebuildTask.render HEAD. Takes over
      * the capture's mesh data: it is released here when the capture is dropped
      * and otherwise travels to the render thread with the queue entry.
      */

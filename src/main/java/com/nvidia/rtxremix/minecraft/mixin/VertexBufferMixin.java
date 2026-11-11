@@ -30,15 +30,7 @@ public abstract class VertexBufferMixin {
         rtxremix$upload(target, data, usage, rtxremix$vertexStorage);
     }
 
-    // Both overloads are named explicitly: the refmap keys one selector string to one
-    // intermediary method, so a bare overloaded name would reach only one of them in a
-    // production (intermediary-mapped) client.
-    @Redirect(
-        method = {
-            "uploadIndexBuffer(Lnet/minecraft/client/util/BufferAllocator$CloseableBuffer;)V",
-            "uploadIndexBuffer(Lnet/minecraft/client/render/BuiltBuffer$DrawParameters;Ljava/nio/ByteBuffer;)Lcom/mojang/blaze3d/systems/RenderSystem$ShapeIndexBuffer;"
-        },
-        at = @At(value = "INVOKE", target = rtxremix$GL_BUFFER_DATA))
+    @Redirect(method = "uploadIndexBuffer", at = @At(value = "INVOKE", target = rtxremix$GL_BUFFER_DATA))
     private void rtxremix$uploadIndexData(int target, ByteBuffer data, int usage) {
         rtxremix$upload(target, data, usage, rtxremix$indexStorage);
     }

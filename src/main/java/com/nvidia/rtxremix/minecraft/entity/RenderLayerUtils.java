@@ -6,7 +6,7 @@ package com.nvidia.rtxremix.minecraft.entity;
 
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderPhase;
-import net.minecraft.client.render.VertexFormatElement;
+import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
 
 import java.util.Collections;
@@ -55,7 +55,7 @@ final class RenderLayerUtils {
      * pools by one, so they share this.
      */
     static final Identifier UNTEXTURED_LAYER_ID =
-            Identifier.of("rtxremix", "untextured_entity_layer");
+            new Identifier("rtxremix", "untextured_entity_layer");
 
     private RenderLayerUtils() {}
 
@@ -138,7 +138,7 @@ final class RenderLayerUtils {
         // capturableTexture declined must not re-enter capture through here.
         return extractTexture(layer).isEmpty()
                 && topology(layer).filter(t -> t == Topology.TRIANGLE_STRIP).isPresent()
-                && layer.getVertexFormat().getElements().contains(VertexFormatElement.COLOR);
+                && layer.getVertexFormat().getElements().contains(VertexFormats.COLOR_ELEMENT);
     }
 
     /**

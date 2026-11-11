@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A render region holds one reference on each of its nine chunk snapshots from construction
+ * A render region holds one reference on each of its chunk snapshots from construction
  * until {@link #rtxremix$release}, which the rebuild task that consumed it calls exactly once;
  * see {@link RebuildTaskMixin}.
  */
@@ -27,14 +27,16 @@ public abstract class ChunkRendererRegionMixin implements RegionSnapshotRelease 
 
     @Shadow
     @Final
-    protected RenderedChunk[] chunks;
+    protected RenderedChunk[][] chunks;
 
     private final AtomicBoolean rtxremix$released = new AtomicBoolean();
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void rtxremix$retainSnapshots(World world, int chunkX, int chunkZ, RenderedChunk[] renderedChunks, CallbackInfo ci) {
-        for (RenderedChunk snapshot : chunks) {
-            ((RegionSnapshotRelease) snapshot).rtxremix$retain();
+    private void rtxremix$retainSnapshots(World world, int chunkX, int chunkZ, RenderedChunk[][] renderedChunks, CallbackInfo ci) {
+        for (RenderedChunk[] row : chunks) {
+            for (RenderedChunk snapshot : row) {
+                ((RegionSnapshotRelease) snapshot).rtxremix$retain();
+            }
         }
     }
 
@@ -48,8 +50,10 @@ public abstract class ChunkRendererRegionMixin implements RegionSnapshotRelease 
         if (!rtxremix$released.compareAndSet(false, true)) {
             return;
         }
-        for (RenderedChunk snapshot : chunks) {
-            ((RegionSnapshotRelease) snapshot).rtxremix$release();
+        for (RenderedChunk[] row : chunks) {
+            for (RenderedChunk snapshot : row) {
+                ((RegionSnapshotRelease) snapshot).rtxremix$release();
+            }
         }
     }
 }

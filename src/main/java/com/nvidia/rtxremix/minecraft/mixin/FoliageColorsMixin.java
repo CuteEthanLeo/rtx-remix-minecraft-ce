@@ -5,7 +5,7 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.terrain.BiomeColorGeneration;
-import net.minecraft.world.biome.FoliageColors;
+import net.minecraft.client.color.world.FoliageColors;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

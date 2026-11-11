@@ -30,10 +30,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *   <li><b>createRebuildTask:</b> Records which neighbour columns the region
  *       snapshot contained, so a later chunk-load re-flag from a column the
  *       capture already read can be dropped.
- *   <li><b>method_60908:</b> Tracks whether the section contains block
+ *   <li><b>published chunk data:</b> Tracks whether the section contains block
  *       entities and flags empty render data as a removal candidate. The
  *       render thread validates the live world section before removing
  *       Remix terrain because vanilla can publish temporary empty data.
+ *       {@code RebuildTaskMixin} reports the publish, which vanilla does from a
+ *       rebuild task's completion lambda.
  * </ul>
  */
 @Mixin(ChunkBuilder.BuiltChunk.class)
@@ -98,8 +100,8 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
      * The probe sees exactly the columns the snapshot holds: ChunkRendererRegionBuilder.build
      * reads ClientChunkManager.getChunk(x, z, FULL, true), which returns the shared EmptyChunk
      * precisely when this create=false probe returns null, and nothing interleaves on the
-     * render thread between the two. A null region (empty own section) is recorded too: it
-     * has no geometry that a neighbour could make wrong.
+     * render thread between the two. A null region (an empty neighbourhood) is recorded too:
+     * it has no geometry that a neighbour could make wrong.
      */
     @Inject(
             method = "createRebuildTask(Lnet/minecraft/client/render/chunk/ChunkRendererRegionBuilder;)"
@@ -125,8 +127,8 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
         }
     }
 
-    @Inject(method = "method_60908(Lnet/minecraft/client/render/chunk/ChunkBuilder$ChunkData;)V", at = @At("HEAD"))
-    private void rtxremix$onChunkDataSet(ChunkBuilder.ChunkData chunkData, CallbackInfo ci) {
+    @Override
+    public void rtxremix$onChunkDataPublished(ChunkBuilder.ChunkData chunkData) {
         rtxremix$hasBlockEntities = !chunkData.getBlockEntities().isEmpty();
 
         if (!chunkData.isEmpty()) {

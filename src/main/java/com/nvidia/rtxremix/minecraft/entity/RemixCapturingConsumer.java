@@ -270,9 +270,9 @@ public class RemixCapturingConsumer implements VertexConsumer {
     }
 
     @Override
-    public VertexConsumer vertex(float x, float y, float z) {
+    public VertexConsumer vertex(double x, double y, double z) {
         beginVertex(-1);
-        vx = x; vy = y; vz = z;
+        vx = (float) x; vy = (float) y; vz = (float) z;
         return this;
     }
 
@@ -343,8 +343,26 @@ public class RemixCapturingConsumer implements VertexConsumer {
     public VertexConsumer normal(float x, float y, float z) {
         vnx = x; vny = y; vnz = z;
         explicitNormal = true;
-        finalizeVertex();
         return this;
+    }
+
+    // ---- VertexConsumer: vertex end and fixed colour ----
+
+    @Override
+    public void next() {
+        finalizeVertex();
+    }
+
+    /**
+     * Not honoured: vanilla fixes a colour only on the buffers its outline provider wraps,
+     * never on a consumer a capture provider handed out.
+     */
+    @Override
+    public void fixedColor(int red, int green, int blue, int alpha) {
+    }
+
+    @Override
+    public void unfixColor() {
     }
 
     // ---- Vertex finalization ----
@@ -407,6 +425,20 @@ public class RemixCapturingConsumer implements VertexConsumer {
         currentVertexBoneIndex = -1;
         vColor = 0xFFFFFFFF;
         vOverlay = OverlayTexture.DEFAULT_UV;
+    }
+
+    /**
+     * Packs a model tint into ARGB. Vanilla makes these floats by dividing colour bytes by
+     * 255, and rounding recovers the bytes exactly, where truncation would lose a step on
+     * some of them.
+     */
+    public static int packTint(float red, float green, float blue, float alpha) {
+        return (tintChannel(alpha) << 24) | (tintChannel(red) << 16)
+                | (tintChannel(green) << 8) | tintChannel(blue);
+    }
+
+    private static int tintChannel(float value) {
+        return Math.clamp(Math.round(value * 255.0f), 0, OPAQUE);
     }
 
     /** Overlay rows below this hold the red damage tint; the rest hold the white flash. */

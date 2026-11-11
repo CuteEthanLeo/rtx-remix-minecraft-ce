@@ -875,7 +875,7 @@ public class ChunkManager {
         }
 
         WorldChunk wc = currentWorld.getChunkManager().getWorldChunk(cx, cz, false);
-        return wc != null && wc.isSectionEmpty(sy);
+        return wc != null && wc.getSection(wc.sectionCoordToIndex(sy)).isEmpty();
     }
 
     private int drainBlockData() {

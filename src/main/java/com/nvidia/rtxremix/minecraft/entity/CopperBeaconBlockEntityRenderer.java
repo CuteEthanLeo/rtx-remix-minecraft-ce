@@ -34,16 +34,16 @@ public final class CopperBeaconBlockEntityRenderer
         implements BlockEntityRenderer<CopperBeaconBlockEntity> {
 
     public static final EntityModelLayer BODY_MODEL_LAYER = new EntityModelLayer(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "body");
+            new Identifier(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "body");
     public static final EntityModelLayer LENS_MODEL_LAYER = new EntityModelLayer(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "lens");
+            new Identifier(RtxRemixCommonMod.MOD_ID, "copper_beacon"), "lens");
     private static final SpriteIdentifier COPPER_TEXTURE = new SpriteIdentifier(
             PlayerScreenHandler.BLOCK_ATLAS_TEXTURE,
-            Identifier.ofVanilla("block/copper_block"));
+            new Identifier("block/copper_block"));
     static final Identifier LENS_SPRITE_ID =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens");
+            new Identifier(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens");
     static final Identifier UNLIT_LENS_SPRITE_ID =
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens_unlit");
+            new Identifier(RtxRemixCommonMod.MOD_ID, "block/copper_beacon_lens_unlit");
     private static final SpriteIdentifier LENS_TEXTURE = new SpriteIdentifier(
             PlayerScreenHandler.BLOCK_ATLAS_TEXTURE,
             LENS_SPRITE_ID);
@@ -145,7 +145,13 @@ public final class CopperBeaconBlockEntityRenderer
                 lensTexture(beacon.isActive(), beacon.getIntensityMultiplier());
         VertexConsumer lensVertices =
                 lensTexture.getVertexConsumer(vertexConsumers, RenderLayer::getEntitySolid);
-        lens.render(matrices, lensVertices, light, overlay, beacon.getLensTint());
+        int lensTint = beacon.getLensTint();
+        lens.render(
+                matrices, lensVertices, light, overlay,
+                ((lensTint >> 16) & 0xFF) / 255.0f,
+                ((lensTint >> 8) & 0xFF) / 255.0f,
+                (lensTint & 0xFF) / 255.0f,
+                (lensTint >>> 24) / 255.0f);
         matrices.pop();
     }
 
@@ -190,7 +196,7 @@ public final class CopperBeaconBlockEntityRenderer
         }
 
         @Override
-        public VertexConsumer vertex(float x, float y, float z) {
+        public VertexConsumer vertex(double x, double y, double z) {
             delegate.vertex(x, y, z);
             return this;
         }
@@ -223,6 +229,21 @@ public final class CopperBeaconBlockEntityRenderer
         public VertexConsumer normal(float x, float y, float z) {
             delegate.normal(x, y, z);
             return this;
+        }
+
+        @Override
+        public void next() {
+            delegate.next();
+        }
+
+        @Override
+        public void fixedColor(int red, int green, int blue, int alpha) {
+            delegate.fixedColor(red, green, blue, alpha);
+        }
+
+        @Override
+        public void unfixColor() {
+            delegate.unfixColor();
         }
     }
 }

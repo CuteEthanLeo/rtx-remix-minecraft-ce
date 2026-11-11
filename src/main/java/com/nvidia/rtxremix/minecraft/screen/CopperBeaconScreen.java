@@ -38,7 +38,7 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
     private static final int RANGE_SLIDER_GAP = 6;
     private static final int RANGE_SLIDER_WIDTH =
             (PANEL_WIDTH - RANGE_SLIDER_GAP) / 2;
-    private static final Identifier SLOT_TEXTURE = Identifier.ofVanilla("container/slot");
+    private static final Identifier SLOT_TEXTURE = new Identifier("container/slot");
 
     private final Map<CopperBeaconUpdatePayload.Field, Float> pending =
             new EnumMap<>(CopperBeaconUpdatePayload.Field.class);

@@ -131,7 +131,7 @@ class ChunkManagerLightBudgetTest {
         for (int i = 0; i < lights.length; i++) {
             entry.putLight(
                     new BlockLightKey(new BlockPos(i, 0, 0),
-                            Identifier.of("test", "light_" + i), 0),
+                            new Identifier("test", "light_" + i), 0),
                     new TerrainLight(lights[i]));
         }
     }

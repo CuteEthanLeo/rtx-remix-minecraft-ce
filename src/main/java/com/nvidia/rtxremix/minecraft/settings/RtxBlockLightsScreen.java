@@ -10,7 +10,6 @@ import java.util.List;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.option.GameOptionsScreen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.DirectionalLayoutWidget;
@@ -20,7 +19,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 /** Two-column editor for built-in block-light intensity multipliers. */
-final class RtxBlockLightsScreen extends GameOptionsScreen {
+final class RtxBlockLightsScreen extends RtxOptionListScreen {
 
     private final RtxSettings settings;
     private final Runnable saveSettings;

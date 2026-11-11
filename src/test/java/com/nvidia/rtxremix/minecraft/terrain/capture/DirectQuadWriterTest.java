@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DirectQuadWriterTest {
 
-    private static final Identifier CUTOUT_SPRITE = Identifier.ofVanilla("test/cutout");
+    private static final Identifier CUTOUT_SPRITE = new Identifier("test/cutout");
     private static final float[] FRONT_POSITIONS = {
             0.0f, 0.0f, 0.0f,
             1.0f, 0.0f, 0.0f,
@@ -158,7 +158,7 @@ class DirectQuadWriterTest {
         stageCutoutQuad(writer, FRONT_POSITIONS, FRONT_UVS, 1.0f, CUTOUT_SPRITE, 0xFFFFFFFF);
         stageCutoutQuad(writer, BACK_POSITIONS, DISTINCT_BACK_UVS, 1.0f, CUTOUT_SPRITE, 0xFFFFFFFF);
         stageCutoutQuad(writer, BACK_POSITIONS, DISTINCT_BACK_UVS, -1.0f,
-                Identifier.ofVanilla("test/cutout_overlay"), 0xFFFFFFFF);
+                new Identifier("test/cutout_overlay"), 0xFFFFFFFF);
         writer.flushBlock(null);
 
         assertEquals(12, totalVertices(writer.buildMeshData()));
@@ -226,7 +226,7 @@ class DirectQuadWriterTest {
         writer.setRainExposed(true);
         writer.stageQuad(top, FRONT_UVS,
                 0.0f, 1.0f, 0.0f,
-                0xFFFFFFFF, Identifier.ofVanilla("block/stone"),
+                0xFFFFFFFF, new Identifier("block/stone"),
                 0.0f, 0.0f, 1.0f, 1.0f,
                 "solid");
         writer.flushBlock(null);

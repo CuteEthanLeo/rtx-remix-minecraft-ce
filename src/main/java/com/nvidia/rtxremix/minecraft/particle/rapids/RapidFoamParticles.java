@@ -20,9 +20,9 @@ public final class RapidFoamParticles {
     private RapidFoamParticles() {}
 
     public static void register() {
-        Registry.register(Registries.PARTICLE_TYPE, Identifier.of(RtxRemixCommonMod.MOD_ID, "rapid_foam"), RAPID_FOAM);
-        Registry.register(Registries.PARTICLE_TYPE, Identifier.of(RtxRemixCommonMod.MOD_ID, "rapid_foam_dot"), RAPID_FOAM_DOT);
-        Registry.register(Registries.PARTICLE_TYPE, Identifier.of(RtxRemixCommonMod.MOD_ID, "rapid_mist"), RAPID_MIST);
+        Registry.register(Registries.PARTICLE_TYPE, new Identifier(RtxRemixCommonMod.MOD_ID, "rapid_foam"), RAPID_FOAM);
+        Registry.register(Registries.PARTICLE_TYPE, new Identifier(RtxRemixCommonMod.MOD_ID, "rapid_foam_dot"), RAPID_FOAM_DOT);
+        Registry.register(Registries.PARTICLE_TYPE, new Identifier(RtxRemixCommonMod.MOD_ID, "rapid_mist"), RAPID_MIST);
         ParticleFactoryRegistry.getInstance().register(RAPID_FOAM, RapidFoamParticle.Factory::new);
         ParticleFactoryRegistry.getInstance().register(RAPID_FOAM_DOT, RapidFoamDotParticle.Factory::new);
         ParticleFactoryRegistry.getInstance().register(RAPID_MIST, RapidMistParticle.Factory::new);

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class EntityMaterialKeyTest {
 
-    private static final Identifier TEX = Identifier.of("minecraft", "textures/entity/cow/cow.png");
+    private static final Identifier TEX = new Identifier("minecraft", "textures/entity/cow/cow.png");
 
     @Test
     void lookupProbeAgreesWithTheStoredRecordOnHashAndEquality() {

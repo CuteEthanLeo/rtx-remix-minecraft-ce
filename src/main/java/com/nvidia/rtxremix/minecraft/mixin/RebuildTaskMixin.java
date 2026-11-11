@@ -4,16 +4,19 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.nvidia.rtxremix.minecraft.terrain.ChunkBuilderBlockEntityAccess;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSnapshotRelease;
-import net.minecraft.client.render.chunk.BlockBufferAllocatorStorage;
+import net.minecraft.client.render.chunk.BlockBufferBuilderStorage;
 import net.minecraft.client.render.chunk.ChunkBuilder;
 import net.minecraft.client.render.chunk.ChunkRendererRegion;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -23,6 +26,9 @@ import java.util.concurrent.CompletableFuture;
  * {@code run} is owned by this worker whichever branch vanilla takes, including the early
  * returns that never read it. A task cancelled before it ever runs leaves its region to the
  * collector, which only forgoes the reuse.
+ *
+ * <p>Also reports the chunk data a finished rebuild publishes to its built chunk, which
+ * vanilla does from the completion lambda of {@code run}.
  */
 @Mixin(targets = "net.minecraft.client.render.chunk.ChunkBuilder$BuiltChunk$RebuildTask")
 public abstract class RebuildTaskMixin {
@@ -30,19 +36,33 @@ public abstract class RebuildTaskMixin {
     @Shadow
     protected ChunkRendererRegion region;
 
+    /** The enclosing {@code BuiltChunk}. */
+    @Shadow
+    @Final
+    ChunkBuilder.BuiltChunk field_20839;
+
     private ChunkRendererRegion rtxremix$consumed;
 
     @Inject(method = "run", at = @At("HEAD"))
-    private void rtxremix$captureRegion(BlockBufferAllocatorStorage buffers, CallbackInfoReturnable<CompletableFuture<ChunkBuilder.Result>> cir) {
+    private void rtxremix$captureRegion(BlockBufferBuilderStorage buffers, CallbackInfoReturnable<CompletableFuture<ChunkBuilder.Result>> cir) {
         rtxremix$consumed = region;
     }
 
     @Inject(method = "run", at = @At("RETURN"))
-    private void rtxremix$releaseRegion(BlockBufferAllocatorStorage buffers, CallbackInfoReturnable<CompletableFuture<ChunkBuilder.Result>> cir) {
+    private void rtxremix$releaseRegion(BlockBufferBuilderStorage buffers, CallbackInfoReturnable<CompletableFuture<ChunkBuilder.Result>> cir) {
         ChunkRendererRegion consumed = rtxremix$consumed;
         rtxremix$consumed = null;
         if (consumed != null) {
             ((RegionSnapshotRelease) consumed).rtxremix$release();
         }
+    }
+
+    @Inject(
+            method = "method_23619(Lnet/minecraft/client/render/chunk/ChunkBuilder$ChunkData;Ljava/util/List;Ljava/lang/Throwable;)"
+                    + "Lnet/minecraft/client/render/chunk/ChunkBuilder$Result;",
+            at = @At(value = "INVOKE", target = "Ljava/util/concurrent/atomic/AtomicReference;set(Ljava/lang/Object;)V"))
+    private void rtxremix$onChunkDataSet(ChunkBuilder.ChunkData chunkData, List<?> uploads, Throwable failure,
+                                         CallbackInfoReturnable<ChunkBuilder.Result> cir) {
+        ((ChunkBuilderBlockEntityAccess) field_20839).rtxremix$onChunkDataPublished(chunkData);
     }
 }
