@@ -6,7 +6,7 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.nvidia.rtxremix.minecraft.texture.GlyphPageMirror;
-import net.minecraft.client.gl.GlResourceManager;
+import net.minecraft.client.gl.GlCommandEncoder;
 import net.minecraft.client.texture.NativeImage;
 import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,13 +27,13 @@ import java.nio.IntBuffer;
  * for an image, the source window. Only an upload inside a glyph upload scope is mirrored,
  * so every other texture upload in the game costs one static read.
  */
-@Mixin(GlResourceManager.class)
-public abstract class GlResourceManagerUploadMixin {
+@Mixin(GlCommandEncoder.class)
+public abstract class GlCommandEncoderUploadMixin {
 
     @Inject(
-            method = "writeToTexture(Lcom/mojang/blaze3d/textures/GpuTexture;Lnet/minecraft/client/texture/NativeImage;IIIIIII)V",
+            method = "writeToTexture(Lcom/mojang/blaze3d/textures/GpuTexture;Lnet/minecraft/client/texture/NativeImage;IIIIIIII)V",
             at = @At("HEAD"))
-    private void rtxremix$mirrorGlyphImageUpload(GpuTexture target, NativeImage source, int mipLevel,
+    private void rtxremix$mirrorGlyphImageUpload(GpuTexture target, NativeImage source, int mipLevel, int depthOrLayer,
                                                  int intoX, int intoY, int width, int height,
                                                  int x, int y, CallbackInfo ci) {
         GlyphPageMirror page = GlyphPageMirror.uploadTarget();
@@ -51,11 +51,11 @@ public abstract class GlResourceManagerUploadMixin {
     }
 
     @Inject(
-            method = "writeToTexture(Lcom/mojang/blaze3d/textures/GpuTexture;Ljava/nio/IntBuffer;Lnet/minecraft/client/texture/NativeImage$Format;IIIII)V",
+            method = "writeToTexture(Lcom/mojang/blaze3d/textures/GpuTexture;Ljava/nio/IntBuffer;Lnet/minecraft/client/texture/NativeImage$Format;IIIIII)V",
             at = @At("HEAD"))
     private void rtxremix$mirrorGlyphBufferUpload(GpuTexture target, IntBuffer source, NativeImage.Format format,
-                                                  int mipLevel, int intoX, int intoY, int width, int height,
-                                                  CallbackInfo ci) {
+                                                  int mipLevel, int depthOrLayer, int intoX, int intoY,
+                                                  int width, int height, CallbackInfo ci) {
         GlyphPageMirror page = GlyphPageMirror.uploadTarget();
         if (page == null || mipLevel != 0 || width <= 0 || height <= 0) {
             return;

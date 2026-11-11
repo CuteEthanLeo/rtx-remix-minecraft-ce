@@ -23,7 +23,6 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColors;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.model.BakedQuad;
@@ -1109,13 +1108,12 @@ public final class BlockQuadEmitter {
         // translucent material with the frame as a diffuse layer.
         // Stained glass is already translucent and keeps vanilla's layer.
         if (state.isOf(Blocks.GLASS) || state.isOf(Blocks.GLASS_PANE)) return "glass";
-        RenderLayer layer = RenderLayers.getBlockLayer(state);
-        if (layer == RenderLayer.getSolid()) return "solid";
-        if (layer == RenderLayer.getCutoutMipped()) return "cutout_mipped";
-        if (layer == RenderLayer.getCutout()) return "cutout";
-        if (layer == RenderLayer.getTranslucent()) return "translucent";
-        if (layer == RenderLayer.getTripwire()) return "cutout";
-        return "solid";
+        return switch (RenderLayers.getBlockLayer(state)) {
+            case SOLID -> "solid";
+            case CUTOUT_MIPPED -> "cutout_mipped";
+            case CUTOUT, TRIPWIRE -> "cutout";
+            case TRANSLUCENT -> "translucent";
+        };
     }
 
     private static void setPos4(float[] out,

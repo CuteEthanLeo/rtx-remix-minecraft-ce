@@ -3,9 +3,10 @@
 
 #version 150
 
+#moj_import <minecraft:projection.glsl>
+
 uniform sampler2D Sampler0;
 uniform sampler2D Sampler1;
-uniform mat4 ProjMat;
 
 in vec2 texCoord;
 in vec4 vertexColor;

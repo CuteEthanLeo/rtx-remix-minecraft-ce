@@ -8,6 +8,7 @@ import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.NativeImage;
@@ -238,7 +239,9 @@ class DynamicTextureCacheTest {
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "createCommandEncoder" -> encoder;
                     case "createTexture" -> new HeadlessTexture(
-                            (TextureFormat) arguments[1], (int) arguments[2], (int) arguments[3], (int) arguments[4]);
+                            (int) arguments[1], (TextureFormat) arguments[2], (int) arguments[3], (int) arguments[4],
+                            (int) arguments[5], (int) arguments[6]);
+                    case "createTextureView" -> new HeadlessTextureView((GpuTexture) arguments[0]);
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
         try {
@@ -253,8 +256,26 @@ class DynamicTextureCacheTest {
     private static final class HeadlessTexture extends GpuTexture {
         private boolean closed;
 
-        HeadlessTexture(TextureFormat format, int width, int height, int mipLevels) {
-            super("test", format, width, height, mipLevels);
+        HeadlessTexture(int usage, TextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+            super(usage, "test", format, width, height, depthOrLayers, mipLevels);
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+
+        @Override
+        public boolean isClosed() {
+            return closed;
+        }
+    }
+
+    private static final class HeadlessTextureView extends GpuTextureView {
+        private boolean closed;
+
+        HeadlessTextureView(GpuTexture texture) {
+            super(texture, 0, texture.getMipLevels());
         }
 
         @Override

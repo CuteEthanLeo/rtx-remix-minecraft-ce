@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -166,7 +167,8 @@ public final class CloudRenderer {
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
-        float cloudHeight = world.getDimensionEffects().getCloudsHeight();
+        Optional<Integer> dimensionCloudHeight = world.getDimension().cloudHeight();
+        float cloudHeight = dimensionCloudHeight.isPresent() ? dimensionCloudHeight.get() : Float.NaN;
         if (client.options.getCloudRenderModeValue() == CloudRenderMode.OFF
                 || Float.isNaN(cloudHeight)) {
             releaseResources();

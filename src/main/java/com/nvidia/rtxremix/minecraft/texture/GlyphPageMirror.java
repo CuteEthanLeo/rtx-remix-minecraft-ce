@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
  * moment the upload returns, so the GL texture is the only complete copy of the page.
  * Remix needs the pixels to build a material for text quads, so this mirror follows
  * every glyph upload. {@code GlyphAtlasTextureMixin} opens an upload scope around the
- * glyph's {@code upload} call, and {@code GlResourceManagerUploadMixin} writes the same
+ * glyph's {@code upload} call, and {@code GlCommandEncoderUploadMixin} writes the same
  * rectangle here that the command encoder hands to GL.
  *
  * <p>The mirror stores what the text shaders read, not what was uploaded. A colour page

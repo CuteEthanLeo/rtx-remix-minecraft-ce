@@ -301,7 +301,7 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
         context.drawBorder(x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
         for (var slot : handler.slots) {
             context.drawGuiTexture(
-                    net.minecraft.client.render.RenderLayer::getGuiTextured,
+                    net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
                     SLOT_TEXTURE,
                     x + slot.x - 1,
                     y + slot.y - 1,

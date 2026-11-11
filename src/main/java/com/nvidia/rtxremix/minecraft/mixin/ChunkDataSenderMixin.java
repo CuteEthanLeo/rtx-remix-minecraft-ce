@@ -181,7 +181,7 @@ public abstract class ChunkDataSenderMixin {
             return;
         }
         ChunkPos centre = player.getChunkPos();
-        int ringRadius = LocalChunkBatchPacing.clientRingRadius(player.server.getPlayerManager().getViewDistance());
+        int ringRadius = LocalChunkBatchPacing.clientRingRadius(player.getServer().getPlayerManager().getViewDistance());
         int sent = rtxremix$unloads.drain(
                 LocalChunkBatchPacing.unloadBatchSize(rtxremix$unloads.size()),
                 key -> centre.getChebyshevDistance(ChunkPos.getPackedX(key), ChunkPos.getPackedZ(key)) >= ringRadius,

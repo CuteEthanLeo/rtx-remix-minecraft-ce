@@ -8,6 +8,7 @@ import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.terrain.capture.SectionBlockData;
 import com.nvidia.rtxremix.minecraft.terrain.capture.BlockQuadEmitter;
 import com.nvidia.rtxremix.minecraft.terrain.capture.BlockDataQueue;
+import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSectionProbe;
 import com.nvidia.rtxremix.minecraft.terrain.VanillaSectionBuilds;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
@@ -103,7 +104,9 @@ public class SectionBuilderMixin {
         rtxremix$tracyOuter.set(ProfileScope.begin("SectionBuilder"));
         rtxremix$tracyBlockLoop.set(null);
 
-        if (renderRegion == null) return;
+        // Vanilla builds air sections too. One has nothing to capture, and its empty
+        // render data already makes it a removal candidate.
+        if (((RegionSectionProbe) renderRegion).rtxremix$isSectionEmpty()) return;
 
         BlockTextureManager tex = null;
         RtxRemixMod mod = RtxRemixMod.getInstance();

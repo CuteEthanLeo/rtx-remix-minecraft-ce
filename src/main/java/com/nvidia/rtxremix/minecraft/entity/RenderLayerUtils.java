@@ -94,10 +94,19 @@ final class RenderLayerUtils {
     }
 
     private static Optional<Identifier> capturableTextureUncached(RenderLayer layer) {
-        if (layer.getPipeline().getDepthTestFunction() == DepthTestFunction.NO_DEPTH_TEST) {
+        RenderPipeline pipeline = pipelineOf(layer);
+        if (pipeline == null || pipeline.getDepthTestFunction() == DepthTestFunction.NO_DEPTH_TEST) {
             return Optional.empty();
         }
         return extractTexture(layer);
+    }
+
+    /**
+     * A layer's pipeline, or null for a layer that is not vanilla's multi-phase kind. Such a
+     * layer has no texture phase either, so it is never captured.
+     */
+    private static RenderPipeline pipelineOf(RenderLayer layer) {
+        return layer instanceof RenderLayer.MultiPhase multiPhase ? multiPhase.pipeline : null;
     }
 
     private static Optional<Identifier> extractTexture(RenderLayer layer) {
@@ -159,7 +168,7 @@ final class RenderLayerUtils {
     }
 
     private static boolean isStreamedPerFrameUncached(RenderLayer layer) {
-        RenderPipeline pipeline = layer.getPipeline();
+        RenderPipeline pipeline = pipelineOf(layer);
         boolean beaconBeamProgram = pipeline == RenderPipelines.BEACON_BEAM_OPAQUE
                 || pipeline == RenderPipelines.BEACON_BEAM_TRANSLUCENT;
         return classifyStreamedPerFrame(topology(layer).orElse(Topology.QUADS), beaconBeamProgram);
@@ -180,8 +189,8 @@ final class RenderLayerUtils {
      * behaviour and it is classified as translucent.
      */
     static SurfaceMode surfaceMode(RenderLayer layer) {
-        RenderPipeline pipeline = layer.getPipeline();
-        BlendFunction blend = pipeline.getBlendFunction().orElse(null);
+        RenderPipeline pipeline = pipelineOf(layer);
+        BlendFunction blend = pipeline == null ? null : pipeline.getBlendFunction().orElse(null);
         return classifySurfaceMode(
                 pipeline == RenderPipelines.ENTITY_EYES
                         || pipeline == RenderPipelines.ENTITY_TRANSLUCENT_EMISSIVE,

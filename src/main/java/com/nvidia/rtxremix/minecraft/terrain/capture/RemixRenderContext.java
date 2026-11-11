@@ -4,12 +4,16 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
-import net.fabricmc.fabric.api.renderer.v1.material.RenderMaterial;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableQuadView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadTransform;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
+import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
+import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.block.BlockState;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.item.ItemRenderState;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.Identifier;
@@ -19,6 +23,7 @@ import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -108,7 +113,12 @@ final class RemixRenderContext {
 
         private Direction cullFaceVal;
         private Direction nominalFaceVal;
-        private RenderMaterial materialVal;
+        private BlockRenderLayer renderLayerVal;
+        private boolean emissiveVal;
+        private boolean diffuseShadeVal = true;
+        private TriState ambientOcclusionVal = TriState.DEFAULT;
+        private ItemRenderState.Glint glintVal;
+        private ShadeMode shadeModeVal = ShadeMode.ENHANCED;
         private int tintIndexVal = -1;
         private int tagVal;
 
@@ -127,7 +137,12 @@ final class RemixRenderContext {
             Arrays.fill(normData, 0);
             cullFaceVal = null;
             nominalFaceVal = null;
-            materialVal = null;
+            renderLayerVal = null;
+            emissiveVal = false;
+            diffuseShadeVal = true;
+            ambientOcclusionVal = TriState.DEFAULT;
+            glintVal = null;
+            shadeModeVal = ShadeMode.ENHANCED;
             tintIndexVal = -1;
             tagVal = 0;
             bakedSprite = null;
@@ -164,7 +179,7 @@ final class RemixRenderContext {
             float[] capturedPos = posData.clone();
             float[] capturedUv = uvData.clone();
 
-            Vector3f fn = faceNormal();
+            Vector3fc fn = faceNormal();
             float nx = fn.x(), ny = fn.y(), nz = fn.z();
 
             int capturedColor = colors[0];
@@ -288,8 +303,38 @@ final class RemixRenderContext {
         }
 
         @Override
-        public QuadEmitter material(RenderMaterial material) {
-            this.materialVal = material;
+        public QuadEmitter renderLayer(@Nullable BlockRenderLayer renderLayer) {
+            this.renderLayerVal = renderLayer;
+            return this;
+        }
+
+        @Override
+        public QuadEmitter emissive(boolean emissive) {
+            this.emissiveVal = emissive;
+            return this;
+        }
+
+        @Override
+        public QuadEmitter diffuseShade(boolean shade) {
+            this.diffuseShadeVal = shade;
+            return this;
+        }
+
+        @Override
+        public QuadEmitter ambientOcclusion(TriState ao) {
+            this.ambientOcclusionVal = ao;
+            return this;
+        }
+
+        @Override
+        public QuadEmitter glint(@Nullable ItemRenderState.Glint glint) {
+            this.glintVal = glint;
+            return this;
+        }
+
+        @Override
+        public QuadEmitter shadeMode(ShadeMode mode) {
+            this.shadeModeVal = mode;
             return this;
         }
 
@@ -390,10 +435,8 @@ final class RemixRenderContext {
         }
 
         @Override
-        public QuadEmitter fromVanilla(BakedQuad quad, RenderMaterial material,
-                                        @Nullable Direction cullFace) {
-            this.cullFaceVal = cullFace;
-            this.materialVal = material;
+        public QuadEmitter fromBakedQuad(BakedQuad quad) {
+            this.diffuseShadeVal = quad.shade();
             this.tintIndexVal = quad.tintIndex();
             this.bakedSprite = quad.sprite();
             this.nominalFaceVal = quad.face();
@@ -416,6 +459,12 @@ final class RemixRenderContext {
                     normal(v, nx, ny, nz);
                 }
             }
+            int lightEmission = quad.lightEmission();
+            if (lightEmission > 0) {
+                for (int v = 0; v < 4; v++) {
+                    lightmaps[v] = LightmapTextureManager.applyEmission(lightmaps[v], lightEmission);
+                }
+            }
             return this;
         }
 
@@ -436,7 +485,12 @@ final class RemixRenderContext {
             }
             cullFace(source.cullFace());
             nominalFace(source.nominalFace());
-            material(source.material());
+            renderLayer(source.renderLayer());
+            emissive(source.emissive());
+            diffuseShade(source.diffuseShade());
+            ambientOcclusion(source.ambientOcclusion());
+            glint(source.glint());
+            shadeMode(source.shadeMode());
             tintIndex(source.tintIndex());
             tag(source.tag());
             return this;
@@ -511,7 +565,7 @@ final class RemixRenderContext {
         @Override public @Nullable Direction nominalFace() { return nominalFaceVal; }
 
         @Override
-        public Vector3f faceNormal() {
+        public Vector3fc faceNormal() {
             if (faceNormalDirty) {
                 float x0 = posData[0], y0 = posData[1], z0 = posData[2];
                 float x1 = posData[3], y1 = posData[4], z1 = posData[5];
@@ -528,7 +582,12 @@ final class RemixRenderContext {
             return faceNormalCache;
         }
 
-        @Override public RenderMaterial material() { return materialVal; }
+        @Override public @Nullable BlockRenderLayer renderLayer() { return renderLayerVal; }
+        @Override public boolean emissive() { return emissiveVal; }
+        @Override public boolean diffuseShade() { return diffuseShadeVal; }
+        @Override public TriState ambientOcclusion() { return ambientOcclusionVal; }
+        @Override public @Nullable ItemRenderState.Glint glint() { return glintVal; }
+        @Override public ShadeMode shadeMode() { return shadeModeVal; }
         @Override public int tintIndex() { return tintIndexVal; }
         @Override public int tag() { return tagVal; }
 

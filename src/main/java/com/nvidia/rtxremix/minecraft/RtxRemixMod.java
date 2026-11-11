@@ -675,8 +675,7 @@ public class RtxRemixMod implements ClientModInitializer {
 
     /**
      * Submits and composites the ready Remix scene exactly once. Called before
-     * Minecraft's screen overlays, or from a render-tail fallback when that
-     * overlay path is skipped.
+     * Minecraft's screen overlays.
      */
     public static void submitRemixFrameIfReady() {
         RtxRemixMod mod = instance;
@@ -1894,7 +1893,7 @@ public class RtxRemixMod implements ClientModInitializer {
     /**
      * Sections the last recapture actually queued, kept until the next snapshot so a
      * reload that lands while they are still building does not lose them: their new
-     * slots hold {@code ChunkData.EMPTY} until the rebuild completes and would otherwise
+     * slots hold placeholder render data until the rebuild completes and would otherwise
      * fall out of the built set. Only what the queue accepted is kept, not its input:
      * the input unions the previous pending set, so storing it would carry every
      * position the residency, non-empty and lighting filters rejected from one

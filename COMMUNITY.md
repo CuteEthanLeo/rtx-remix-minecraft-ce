@@ -52,12 +52,30 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - **第三人称玩家影子**：静态审查没有找到压掉影子的代码，需要在游戏里按复现步骤确认（见下方「验证」）后再修。
 - 雨滴落在**水面**（湖、河）上的环形涟漪：仍用「雨中加快、加细的双层波浪」近似。露天地面上的积水坑和雨滴涟漪已经加入（见上表「积水坑」「雨滴涟漪」）。
 
-### Minecraft 1.21.5 分支（`mc/1.21.5`）移植状态
+### Minecraft 1.21.6 分支（`mc/1.21.6`）移植状态
 
-这个分支在 `mc/1.21.4` 的基础上前移到 1.21.5，没有停用任何功能。**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。1.21.5 把原版的 GL 层换成了 `RenderPipeline` / `GpuDevice` / `RenderPass`，方块模型换成了 `BlockStateModel` / `BlockModelPart`，NBT 读取改为带默认值的形式。和 1.21.4 相比：
+这个分支在 `mc/1.21.5` 的基础上前移到 1.21.6，没有停用任何功能。**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。1.21.6 把 GUI 改成先记录后绘制，把着色器的 uniform 改成 uniform block（投影、雾、动态变换各一块），把区块段的绘制重新分组，把渲染区域快照从整列改成区块段，方块实体数据改用 `ReadView` / `WriteView`。和 1.21.5 相比：
+
+- 原版地形绘制的跳过：`renderLayer` 变成了 `renderBlockLayers` 加 `SectionRenderState.renderSection`。Remix 渲染世界时，`renderBlockLayers` 直接返回一份没有绘制项的状态（不再为每个区块段写变换 uniform），主通道里三组图层的 `renderSection` 调用被跳过。`renderSection` 自己开关渲染通道，跳过它不留下状态。
+- 渲染区域快照：1.21.6 的区域是 3×3×3 个区块段快照（原来是 3×3 个整列）。池化存储的引用改在 `ChunkRendererRegionBuilder` 创建快照的 lambda 上获取，`ClientChunkMixin` 和 `ClientChunkSnapshotAccess` 删除。快照最后一次释放后丢弃调色板数据，过期读取会直接报错。地形捕获读邻居的范围（水平 2 格、向上最多到上一个区块段）仍在区域之内。
+- 空区块段：1.21.6 原版对全是空气的区块段也执行一次构建。mod 对空段不做捕获，仍然由「空渲染数据成为移除候选」这条路径处理，和 1.21.5 的行为一致。
+- `BuiltChunk` 的 `setData` / `ChunkData` 变成 `setCurrentRenderData` / `AbstractChunkRenderData`。「尚未构建」的判断改为当前数据不是 `ChunkRenderData`（即 `HIDDEN` 或 `READY` 占位）。原版删除了 `getSquaredCameraDistance`，mixin 自己按同样的公式计算。
+- Remix 帧的提交位置：屏幕效果（`InGameOverlayRenderer.renderOverlays`）从 `renderHand` 移到了 `renderWorld`，提交点随之移到 `renderWorld` 里这次调用之前。新位置每条路径都会经过，原来 `renderWorld` 末尾的兜底注入删除。
+- 1.21.6 的 GUI 延迟绘制不改变合成顺序：Remix 画面在世界渲染阶段合成到主帧缓冲，GUI 之后才画上去，呈现仍在 `RenderSystem.flipFrame`。
+- 雨雪叠加：两条管线改用 uniform block。投影矩阵写进自己的 `RawProjectionMatrix` 缓冲，天气相机的模型视图矩阵直接写进 `DynamicTransforms`，不再改动共享的模型视图栈和着色器颜色。`rain_refraction` 着色器改为导入 `dynamictransforms.glsl` 和 `projection.glsl`。采样器改绑 `GpuTextureView`，`ExternalGlTexture` 为 Remix 颜色图提供视图。
+- 实体图层的管线：`RenderLayer.getPipeline()` 被删除，改用访问加宽读取 `RenderLayer.MultiPhase.pipeline`。
+- Fabric 渲染 API 删除了 `RenderMaterial`：渲染层、自发光、漫反射着色、环境光遮蔽、附魔光效和着色模式直接记录在四边形上，原版四边形经 `fromBakedQuad` 进入捕获。
+- 方块图层分类改读 `BlockRenderLayer` 枚举。
+- 铜信标的方块实体数据改用 `ReadView` / `WriteView` 读写，键名和内容不变，已放置的信标照常读取。
+- 字形页镜像：`GlResourceManager` 改名为 `GlCommandEncoder`，mixin 相应改名为 `GlCommandEncoderUploadMixin`，`writeToTexture` 多了一个层参数。
+- 云高度改读维度类型的 `cloudHeight`（`DimensionEffects.getCloudsHeight()` 被删除）。
+- 性能统计：不剔除的方块实体数改读 `ClientWorld.getBlockEntities()`，待批处理的区块数改读 `ChunkBuilder.getScheduledTaskCount()`。
+- 铜信标界面的槽位贴图改用 `RenderPipelines.GUI_TEXTURED` 绘制。
+
+下面是 1.21.5 移植时的说明，同样适用。和 1.21.4 相比：
 
 - 雨雪叠加（含雨的折射着色器）改成两条 `RenderPipeline`，经 `RenderPass` 画到主帧缓冲；不再手工保存和恢复 GL 混合、深度、剔除状态，由渲染通道自己设置。Remix 的最终颜色图通过 `ExternalGlTexture` 包装后作为采样器传入。`rain_refraction.json` 着色器定义文件删除。
-- 字形页镜像和动画精灵上传转发改挂在命令编码器的 `writeToTexture`（`GlResourceManagerUploadMixin`）和带 `GpuTexture` 参数的 `SpriteContents.upload` 上。
+- 字形页镜像和动画精灵上传转发改挂在命令编码器的 `writeToTexture`（1.21.6 起为 `GlCommandEncoderUploadMixin`）和带 `GpuTexture` 参数的 `SpriteContents.upload` 上。
 - Remix 画面叠加到主帧缓冲改为直接状态访问的帧缓冲拷贝（`TextureOverlay`），不再画全屏四边形。
 - 实体图层的材质分类（不透明、镂空、半透明、自发光、信标光柱、穿透文字）改从图层的 `RenderPipeline` 读取，而不是 `RenderPhase` 的着色器和透明度阶段。
 - 方块模型：原版的三种 `BlockStateModel`（简单、加权、多部件）且选出的部件都是烘焙四边形时走原版路径，其余（模组自己的模型或 Fabric 网格部件）走 Fabric 的 `emitQuads`。每个方块只取一次随机种子，和 1.21.5 原版的区块构建一致。
@@ -217,10 +235,23 @@ Known gaps: the third-person player shadow still needs an in-game reproduction b
 water (lakes, rivers) are still approximated by faster, finer wave layers (puddles and ripples on open ground are
 implemented, see above).
 
-The `mc/1.21.5` branch moves forward from `mc/1.21.4` to 1.21.5 and drops no feature. It is verified only by the
+The `mc/1.21.6` branch moves forward from `mc/1.21.5` to 1.21.6 and drops no feature. It is verified only by the
 build, the JVM tests, and `MixinTargetsApplyTest`, which loads every mixin target under Fabric Loader; rendering is
-not yet verified in game. 1.21.5 replaced vanilla's GL layer with `RenderPipeline`, `GpuDevice` and `RenderPass`, and
-block models with `BlockStateModel` and `BlockModelPart`. Relative to 1.21.4: the rain and snow overlay, rain
+not yet verified in game. 1.21.6 made GUI drawing deferred, moved shader uniforms into uniform blocks, regrouped
+section drawing, cut render region snapshots down to sections, and moved block entity data to `ReadView` and
+`WriteView`. Relative to 1.21.5: vanilla's terrain draws are skipped by returning an empty draw state from
+`renderBlockLayers` and skipping the three `SectionRenderState.renderSection` calls of the main pass; the pooled
+region snapshot storage follows the 3x3x3 section snapshots (`ClientChunkMixin` and `ClientChunkSnapshotAccess` are
+gone); air sections, which 1.21.6 vanilla now builds, are not captured and still leave through the empty render data
+path; `BuiltChunkMixin` hooks `setCurrentRenderData`; the Remix frame is submitted in `renderWorld` before
+`InGameOverlayRenderer.renderOverlays`, which left `renderHand`, and the tail fallback is removed; the rain and snow
+pipelines use the `DynamicTransforms`, `Projection` and `Fog` blocks with their own projection buffer and no longer
+touch the shared model view stack or shader colour; entity layers read their pipeline from
+`RenderLayer.MultiPhase.pipeline`; Fabric's `RenderMaterial` is gone, so quad material properties are carried on the
+quad; the Copper Beacon reads and writes the same keys through views; and `GlResourceManagerUploadMixin` became
+`GlCommandEncoderUploadMixin`. Deferred GUI drawing does not change the composite order: the Remix image is
+composited during the world pass and the GUI is drawn over it before `RenderSystem.flipFrame` presents. Inherited
+from the 1.21.5 port, relative to 1.21.4: the rain and snow overlay, rain
 refraction included, draws through two render pipelines in a render pass and no longer saves and restores GL state by
 hand; the glyph page mirror and animated sprite forwarding hook the command encoder's texture writes; the Remix image
 is composited with a direct-state-access framebuffer blit; entity layers are classified from their pipeline rather

@@ -6,10 +6,12 @@ package com.nvidia.rtxremix.minecraft.terrain.capture;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.fabricmc.fabric.impl.client.indigo.renderer.IndigoRenderer;
+import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
+import net.fabricmc.fabric.api.util.TriState;
 import net.fabricmc.fabric.impl.client.indigo.renderer.mesh.MutableMeshImpl;
 import net.minecraft.Bootstrap;
 import net.minecraft.SharedConstants;
+import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,13 +45,23 @@ class RemixRenderContextTest {
             emitter.lightmap(vertex, 0x00F000A0 + vertex);
             emitter.normal(vertex, 0, 1, 0);
         }
+        emitter.renderLayer(BlockRenderLayer.TRANSLUCENT)
+                .emissive(true)
+                .diffuseShade(false)
+                .ambientOcclusion(TriState.FALSE)
+                .shadeMode(ShadeMode.VANILLA);
         emitter.tintIndex(3).tag(42).emit();
         Mesh mesh = builder.immutableCopy();
         RemixRenderContext context = context();
         int[] visits = {0};
         context.pushTransform(quad -> {
             visits[0]++;
-            assertSame(IndigoRenderer.STANDARD_MATERIAL, quad.material());
+            assertSame(BlockRenderLayer.TRANSLUCENT, quad.renderLayer());
+            assertTrue(quad.emissive());
+            assertFalse(quad.diffuseShade());
+            assertSame(TriState.FALSE, quad.ambientOcclusion());
+            assertNull(quad.glint());
+            assertSame(ShadeMode.VANILLA, quad.shadeMode());
             assertEquals(Direction.UP, quad.cullFace());
             assertEquals(Direction.UP, quad.nominalFace());
             assertEquals(3, quad.tintIndex());

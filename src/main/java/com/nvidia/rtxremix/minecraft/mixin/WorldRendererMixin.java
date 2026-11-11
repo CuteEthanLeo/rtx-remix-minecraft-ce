@@ -20,6 +20,8 @@ import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.systems.RenderPass;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
@@ -30,21 +32,22 @@ import net.minecraft.world.BlockRenderView;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
-import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.particle.ParticleManager;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BlockRenderLayerGroup;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.BuiltChunkStorage;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.render.SectionRenderState;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexConsumerProvider;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.chunk.ChunkRenderData;
 import net.minecraft.client.render.chunk.ChunkRendererRegionBuilder;
 import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.util.math.MatrixStack;
@@ -59,6 +62,8 @@ import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -75,7 +80,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Set;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.SortedSet;
 
 /**
@@ -102,6 +108,8 @@ public abstract class WorldRendererMixin
         implements WorldRendererCloudAccess, WorldRendererProfilingAccess,
         WorldRendererStarAccess, WorldRendererTerrainAccess {
     private static final int rtxremix$BLOCK_ENTITY_CHUNK_LIST_INITIAL_CAPACITY = 32_768;
+
+    private static final SectionRenderState rtxremix$NO_SECTION_DRAWS = rtxremix$emptySectionRenderState();
 
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$renderScope = new ThreadLocal<>();
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$setupTerrainScope = new ThreadLocal<>();
@@ -134,10 +142,6 @@ public abstract class WorldRendererMixin
     @Shadow
     @Final
     private ObjectArrayList<ChunkBuilder.BuiltChunk> builtChunks;
-
-    @Shadow
-    @Final
-    private Set<BlockEntity> noCullingBlockEntities;
 
     @Shadow
     @Final
@@ -244,7 +248,7 @@ public abstract class WorldRendererMixin
             return built;
         }
         for (ChunkBuilder.BuiltChunk builtChunk : chunks.chunks) {
-            if (builtChunk.getData() == ChunkBuilder.ChunkData.UNPROCESSED) {
+            if (!(builtChunk.getCurrentRenderData() instanceof ChunkRenderData)) {
                 continue;
             }
             BlockPos origin = builtChunk.getOrigin();
@@ -277,7 +281,7 @@ public abstract class WorldRendererMixin
                 continue;
             }
             WorldChunk worldChunk = world.getChunkManager().getWorldChunk(cx, cz, false);
-            if (worldChunk != null && !worldChunk.isSectionEmpty(sy)
+            if (worldChunk != null && !worldChunk.getSection(worldChunk.sectionCoordToIndex(sy)).isEmpty()
                     && lightingProvider.isLightingEnabled(ChunkSectionPos.asLong(cx, sy, cz))) {
                 loadedSections.add(builtChunk);
             }
@@ -301,7 +305,7 @@ public abstract class WorldRendererMixin
         LongOpenHashSet queued = new LongOpenHashSet(loadedSections.size());
         try {
             for (ChunkBuilder.BuiltChunk builtChunk : loadedSections) {
-                builtChunk.scheduleRebuild(chunkBuilder, regionBuilder);
+                builtChunk.scheduleRebuild(regionBuilder);
                 // Prevent WorldRenderer.updateChunks from queueing this same slot a
                 // second time when it next walks vanilla's visible section list.
                 builtChunk.cancelRebuild();
@@ -433,9 +437,11 @@ public abstract class WorldRendererMixin
             RenderTickCounter tickCounter,
             boolean renderBlockOutline,
             Camera camera,
-            GameRenderer gameRenderer,
             Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
+            GpuBufferSlice fog,
+            Vector4f fogColor,
+            boolean shouldRenderSky,
             CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$renderScope,
@@ -458,9 +464,11 @@ public abstract class WorldRendererMixin
             RenderTickCounter tickCounter,
             boolean renderBlockOutline,
             Camera camera,
-            GameRenderer gameRenderer,
             Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
+            GpuBufferSlice fog,
+            Vector4f fogColor,
+            boolean shouldRenderSky,
             CallbackInfo ci) {
         rtxremix$closeProfilerPhase();
         rtxremix$close(rtxremix$renderScope);
@@ -480,20 +488,40 @@ public abstract class WorldRendererMixin
         rtxremix$transitionProfilerPhase(name);
     }
 
-    @Inject(method = "renderLayer", at = @At("HEAD"), cancellable = true)
-    private void rtxremix$skipVanillaTerrainLayer(
-            RenderLayer renderLayer,
-            double x,
-            double y,
-            double z,
-            Matrix4f matrix4f,
-            Matrix4f positionMatrix,
-            CallbackInfo ci) {
-        rtxremix$renderLayerCalls++;
-        if (RtxRemixMod.isRemixWorldRendering() && rtxremix$isVanillaTerrainLayer(renderLayer)) {
-            rtxremix$renderLayerSkips++;
-            ci.cancel();
+    /**
+     * Remix draws the terrain, so vanilla's per-frame list of section draws and their
+     * dynamic transform uniforms is not built: the main pass gets a state with no draws.
+     */
+    @Inject(method = "renderBlockLayers", at = @At("HEAD"), cancellable = true)
+    private void rtxremix$skipVanillaSectionDrawList(
+            Matrix4fc positionMatrix,
+            double cameraX,
+            double cameraY,
+            double cameraZ,
+            CallbackInfoReturnable<SectionRenderState> cir) {
+        if (RtxRemixMod.isRemixWorldRendering()) {
+            cir.setReturnValue(rtxremix$NO_SECTION_DRAWS);
         }
+    }
+
+    // Skipping a layer group is state-neutral: renderSection opens its own render pass on
+    // the group's framebuffer without clearing it, draws, and closes the pass.
+    @WrapOperation(
+            method = "method_62214",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/client/render/SectionRenderState;renderSection(Lnet/minecraft/client/render/BlockRenderLayerGroup;)V"
+            ))
+    private void rtxremix$skipVanillaTerrainLayerGroup(
+            SectionRenderState sectionRenderState,
+            BlockRenderLayerGroup group,
+            Operation<Void> original) {
+        rtxremix$renderLayerCalls++;
+        if (RtxRemixMod.isRemixWorldRendering()) {
+            rtxremix$renderLayerSkips++;
+            return;
+        }
+        original.call(sectionRenderState, group);
     }
 
     // 1.21.2: the particle draw runs in the particles render pass's lambda (method_62213).
@@ -711,7 +739,7 @@ public abstract class WorldRendererMixin
     }
 
     private int rtxremix$chunksToBatch() {
-        return chunkBuilder == null ? -1 : chunkBuilder.getToBatchCount();
+        return chunkBuilder == null ? -1 : chunkBuilder.getScheduledTaskCount();
     }
 
     private void rtxremix$transitionProfilerPhase(String vanillaPhaseName) {
@@ -762,12 +790,7 @@ public abstract class WorldRendererMixin
     }
 
     private int rtxremix$noCullBlockEntityCount() {
-        if (noCullingBlockEntities == null) {
-            return -1;
-        }
-        synchronized (noCullingBlockEntities) {
-            return noCullingBlockEntities.size();
-        }
+        return world == null ? -1 : world.getBlockEntities().size();
     }
 
     private static String rtxremix$sanitizePhase(String phase) {
@@ -832,11 +855,12 @@ public abstract class WorldRendererMixin
         }
     }
 
-    private static boolean rtxremix$isVanillaTerrainLayer(RenderLayer renderLayer) {
-        return renderLayer == RenderLayer.getSolid()
-                || renderLayer == RenderLayer.getCutoutMipped()
-                || renderLayer == RenderLayer.getCutout()
-                || renderLayer == RenderLayer.getTranslucent()
-                || renderLayer == RenderLayer.getTripwire();
+    private static SectionRenderState rtxremix$emptySectionRenderState() {
+        EnumMap<BlockRenderLayer, List<RenderPass.RenderObject<GpuBufferSlice[]>>> drawsPerLayer =
+                new EnumMap<>(BlockRenderLayer.class);
+        for (BlockRenderLayer layer : BlockRenderLayer.values()) {
+            drawsPerLayer.put(layer, List.of());
+        }
+        return new SectionRenderState(drawsPerLayer, 0, new GpuBufferSlice[0]);
     }
 }

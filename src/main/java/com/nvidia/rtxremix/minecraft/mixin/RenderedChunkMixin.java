@@ -5,32 +5,44 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.terrain.capture.RenderRegionStoragePool;
+import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSectionProbe;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RegionSnapshotRelease;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.collection.PackedIntegerArray;
 import net.minecraft.world.chunk.PalettedContainer;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A chunk snapshot for a render region whose block-state copies draw their storage from
- * {@link RenderRegionStoragePool} and give it back when the last region holding the snapshot
+ * A section snapshot for a render region whose block-state copy draws its storage from
+ * {@link RenderRegionStoragePool} and gives it back when the last region holding the snapshot
  * has been consumed. Snapshots are shared between the regions one frame's rebuild scheduling
  * builds, hence the count. The pool flag is set around the constructor by
- * {@link ClientChunkMixin}; vanilla's own snapshot code is untouched.
+ * {@link ChunkRendererRegionBuilderMixin}; vanilla's own snapshot code is untouched.
  */
 @Mixin(targets = "net.minecraft.client.render.chunk.RenderedChunk")
-public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
+public abstract class RenderedChunkMixin implements RegionSnapshotRelease, RegionSectionProbe {
 
     @Shadow
     @Final
-    private List<PalettedContainer<BlockState>> blockStateContainers;
+    @Nullable
+    private PalettedContainer<BlockState> blockPalette;
+
+    @Shadow
+    @Final
+    private boolean debugWorld;
 
     private final AtomicInteger rtxremix$regions = new AtomicInteger();
+
+    // The debug world generates its blocks on read and keeps no palette.
+    @Override
+    public boolean rtxremix$isSectionEmpty() {
+        return blockPalette == null && !debugWorld;
+    }
 
     @Override
     public void rtxremix$retain() {
@@ -39,16 +51,15 @@ public abstract class RenderedChunkMixin implements RegionSnapshotRelease {
 
     @Override
     public void rtxremix$release() {
-        if (rtxremix$regions.decrementAndGet() != 0 || blockStateContainers == null) {
+        if (rtxremix$regions.decrementAndGet() != 0 || blockPalette == null) {
             return;
         }
-        for (PalettedContainer<BlockState> container : blockStateContainers) {
-            if (container != null && container.data.storage() instanceof PackedIntegerArray packed) {
-                RenderRegionStoragePool.release(packed.getData());
-            }
+        if (blockPalette.data.storage() instanceof PackedIntegerArray packed) {
+            RenderRegionStoragePool.release(packed.getData());
         }
         // Nothing may read the snapshot after its last release; make a stale read fail loudly
-        // instead of returning whatever the recycled arrays hold next.
-        blockStateContainers.clear();
+        // instead of returning whatever the recycled array holds next. The container is this
+        // snapshot's own copy, so dropping its data affects no one else.
+        blockPalette.data = null;
     }
 }

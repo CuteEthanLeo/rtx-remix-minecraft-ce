@@ -13,6 +13,10 @@ also part of every mod file name.
 
 ### Added
 
+- A package for Minecraft 1.21.6, moved forward from the 1.21.5 branch with
+  every feature kept. Terrain, rain and snow, region snapshots and the Copper
+  Beacon's saved data follow the section drawing, uniform block, and data view
+  APIs 1.21.6 introduced.
 - A package for Minecraft 1.21.5, moved forward from the 1.21.4 branch with
   every feature kept. Rain and snow, text, animated textures, entity layers
   and block models follow the render pipeline and block model APIs 1.21.5

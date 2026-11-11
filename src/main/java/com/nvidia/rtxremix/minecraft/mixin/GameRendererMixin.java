@@ -8,13 +8,11 @@ import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
-import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -52,27 +50,19 @@ public abstract class GameRendererMixin {
         renderer.captureFirstPersonModel(heldItemRenderer, tickDelta, matrices, player, light);
     }
 
+    /**
+     * After the first-person hand has been captured and before the screen effects, which
+     * draw over the composited image. renderWorld reaches this call on every path, including
+     * third person, sleeping, a hidden hand and the panorama, where renderHand draws nothing.
+     */
     @Inject(
-            method = "renderHand",
+            method = "renderWorld",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/hud/InGameOverlayRenderer;renderOverlays(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;)V",
+                    target = "Lnet/minecraft/client/gui/hud/InGameOverlayRenderer;renderOverlays(ZF)V",
                     shift = At.Shift.BEFORE
             ))
     private void rtxremix$submitBeforeScreenOverlays(
-            Camera camera,
-            float tickDelta,
-            Matrix4f positionMatrix,
-            CallbackInfo ci) {
-        RtxRemixMod.submitRemixFrameIfReady();
-    }
-
-    /**
-     * Covers third person, sleeping, hidden-hand, panorama, and other paths
-     * where HeldItemRenderer or InGameOverlayRenderer is skipped.
-     */
-    @Inject(method = "renderWorld", at = @At("TAIL"))
-    private void rtxremix$submitAtRenderWorldTail(
             RenderTickCounter tickCounter,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
