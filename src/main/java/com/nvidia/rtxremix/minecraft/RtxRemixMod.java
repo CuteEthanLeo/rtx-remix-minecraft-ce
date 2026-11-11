@@ -265,6 +265,7 @@ public class RtxRemixMod implements ClientModInitializer {
         }
         releaseRemixMenuCapture();
         relockCursorUnlessScreenOpen();
+        renderer.onRemixMenuClosed();
         LOGGER.info("Remix menu closed");
     }
 
@@ -296,6 +297,7 @@ public class RtxRemixMod implements ClientModInitializer {
             case CLOSED -> {
                 KeyMapping.releaseAll();
                 relockCursorUnlessScreenOpen();
+                renderer.onRemixMenuClosed();
                 LOGGER.info("Remix menu closed by the runtime");
             }
             case OWN_WRITE_OVERDUE -> LOGGER.warn(

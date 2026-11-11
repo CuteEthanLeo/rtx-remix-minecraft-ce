@@ -138,6 +138,15 @@ can later stand at each one and take the picture again.
 | `/rtx shot mark <name>` | Mark the current pose and scene under that name, replacing a shot of the same name |
 | `/rtx shot remove <name>` | Remove a shot |
 
+## Frame Generation Pacing
+
+With DLSS frame generation on, Settings → Performance → Framerate → Frame
+Generation Pacing holds real frames to a steady interval just above what each
+frame needs, so generated frames land evenly instead of in a saw-tooth. It is
+on by default and costs a few percent of the real frame rate. Every 300 frames
+the log's performance report shows its target interval, how many frames missed
+it, and how precisely the wait ended.
+
 ## Top Optimization
 
 Community Edition, experimental: frame-rate optimizations that do not change

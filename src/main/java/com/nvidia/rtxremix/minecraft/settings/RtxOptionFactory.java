@@ -45,6 +45,7 @@ final class RtxOptionFactory {
      */
     static final int SENTINEL_SLIDER_VALUE = 33;
     static final String UNFOCUSED_FRAMERATE_ID = "framerate.unfocused";
+    static final String FRAME_GEN_PACING_ID = "framerate.frameGenPacing";
     static final String MOTION_BLUR_ID = "post.motionBlur";
     static final String MOTION_BLUR_SHUTTER_ID = "post.motionBlurShutterTime";
     static final String VOLUMETRIC_QUALITY_ID = "community.volumetricQuality";
