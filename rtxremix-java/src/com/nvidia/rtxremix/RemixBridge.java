@@ -27,6 +27,12 @@ public final class RemixBridge {
      */
     public static native int initialize(String dllPath);
 
+    /**
+     * Returns the Windows error code ({@code GetLastError}) of the last failed attempt to load the
+     * runtime DLL in {@link #initialize}, or 0 when the last attempt loaded it.
+     */
+    public static native int lastLoadLibraryError();
+
     // ─── process command line ────────────────────────────────────────────
 
     /** @return this process's command line as its PEB holds it, which crash dumps capture */
