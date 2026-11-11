@@ -11,11 +11,16 @@ also part of every mod file name.
 
 ## Community Edition 0.1.0-ce.8.1 - 2026-11-11
 
+### Added
+
+- A package for Minecraft 1.21.3: the 1.21.2 port, rebuilt and retested
+  against 1.21.3.
+
 ### Fixed
 
-- The Copper Beacon can be crafted on Minecraft 1.21.2. Its recipe still used
-  the ingredient format that 1.21.2 replaced, so the game skipped the recipe
-  when a world loaded.
+- The Copper Beacon can be crafted on Minecraft 1.21.2 and later. Its recipe
+  still used the ingredient format that 1.21.2 replaced, so the game skipped
+  the recipe when a world loaded.
 
 ## Community Edition 0.1.0-ce.8 - 2026-11-11
 
