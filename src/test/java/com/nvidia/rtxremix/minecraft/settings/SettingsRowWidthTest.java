@@ -64,7 +64,9 @@ class SettingsRowWidthTest {
      */
     private static final int FULL_WIDTH_OPTION_WIDTH = 310;
     private static final int FULL_WIDTH_OPTION_TEXT_WIDTH = FULL_WIDTH_OPTION_WIDTH - 2 * WIDGET_TEXT_MARGIN;
-    private static final Set<String> FULL_WIDTH_ROWS = Set.of("rtxremix.setting.framerate.unfocused");
+    private static final Set<String> FULL_WIDTH_ROWS = Set.of(
+            "rtxremix.setting.framerate.unfocused",
+            "rtxremix.setting.framerate.frameGenPacing");
 
     private static final String LABEL_PREFIX = "rtxremix.setting.";
     private static final String TOOLTIP_SUFFIX = ".tip";
@@ -82,6 +84,7 @@ class SettingsRowWidthTest {
             entry("rtxremix.setting.dist.entity", "Auto"),
             entry("rtxremix.setting.light.reach", "256"),
             entry("rtxremix.setting.framerate.unfocused", "Unlimited"),
+            entry("rtxremix.setting.framerate.frameGenPacing", "OFF"),
             entry("rtxremix.setting.sky.enabled", "OFF"),
             entry("rtxremix.setting.sky.ambient", "OFF"),
             entry("rtxremix.setting.sky.haloFocus", "0.99"),

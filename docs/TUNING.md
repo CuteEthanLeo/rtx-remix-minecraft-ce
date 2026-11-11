@@ -128,6 +128,7 @@ their distance.
 | `rtxremix.waterRapids.spawnBudgetPerTick` | Foam and mist particles spawned per tick near fast water. 0 turns the effect off | `WaterRapidParticleSpawner` |
 | `rtxremix.particles.fastAirCollision` | Take a fast path through particle collision when every swept cell is air. Set to false to disable the fast path | `ParticleStateMixin` |
 | `rtxremix.particles.fastAirCollisionMaxBlocks` | Largest sweep, in cells, that the fast path handles | `ParticleStateMixin` |
+| `rtxremix.frameGenPacing` | Set to false to stop holding real frames to a steady interval while DLSS frame generation is on. By default, while `rtx.dlfg.enable` resolves true and the window is focused, the frame after each Present waits until an interval just above the recent slow frames, so the runtime's frame generation, which spaces each generated frame by the previous real-frame interval, puts them on screen evenly; Max Framerate is then applied by the same precise wait instead of vanilla's limiter. The Frame Generation Pacing setting switches it per player; on this branch a pacing line is logged every 300 frames | `FrameGenPacing`, `FrameGenPacer` |
 
 ## Profiling And Diagnostics
 

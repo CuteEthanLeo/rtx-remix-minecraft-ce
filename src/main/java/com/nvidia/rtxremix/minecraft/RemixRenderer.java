@@ -29,6 +29,8 @@ import com.nvidia.rtxremix.minecraft.logic.ViewDistanceFade;
 import com.nvidia.rtxremix.minecraft.profiling.PerformanceTimer;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.settings.CameraEffectsSettings;
+import com.nvidia.rtxremix.minecraft.settings.FrameGenerationProbe;
+import com.nvidia.rtxremix.minecraft.community.pacing.FrameGenPacing;
 import com.nvidia.rtxremix.minecraft.settings.VolumetricQualitySettings;
 import com.nvidia.rtxremix.minecraft.community.ExportClock;
 import com.nvidia.rtxremix.minecraft.community.RainRipples;
@@ -85,6 +87,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.ToIntBiFunction;
 
 /**
  * Render-thread bridge between Minecraft's world and the RTX Remix runtime.
@@ -117,6 +120,14 @@ public class RemixRenderer {
     private RemixAPI remixApi;
     /** {@link RemixAPI#setConfigVariable}, bound once so per-frame callers allocate nothing. */
     private BiConsumer<String, String> configWriter;
+    /** Remix's resolved-option read into a caller-owned buffer, for the frame-generation probe. */
+    private ToIntBiFunction<String, byte[]> configReader;
+    // Community Edition: holds real frames steady while DLSS frame generation is on.
+    private final FrameGenerationProbe frameGenerationProbe = new FrameGenerationProbe();
+    private final FrameGenPacing frameGenPacing = new FrameGenPacing();
+    /** Frames until the next pacing line in the log. */
+    private int framesUntilPacingReport = PACING_REPORT_FRAMES;
+    private static final int PACING_REPORT_FRAMES = 300;
     private boolean initialized = false;
     private long windowHandle;
     
@@ -320,6 +331,10 @@ public class RemixRenderer {
 
             postProcessingSettings = new PostProcessingSettings(remixApi::setConfigVariable);
             configWriter = remixApi::setConfigVariable;
+            configReader = remixApi::getConfigVariableResolved;
+            // Read once now that startup has loaded the configuration; a failed read is
+            // retried by the per-frame poll.
+            frameGenerationProbe.poll(configReader);
             cameraEffectsSettings = new CameraEffectsSettings(configWriter);
             volumetricQualitySettings = new VolumetricQualitySettings(remixApi::setConfigVariable);
             
@@ -1491,6 +1506,7 @@ public class RemixRenderer {
         LOGGER.info("Clearing world resources...");
         joinInFlightParticleRenderTask();
         discardPendingParticleFrame();
+        frameGenPacing.reset();
         
         if (chunkManager != null) {
             chunkManager.clear();
@@ -1686,6 +1702,47 @@ public class RemixRenderer {
 
     public BenchmarkController getBenchmarkController() {
         return benchmarkController;
+    }
+
+    /**
+     * Community Edition: called right after Present returns, where vanilla's frame limiter
+     * runs. Follows whether frame generation is on and, while it is, holds real frames to a
+     * steady interval; see {@link FrameGenPacing}. Logs a pacing line every
+     * {@link #PACING_REPORT_FRAMES} frames while pacing has run. Render thread only.
+     */
+    public void onAfterPresentForPacing() {
+        if (!initialized) {
+            return;
+        }
+        boolean frameGeneration = configReader != null && frameGenerationProbe.onFrame(configReader);
+        boolean active = frameGeneration
+                && MinecraftClient.getInstance().isWindowFocused()
+                && (benchmarkController == null || !benchmarkController.isRunning());
+        frameGenPacing.afterPresent(active);
+        if (--framesUntilPacingReport <= 0) {
+            framesUntilPacingReport = PACING_REPORT_FRAMES;
+            StringBuilder report = new StringBuilder();
+            frameGenPacing.appendReport(report);
+            if (report.length() > 0) {
+                LOGGER.info("{}", report.toString().strip());
+            }
+        }
+    }
+
+    /**
+     * Community Edition: whether vanilla's Max Framerate limiter should run this frame. While
+     * frame generation pacing is engaged it takes the cap over instead.
+     */
+    public boolean shouldRunVanillaFrameLimiter(int framerateLimit) {
+        return frameGenPacing.shouldRunVanillaLimiter(framerateLimit);
+    }
+
+    /**
+     * Notes that a Remix menu closed, where frame generation is switched, so pacing rereads it
+     * within a frame or two instead of at the next periodic read. Render thread only.
+     */
+    public void onRemixMenuClosed() {
+        frameGenerationProbe.onRemixMenuClosed();
     }
 
     public CameraController getCameraController() {

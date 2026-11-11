@@ -88,6 +88,8 @@
   "rtxremix.setting.light.reach.tip": "火把在离镜头多少格后不再投光。更亮的光源照得更远，更暗的更近。数值越低，路径追踪器要采样的光源列表越小。",
   "rtxremix.setting.framerate.unfocused": "后台最大帧率",
   "rtxremix.setting.framerate.unfocused.tip": "游戏窗口失去焦点时的帧率上限。数值越低，留给其他程序的 GPU 越多。无限制时只受 Minecraft 自身最大帧率约束。",
+  "rtxremix.setting.framerate.frameGenPacing": "帧生成节奏稳定",
+  "rtxremix.setting.framerate.frameGenPacing.tip": "开启 DLSS 帧生成时，把真实帧锁在略高于每帧所需时间的稳定间隔上，让生成帧均匀上屏，而不是忽快忽慢的锯齿。会损失几个百分点的真实帧率。开启期间也会用精确等待来执行最大帧率限制。",
   "rtxremix.setting.sky.enabled": "天空渲染",
   "rtxremix.setting.sky.enabled.tip": "开关 Remix 天空。",
   "rtxremix.setting.sky.ambient": "天空环境光",

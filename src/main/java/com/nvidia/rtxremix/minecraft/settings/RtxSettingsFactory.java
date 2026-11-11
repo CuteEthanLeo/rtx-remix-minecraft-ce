@@ -18,6 +18,7 @@ import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.nvidia.rtxremix.minecraft.sky.SkyRenderer;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
+import com.nvidia.rtxremix.minecraft.community.pacing.FrameGenPacing;
 import com.nvidia.rtxremix.minecraft.entity.RemixEntityPass;
 import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import com.nvidia.rtxremix.minecraft.community.CommunityLook;
@@ -110,6 +111,7 @@ public final class RtxSettingsFactory {
 
         // --- Framerate ---
         list.add(unfocusedFramerate());
+        list.add(frameGenPacing());
 
         // --- Sky & time of day ---
         list.add(RtxSetting.ofBool("sky.enabled", SettingGroup.SKY,
@@ -351,6 +353,17 @@ public final class RtxSettingsFactory {
                 postProcessing::getHighLightAdaptation, postProcessing::setHighLightAdaptation));
 
         return new RtxSettings(list);
+    }
+
+    /**
+     * Community Edition: holds real frames steady while DLSS frame generation is on. Has no
+     * effect when {@code -Drtxremix.frameGenPacing=false} is set.
+     */
+    static RtxSetting<Boolean> frameGenPacing() {
+        String label = "rtxremix.setting." + RtxOptionFactory.FRAME_GEN_PACING_ID;
+        return RtxSetting.ofBool(RtxOptionFactory.FRAME_GEN_PACING_ID, SettingGroup.FRAMERATE,
+                label, label + ".tip", FrameGenPacing.DEFAULT_ENABLED,
+                FrameGenPacing::isEnabled, FrameGenPacing::setEnabled);
     }
 
     static RtxSetting<Integer> unfocusedFramerate() {

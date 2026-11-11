@@ -91,6 +91,8 @@
   "rtxremix.setting.light.reach.tip": "Blocks from the camera at which a torch stops casting light. Brighter lights reach further and dimmer ones less. Lower values shrink the light list the path tracer samples from.",
   "rtxremix.setting.framerate.unfocused": "Background Max Framerate",
   "rtxremix.setting.framerate.unfocused.tip": "Framerate cap while the game window is not focused. Lower values leave the GPU to other applications. Unlimited leaves only Minecraft's Max Framerate in force.",
+  "rtxremix.setting.framerate.frameGenPacing": "Frame Generation Pacing",
+  "rtxremix.setting.framerate.frameGenPacing.tip": "While DLSS frame generation is on, holds real frames to a steady interval just above what each frame needs, so generated frames land evenly instead of in a saw-tooth. Costs a few percent of the real frame rate. Also applies Max Framerate with a precise wait while it is on.",
   "rtxremix.setting.sky.enabled": "Sky Rendering",
   "rtxremix.setting.sky.enabled.tip": "Toggle the Remix sky.",
   "rtxremix.setting.sky.ambient": "Sky Ambient Light",

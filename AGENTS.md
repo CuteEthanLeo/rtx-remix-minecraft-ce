@@ -186,6 +186,13 @@ wrapper, and runtime support for updating a texture from memory. Glyph pages are
 mirrored on upload, because vanilla assembles them on the GPU and never keeps
 them on the CPU.
 
+**Frame pacing.** While DLSS frame generation is on, `FrameGenPacing`
+(`community/pacing/`) waits right after Present, where vanilla's limiter runs,
+so real frames keep a steady interval: the runtime spaces each generated frame
+by the previous real interval, so real-frame jitter alternates the displayed
+frame times. While engaged it skips vanilla's limiter and applies Max Framerate
+itself; `FrameGenerationProbe` reads `rtx.dlfg.enable` for it.
+
 **Particles.** Slot preparation and CPU mesh snapshots run on a dedicated worker
 and are double buffered: the render thread publishes the previous frame's
 payload at the top of the frame and joins the worker after submit, so particles
