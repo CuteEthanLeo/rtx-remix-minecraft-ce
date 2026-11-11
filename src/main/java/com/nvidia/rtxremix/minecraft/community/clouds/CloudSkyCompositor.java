@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.community.clouds;
 
+import com.nvidia.rtxremix.minecraft.gl.PixelUnpackScope;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import org.lwjgl.BufferUtils;
@@ -89,6 +90,8 @@ public final class CloudSkyCompositor {
     private int occupancyTexture;
     private int parametersBuffer;
     private final ByteBuffer parameters = BufferUtils.createByteBuffer(UBO_BYTES);
+    /** Every client-memory upload runs in it: vanilla leaves its own row length and skips set. */
+    private final PixelUnpackScope unpack = new PixelUnpackScope();
     private final ByteBuffer occupancyUpload =
             BufferUtils.createByteBuffer(VolumetricClouds.OCCUPANCY_SIZE * VolumetricClouds.OCCUPANCY_SIZE);
     private int uploadedOccupancyVersion = -1;
@@ -435,10 +438,10 @@ public final class CloudSkyCompositor {
             ByteBuffer pixels = BufferUtils.createByteBuffer(noise.weather.length);
             pixels.put(noise.weather).flip();
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, weatherMap);
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
-            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, CloudNoise.WEATHER_SIZE, CloudNoise.WEATHER_SIZE,
-                    GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
+            try (PixelUnpackScope ignoredUnpack = unpack.open(1)) {
+                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, CloudNoise.WEATHER_SIZE, CloudNoise.WEATHER_SIZE,
+                        GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+            }
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
             noiseUploaded = true;
         }
@@ -453,11 +456,11 @@ public final class CloudSkyCompositor {
         occupancyUpload.put(VolumetricClouds.occupancy()).flip();
         int previous = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, occupancyTexture);
-        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
-        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0,
-                VolumetricClouds.OCCUPANCY_SIZE, VolumetricClouds.OCCUPANCY_SIZE,
-                GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, occupancyUpload);
-        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
+        try (PixelUnpackScope ignored = unpack.open(1)) {
+            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0,
+                    VolumetricClouds.OCCUPANCY_SIZE, VolumetricClouds.OCCUPANCY_SIZE,
+                    GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, occupancyUpload);
+        }
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, previous);
         uploadedOccupancyVersion = version;
     }
@@ -594,7 +597,7 @@ public final class CloudSkyCompositor {
         return texture;
     }
 
-    private static int createTexture3D(int size, byte[] data) {
+    private int createTexture3D(int size, byte[] data) {
         int previous = GL11.glGetInteger(GL12.GL_TEXTURE_BINDING_3D);
         int texture = GL11.glGenTextures();
         ByteBuffer pixels = BufferUtils.createByteBuffer(data.length);
@@ -606,10 +609,10 @@ public final class CloudSkyCompositor {
             GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
             GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
             GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL11.GL_REPEAT);
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
-            GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL11.GL_RGBA8, size, size, size, 0,
-                    GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
+            try (PixelUnpackScope ignored = unpack.open(1)) {
+                GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL11.GL_RGBA8, size, size, size, 0,
+                        GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, pixels);
+            }
         } finally {
             GL11.glBindTexture(GL12.GL_TEXTURE_3D, previous);
         }
