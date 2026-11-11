@@ -66,6 +66,7 @@ class SettingsRowWidthTest {
     private static final int FULL_WIDTH_OPTION_TEXT_WIDTH = FULL_WIDTH_OPTION_WIDTH - 2 * WIDGET_TEXT_MARGIN;
     private static final Set<String> FULL_WIDTH_ROWS = Set.of(
             "rtxremix.setting.framerate.unfocused",
+            "rtxremix.setting.framerate.frameGenPacing",
             "rtxremix.setting.community.topOptimization",
             "rtxremix.setting.community.topOptimization.pipelinedPresent",
             "rtxremix.setting.community.topOptimization.dryPuddleCull",
@@ -87,6 +88,7 @@ class SettingsRowWidthTest {
             entry("rtxremix.setting.dist.entity", "Auto"),
             entry("rtxremix.setting.light.reach", "256"),
             entry("rtxremix.setting.framerate.unfocused", "Unlimited"),
+            entry("rtxremix.setting.framerate.frameGenPacing", "OFF"),
             entry("rtxremix.setting.community.topOptimization", "OFF"),
             entry("rtxremix.setting.community.topOptimization.pipelinedPresent", "OFF"),
             entry("rtxremix.setting.community.topOptimization.dryPuddleCull", "OFF"),

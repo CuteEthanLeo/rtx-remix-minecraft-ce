@@ -134,6 +134,7 @@ their distance.
 | Key | Effect | Owner |
 |---|---|---|
 | `rtxremix.motionBlur.fgAdaptive` | Set to false to stop motion blur adapting to DLSS frame generation. By default, while `rtx.dlfg.enable` resolves true, the exposure fraction is scaled down for a low base frame rate and fast camera turns, capped at one real frame, and the blur jitter is lowered, so generated frames do not drag overlapping streaks into a wobble | `CameraEffectsSettings` |
+| `rtxremix.frameGenPacing` | Set to false to stop holding real frames to a steady interval while DLSS frame generation is on. By default, while `rtx.dlfg.enable` resolves true and the window is focused, the frame after each Present waits until an interval just above the recent slow frames, so the runtime's frame generation, which spaces each generated frame by the previous real-frame interval, puts them on screen evenly; Max Framerate is then applied by the same precise wait instead of vanilla's limiter. The Frame Generation Pacing setting switches it per player | `FrameGenPacing`, `FrameGenPacer` |
 | `rtxremix.allowRtssVulkanLayer` | Set to true to let RivaTuner Statistics Server's Vulkan layer into the Remix runtime. By default the mod sets `DISABLE_RTSS_LAYER=1` for its own process before the runtime loads, because with DLSS frame generation in fullscreen that layer faults the GPU within seconds (`VK_ERROR_DEVICE_LOST`). The RTSS overlay then does not draw in the game. A `DISABLE_RTSS_LAYER` value already in the environment is left as is | `RtssVulkanLayerPolicy` |
 
 ## Top Optimization

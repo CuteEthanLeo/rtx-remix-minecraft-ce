@@ -196,7 +196,12 @@ gameplay frames only, so the CPU builds frame N+1 while the GPU traces frame N.
 `PresentWaitPolicy` blocks whenever a screen or Remix menu is open and for a few
 frames after anything that may reallocate the interop images; `GlInterop`
 finishes GL before replacing an import, and its client-done value advances only
-past an accepted signal.
+past an accepted signal. While DLSS frame generation is on, `FrameGenPacing`
+(`community/pacing/`) waits right after Present, where vanilla's limiter runs,
+so real frames keep a steady interval: the runtime spaces each generated frame
+by the previous real interval, so real-frame jitter alternates the displayed
+frame times. While engaged it skips vanilla's limiter and applies Max Framerate
+itself; `FrameGenerationProbe` reads `rtx.dlfg.enable` for it.
 
 **Particles.** Slot preparation and CPU mesh snapshots run on a dedicated worker
 that starts with the frame and overlaps the camera, light, terrain, entity, and

@@ -9,6 +9,7 @@ import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.thread.ThreadExecutor;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -257,6 +258,25 @@ public abstract class MinecraftClientMixin {
     )
     private void rtxremix$afterSwapBuffers(boolean tick, CallbackInfo ci) {
         rtxremix$transitionRenderPhase("MinecraftClient.render.frameLimit");
+        // Community Edition: with frame generation on, hold real frames to a steady interval
+        // here, where vanilla's own limiter runs; see FrameGenPacing.
+        RemixRenderer renderer = RtxRemixMod.renderer;
+        if (renderer != null) {
+            renderer.onAfterPresentForPacing();
+        }
+    }
+
+    /** Community Edition: frame generation pacing takes the Max Framerate cap over while engaged. */
+    @WrapWithCondition(
+        method = "render",
+        at = @At(
+            value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/systems/RenderSystem;limitDisplayFPS(I)V"
+        )
+    )
+    private boolean rtxremix$limitUnlessFrameGenPaced(int framerateLimit) {
+        RemixRenderer renderer = RtxRemixMod.renderer;
+        return renderer == null || renderer.shouldRunVanillaFrameLimiter(framerateLimit);
     }
 
     @Inject(
