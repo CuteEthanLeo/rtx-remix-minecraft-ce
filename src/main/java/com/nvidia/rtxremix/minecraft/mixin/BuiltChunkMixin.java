@@ -9,7 +9,7 @@ import com.nvidia.rtxremix.minecraft.terrain.ChunkBuilderBlockEntityAccess;
 import com.nvidia.rtxremix.minecraft.terrain.NeighbourReflagFilter;
 import com.nvidia.rtxremix.minecraft.terrain.SectionLeftRenderSetQueue;
 import com.nvidia.rtxremix.minecraft.terrain.visibility.ChunkSlotMoveLog;
-import net.minecraft.client.renderer.chunk.RenderSectionRegion;
+import net.minecraft.client.renderer.chunk.RenderRegionCache;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Final;
@@ -47,7 +47,7 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
     @Final
     BlockPos.MutableBlockPos renderOrigin;
 
-    /** 26.2 dropped RenderSection.doesChunkExistAt; same create=false FULL-chunk probe. */
+    /** The create=false FULL-chunk probe of RenderSection.doesChunkExistAt, without its light gate. */
     private static boolean rtxremix$doesChunkExistAt(long sectionPos) {
         net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
         return level != null && level.getChunkSource().getChunk(
@@ -61,7 +61,7 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
     /** 1.21.11 dropped BuiltChunk.getSquaredCameraDistance; same centre-to-camera measure. */
     private double rtxremix$squaredCameraDistance() {
         net.minecraft.world.phys.Vec3 camera = net.minecraft.client.Minecraft.getInstance()
-                .gameRenderer.mainCamera().position();
+                .gameRenderer.getMainCamera().position();
         double dx = renderOrigin.getX() + 8.0 - camera.x;
         double dy = renderOrigin.getY() + 8.0 - camera.y;
         double dz = renderOrigin.getZ() + 8.0 - camera.z;
@@ -113,10 +113,10 @@ public abstract class BuiltChunkMixin implements ChunkBuilderBlockEntityAccess, 
      * has no geometry that a neighbour could make wrong.
      */
     @Inject(
-            method = "createCompileTask(Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;)Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection$SectionTask;",
+            method = "createCompileTask(Lnet/minecraft/client/renderer/chunk/RenderRegionCache;)Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection$CompileTask;",
             at = @At("RETURN"))
     private void rtxremix$recordSnapshotNeighbourhood(
-            RenderSectionRegion region, CallbackInfoReturnable<?> cir) {
+            RenderRegionCache regionBuilder, CallbackInfoReturnable<?> cir) {
         // RETURN precedes the synchronous task.run in BuiltChunk.rebuild, so a first build still reads EMPTY here.
         boolean firstBuild = getSectionMesh() == net.minecraft.client.renderer.chunk.CompiledSectionMesh.UNCOMPILED;
         int mask = 0;

@@ -57,7 +57,7 @@ public class HeldItemRendererMixin {
         if (context.isRemixPass()) context.clearHeldItemHolder();
     }
 
-    @Inject(method = "submitArmWithItem", at = @At("HEAD"))
+    @Inject(method = "renderArmWithItem", at = @At("HEAD"))
     private void rtxremix$beginFirstPersonHand(
             AbstractClientPlayer player,
             float tickDelta,
@@ -74,7 +74,7 @@ public class HeldItemRendererMixin {
         if (context.isRemixPass()) context.setActiveHand(hand);
     }
 
-    @Inject(method = "submitArmWithItem", at = @At("RETURN"))
+    @Inject(method = "renderArmWithItem", at = @At("RETURN"))
     private void rtxremix$endFirstPersonHand(
             AbstractClientPlayer player,
             float tickDelta,

@@ -40,14 +40,14 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
         if (changingFov) {
             return camera.getFov();
         }
-        return ((GameRenderer) (Object) this).gameRenderState().levelRenderState.cameraRenderState.hudFov;
+        return ((GameRenderer) (Object) this).getGameRenderState().levelRenderState.cameraRenderState.hudFov;
     }
 
     @Redirect(
             method = "renderItemInHand",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;submitHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/player/LocalPlayer;I)V"
+                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderHandsWithItems(FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/player/LocalPlayer;I)V"
             ))
     private void rtxremix$captureFirstPersonModel(
             ItemInHandRenderer heldItemRenderer,
@@ -58,19 +58,19 @@ public abstract class GameRendererMixin implements GameRendererFovAccess {
             int light) {
         RemixRenderer renderer = RtxRemixMod.renderer;
         if (!RtxRemixMod.shouldCaptureFirstPersonModel()) {
-            heldItemRenderer.submitHandsWithItems(tickDelta, matrices, vertexConsumers, player, light);
+            heldItemRenderer.renderHandsWithItems(tickDelta, matrices, vertexConsumers, player, light);
             return;
         }
 
         renderer.captureFirstPersonModel(heldItemRenderer, tickDelta, matrices, player, light);
     }
 
-    // 26.2: screen overlays are submitted through ScreenEffectRenderer.submit in renderLevel.
+    // Screen overlays are submitted through ScreenEffectRenderer.renderScreenEffect in renderLevel.
     @Inject(
             method = "renderLevel",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;submit(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V",
+                    target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;renderScreenEffect(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V",
                     shift = At.Shift.BEFORE
             ))
     private void rtxremix$submitBeforeScreenOverlays(

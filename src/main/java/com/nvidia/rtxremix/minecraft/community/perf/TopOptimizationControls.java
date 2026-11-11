@@ -91,7 +91,7 @@ public final class TopOptimizationControls {
     public static void onFrameEnd(long nowNanos, long periodNanos, long presentNanos,
                                   PresentWaitPolicy.Mode mode) {
         Minecraft client = Minecraft.getInstance();
-        boolean gameplay = client.gui.screen() == null && !RtxRemixMod.isRemixMenuOpen();
+        boolean gameplay = client.screen == null && !RtxRemixMod.isRemixMenuOpen();
         if (periodNanos > 0 && gameplay) {
             readoutFrameNanos = readoutFrameNanos == 0.0
                     ? periodNanos : readoutFrameNanos + READOUT_WEIGHT * (periodNanos - readoutFrameNanos);
@@ -210,7 +210,7 @@ public final class TopOptimizationControls {
         if (client.level != abWorld) {
             return "world";
         }
-        if (client.gui.screen() != null) {
+        if (client.screen != null) {
             return "screen";
         }
         if (RtxRemixMod.isRemixMenuOpen()) {

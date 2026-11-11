@@ -26,7 +26,7 @@
 > | 26.2 | `mc/26.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc26.2`, such as [`v0.1.0-ce.6+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc26.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
 
 
-Play Minecraft Java Edition 26.2 with real-time path tracing on a GeForce RTX
+Play Minecraft Java Edition 26.1 with real-time path tracing on a GeForce RTX
 GPU, powered by NVIDIA RTX Remix.
 
 ## What To Expect
@@ -47,7 +47,7 @@ Three areas have had less attention than the rest:
   conflict with anything that changes rendering or the chunk pipeline.
 - **A full playthrough.** Blocks, mobs, dimensions, and situations the showcase
   never reaches have had less care, and some will look wrong or run slowly.
-- **Other versions.** It targets Minecraft 1.21.1 only, chosen because that is
+- **Other versions.** It targets Minecraft 26.1 only, chosen because that is
   where the modding community is today. Ports to newer versions are something
   we hope the community takes on.
 
@@ -73,7 +73,7 @@ The step-by-step version, with launcher advice and troubleshooting, is in
 ## Requirements
 
 - Windows 10 or 11, x64 or ARM64.
-- Minecraft Java Edition 1.21.1, on a Microsoft account that owns the game.
+- Minecraft Java Edition 26.1, on a Microsoft account that owns the game.
 - A GeForce RTX 30-series or newer GPU with NVIDIA driver 616.92 or newer.
 - About 5 GB of free disk space while installing; about 3 GB stays in use.
 - An internet connection while the installer runs.

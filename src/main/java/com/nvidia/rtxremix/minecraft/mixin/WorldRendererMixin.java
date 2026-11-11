@@ -17,7 +17,6 @@ import com.nvidia.rtxremix.minecraft.profiling.WorldRendererProfilingAccess;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.cloud.WorldRendererCloudAccess;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
-import com.nvidia.rtxremix.minecraft.LevelExtractorAccess;
 import com.nvidia.rtxremix.minecraft.RemixRenderer;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -38,6 +37,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -48,11 +48,11 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.client.renderer.state.level.ParticlesRenderState;
 import net.minecraft.client.renderer.ViewArea;
+import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.CompiledSectionMesh;
 import net.minecraft.client.renderer.chunk.RenderRegionCache;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -103,12 +103,16 @@ public abstract class WorldRendererMixin
     private ViewArea viewArea;
 
     @Shadow
-    @Final
-    private LevelRenderState levelRenderState;
+    @Nullable
+    private ClientLevel level;
 
     @Shadow
     @Final
     private ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections;
+
+    @Shadow
+    @Final
+    private Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress;
 
     private ProfileScope rtxremix$profilerPhaseScope;
     private String rtxremix$profilerPhaseName;
@@ -127,8 +131,11 @@ public abstract class WorldRendererMixin
 
     @Override
     public int rtxremix$getCloudTicks() {
-        // 26.2: vanilla clouds run on the extracted game time instead of a renderer tick counter.
-        return (int) levelRenderState.gameTime;
+        // Vanilla clouds run on the level's game time instead of a renderer tick counter. The
+        // copy in LevelRenderState is cleared when renderLevel returns, before the Remix frame
+        // reads it, so this reads the level.
+        ClientLevel level = this.level;
+        return level == null ? 0 : (int) level.getGameTime();
     }
 
     @Override
@@ -136,8 +143,51 @@ public abstract class WorldRendererMixin
         return ((WorldRendererStarAccess) skyRenderer).rtxremix$copyStarVertices();
     }
 
-    // 26.2: setBlocksDirty and setSectionDirtyWithNeighbors moved to LevelExtractor; the water
-    // occlusion margin and the chunk-load re-flag filter live in LevelExtractorMixin.
+    /**
+     * Hidden water-top culling reads farther than vanilla's one-block rebuild
+     * margin. Expand horizontal invalidation so a ceiling or fluid update
+     * cannot leave a neighboring section's occlusion decision stale.
+     */
+    @Inject(method = "setBlocksDirty(IIIIII)V", at = @At("HEAD"), cancellable = true)
+    private void rtxremix$expandWaterOcclusionRebuildMargin(
+            int minX, int minY, int minZ, int maxX, int maxY, int maxZ, CallbackInfo ci) {
+        if (!RtxRemixMod.isRtxEnabled()) {
+            return;
+        }
+
+        int radius = Math.max(1, BlockQuadEmitter.getWaterTopOcclusionRadius());
+        LevelRenderer renderer = (LevelRenderer) (Object) this;
+        int minSectionX = SectionPos.blockToSectionCoord(minX - radius);
+        int minSectionY = SectionPos.blockToSectionCoord(minY - 1);
+        int minSectionZ = SectionPos.blockToSectionCoord(minZ - radius);
+        int maxSectionX = SectionPos.blockToSectionCoord(maxX + radius);
+        int maxSectionY = SectionPos.blockToSectionCoord(maxY + 1);
+        int maxSectionZ = SectionPos.blockToSectionCoord(maxZ + radius);
+        for (int sectionZ = minSectionZ; sectionZ <= maxSectionZ; sectionZ++) {
+            for (int sectionX = minSectionX; sectionX <= maxSectionX; sectionX++) {
+                for (int sectionY = minSectionY; sectionY <= maxSectionY; sectionY++) {
+                    renderer.setSectionDirty(sectionX, sectionY, sectionZ);
+                }
+            }
+        }
+        ci.cancel();
+    }
+
+    /**
+     * Chunk-load and light-data re-flags enter here and nowhere else: ClientLevel's
+     * setSectionDirtyWithNeighbors is a pure forwarder. Block updates and biome data use
+     * the other overloads and stay vanilla. Vanilla's 3x3x3 loop is replaced wholesale
+     * because the rule must tell the loading column from its neighbours, which a redirect
+     * of the inner per-section call cannot.
+     */
+    @Inject(method = "setSectionDirtyWithNeighbors(III)V", at = @At("HEAD"), cancellable = true)
+    private void rtxremix$filterChunkLoadReflags(int cx, int sy, int cz, CallbackInfo ci) {
+        if (!RtxRemixMod.isRtxEnabled() || !NeighbourReflagFilter.ENABLED || viewArea == null) {
+            return;
+        }
+        ((BuiltChunkStorageSectionAccess) viewArea).rtxremix$flagLoadedSection(cx, sy, cz);
+        ci.cancel();
+    }
 
     @Override
     public void rtxremix$onNeighbourColumnInvalidated(int cx, int cz) {
@@ -152,7 +202,7 @@ public abstract class WorldRendererMixin
         if (viewArea == null) {
             return built;
         }
-        for (SectionRenderDispatcher.RenderSection builtChunk : rtxremix$residentSections()) {
+        for (SectionRenderDispatcher.RenderSection builtChunk : viewArea.sections) {
             if (builtChunk.getSectionMesh() == CompiledSectionMesh.UNCOMPILED) {
                 continue;
             }
@@ -167,7 +217,7 @@ public abstract class WorldRendererMixin
 
     @Override
     public LongSet rtxremix$queueSectionsForRemix(LongSet sections) {
-        ClientLevel level = Minecraft.getInstance().level;
+        ClientLevel level = this.level;
         if (viewArea == null || sectionRenderDispatcher == null || level == null || sections.isEmpty()) {
             return LongSets.emptySet();
         }
@@ -178,7 +228,7 @@ public abstract class WorldRendererMixin
         LevelLightEngine lightingProvider = level.getLightEngine();
 
         ArrayList<SectionRenderDispatcher.RenderSection> loadedSections = new ArrayList<>();
-        for (SectionRenderDispatcher.RenderSection builtChunk : rtxremix$residentSections()) {
+        for (SectionRenderDispatcher.RenderSection builtChunk : viewArea.sections) {
             BlockPos origin = builtChunk.getRenderOrigin();
             int cx = SectionPos.blockToSectionCoord(origin.getX());
             int sy = SectionPos.blockToSectionCoord(origin.getY());
@@ -196,7 +246,7 @@ public abstract class WorldRendererMixin
 
         // ChunkBuilder's normal task queue is FIFO. Queue nearby sections first
         // so visible holes close promptly while the Remix scene repopulates.
-        Camera camera = Minecraft.getInstance().gameRenderer.mainCamera();
+        Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
         double cameraX = camera.position().x;
         double cameraY = camera.position().y;
         double cameraZ = camera.position().z;
@@ -210,13 +260,12 @@ public abstract class WorldRendererMixin
 
         RenderRegionCache regionBuilder = new RenderRegionCache();
         LongOpenHashSet queued = new LongOpenHashSet(loadedSections.size());
-        LevelExtractorAccess extractor = (LevelExtractorAccess) Minecraft.getInstance().levelExtractor;
         try {
             for (SectionRenderDispatcher.RenderSection builtChunk : loadedSections) {
-                builtChunk.compileAsync(regionBuilder.createRegion(level, builtChunk.getSectionNode()));
-                // Prevent the next extraction from queueing this same slot a second
-                // time when it next walks vanilla's visible section list.
-                extractor.rtxremix$setSectionNotDirty(builtChunk.getSectionNode());
+                builtChunk.rebuildSectionAsync(regionBuilder);
+                // Prevent LevelRenderer.compileSections from queueing this same slot a
+                // second time when it next walks vanilla's visible section list.
+                builtChunk.setNotDirty();
                 BlockPos origin = builtChunk.getRenderOrigin();
                 queued.add(SectionPos.asLong(
                         SectionPos.blockToSectionCoord(origin.getX()),
@@ -234,43 +283,15 @@ public abstract class WorldRendererMixin
         ((BuiltChunkStorageSectionAccess) viewArea).rtxremix$scheduleRebuildIfResident(cx, sy, cz);
     }
 
-    /**
-     * Every section slot the view area holds. 26.2 keeps them in a private rotating storage,
-     * so the slots are read back through the public per-position lookup.
-     */
-    private ArrayList<SectionRenderDispatcher.RenderSection> rtxremix$residentSections() {
-        ArrayList<SectionRenderDispatcher.RenderSection> resident = new ArrayList<>();
-        ViewArea area = viewArea;
-        if (area == null) {
-            return resident;
-        }
-        SectionPos center = area.getCameraSectionPos();
-        int radius = area.getViewDistance();
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int sx = center.x() - radius; sx <= center.x() + radius; sx++) {
-            for (int sz = center.z() - radius; sz <= center.z() + radius; sz++) {
-                for (int sy = area.minSectionY(); sy <= area.maxSectionY(); sy++) {
-                    pos.set(SectionPos.sectionToBlockCoord(sx), SectionPos.sectionToBlockCoord(sy),
-                            SectionPos.sectionToBlockCoord(sz));
-                    SectionRenderDispatcher.RenderSection section = area.getRenderSectionAt(pos);
-                    if (section != null) {
-                        resident.add(section);
-                    }
-                }
-            }
-        }
-        return resident;
-    }
-
     // TODO(1.21.11): WorldRenderer.render no longer calls renderEntity(...); entities are
     // extracted into render states and submitted through OrderedRenderCommandQueue. In-place
     // entity capture (with its outline-only vanilla fallback) is disabled here.
 
-    // TODO(26.2): the block-breaking crack is now submitted as submitBreakingBlockModel from
+    // TODO(26.1): the block-breaking crack is now submitted as submitBreakingBlockModel from
     // LevelRenderer.submitBlockDestroyAnimation over extracted BlockBreakingRenderStates; the
     // in-place Remix crack capture (RemixRenderer.renderBlockDamageInPlace) is not hooked.
 
-    @Inject(method = "render", at = @At("HEAD"))
+    @Inject(method = "renderLevel", at = @At("HEAD"))
     private void rtxremix$renderHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$renderScope,
@@ -287,7 +308,7 @@ public abstract class WorldRendererMixin
         }
     }
 
-    @Inject(method = "render", at = @At("RETURN"))
+    @Inject(method = "renderLevel", at = @At("RETURN"))
     private void rtxremix$renderReturn(CallbackInfo ci) {
         rtxremix$closeProfilerPhase();
         rtxremix$close(rtxremix$renderScope);
@@ -296,7 +317,7 @@ public abstract class WorldRendererMixin
     }
 
     @WrapOperation(
-            method = "render",
+            method = "renderLevel",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/util/profiling/ProfilerFiller;popPush(Ljava/lang/String;)V"
@@ -313,16 +334,16 @@ public abstract class WorldRendererMixin
     // a SectionRenderState drawn later by the frame graph; vanilla terrain layers are no longer
     // skipped while Remix renders the world.
 
-    // 26.2: particles are submitted as features from submitFeatures, not drawn in their own pass.
+    // Particles are submitted as features inside the main pass, not drawn in their own pass.
     @WrapOperation(
-            method = "submitFeatures",
+            method = "lambda$addMainPass$0",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/state/level/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"
+                    target = "Lnet/minecraft/client/renderer/state/level/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeStorage;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V"
             ))
     private void rtxremix$skipVanillaParticleDraw(
             ParticlesRenderState particles,
-            SubmitNodeCollector collector,
+            SubmitNodeStorage collector,
             CameraRenderState camera,
             Operation<Void> original) {
         if (!RtxRemixMod.isRemixWorldRendering()) {
@@ -345,16 +366,11 @@ public abstract class WorldRendererMixin
     // RenderPipelines; the old setShaderTexture/drawWithGlobalProgram capture points are gone, so
     // rain and snow are not captured for RemixWeatherRenderer.
 
-    // TODO(26.2): block entities are walked in LevelExtractor.extractVisibleBlockEntities; the
+    // TODO(26.1): block entities are walked in LevelRenderer.extractVisibleBlockEntities; the
     // narrowing to sections that hold block entities is not ported.
 
-    // 26.2: the section occlusion update at the end of LevelRenderer.render stands in for setupTerrain.
-    @Inject(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/SectionOcclusionGraph;update(Lnet/minecraft/client/renderer/state/level/CameraRenderState;ILnet/minecraft/client/renderer/state/level/ChunkLoadingRenderState;)V"
-            ))
+    // setupTerrain became cullTerrain(Camera, Frustum, boolean).
+    @Inject(method = "cullTerrain", at = @At("HEAD"))
     private void rtxremix$setupTerrainHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$setupTerrainScope,
@@ -362,19 +378,13 @@ public abstract class WorldRendererMixin
                 "Java.WorldRenderer.setupTerrain.ms");
     }
 
-    @Inject(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/SectionOcclusionGraph;update(Lnet/minecraft/client/renderer/state/level/CameraRenderState;ILnet/minecraft/client/renderer/state/level/ChunkLoadingRenderState;)V",
-                    shift = At.Shift.AFTER
-            ))
+    @Inject(method = "cullTerrain", at = @At("RETURN"))
     private void rtxremix$setupTerrainReturn(CallbackInfo ci) {
         rtxremix$close(rtxremix$setupTerrainScope);
     }
 
     @Inject(method = "compileSections", at = @At("HEAD"))
-    private void rtxremix$updateChunksHead(CameraRenderState camera, CallbackInfo ci) {
+    private void rtxremix$updateChunksHead(Camera camera, CallbackInfo ci) {
         int installCount = rtxremix$chunksToUpload();
         int dirtyLeaves = rtxremix$chunksToBatch();
         if (installCount >= 0) {
@@ -390,15 +400,26 @@ public abstract class WorldRendererMixin
                 dirtyLeaves);
     }
 
+    /** Vanilla's region cache is a local of compileSections; captured at construction, released at return. */
+    private RenderRegionCache rtxremix$frameRegionBuilder;
+
+    @WrapOperation(
+            method = "compileSections",
+            at = @At(value = "NEW", target = "()Lnet/minecraft/client/renderer/chunk/RenderRegionCache;"))
+    private RenderRegionCache rtxremix$captureFrameRegionBuilder(Operation<RenderRegionCache> original) {
+        RenderRegionCache builder = original.call();
+        rtxremix$frameRegionBuilder = builder;
+        return builder;
+    }
+
     /**
      * Drops the builder's references so the snapshots it cached can be recycled once their
      * rebuild tasks have run. See {@link ChunkRendererRegionBuilderMixin}.
      */
     @Inject(method = "compileSections", at = @At("RETURN"))
-    private void rtxremix$updateChunksReturn(CameraRenderState camera, CallbackInfo ci) {
-        // 26.2: LevelExtractor.extract builds the frame's region cache; LevelExtractorMixin holds it.
-        RenderRegionCache builder =
-                ((LevelExtractorAccess) Minecraft.getInstance().levelExtractor).rtxremix$takeFrameRegionCache();
+    private void rtxremix$updateChunksReturn(Camera camera, CallbackInfo ci) {
+        RenderRegionCache builder = rtxremix$frameRegionBuilder;
+        rtxremix$frameRegionBuilder = null;
         if (builder != null) {
             ((RegionBuilderRelease) builder).rtxremix$releaseSnapshots();
         }
@@ -409,10 +430,10 @@ public abstract class WorldRendererMixin
             method = "compileSections",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;compileSync(Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;)V"
+                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;rebuildSectionSync(Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;Lnet/minecraft/client/renderer/chunk/RenderRegionCache;)V"
             ),
             require = 0)
-    private void rtxremix$beforeSyncRebuild(CameraRenderState camera, CallbackInfo ci) {
+    private void rtxremix$beforeSyncRebuild(Camera camera, CallbackInfo ci) {
         rtxremix$open(
                 rtxremix$syncRebuildScope,
                 "WorldRenderer.updateChunks.build_near_sync",
@@ -424,22 +445,22 @@ public abstract class WorldRendererMixin
             method = "compileSections",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;compileSync(Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;)V",
+                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;rebuildSectionSync(Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher$RenderSection;Lnet/minecraft/client/renderer/chunk/RenderRegionCache;)V",
                     shift = At.Shift.AFTER
             ),
             require = 0)
-    private void rtxremix$afterSyncRebuild(CameraRenderState camera, CallbackInfo ci) {
+    private void rtxremix$afterSyncRebuild(Camera camera, CallbackInfo ci) {
         rtxremix$close(rtxremix$syncRebuildScope);
     }
 
     @Inject(
-            method = "render",
+            method = "prepareChunkRenders",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadTerrainBuffersToGpu()V"
+                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadGlobalGeomBuffersToGPU()V"
             ),
             require = 0)
-    private void rtxremix$beforeChunkUpload(CallbackInfo ci) {
+    private void rtxremix$beforeChunkUpload(CallbackInfoReturnable<ChunkSectionsToRender> cir) {
         rtxremix$open(
                 rtxremix$uploadScope,
                 "WorldRenderer.updateChunks.upload",
@@ -448,19 +469,19 @@ public abstract class WorldRendererMixin
     }
 
     @Inject(
-            method = "render",
+            method = "prepareChunkRenders",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadTerrainBuffersToGpu()V",
+                    target = "Lnet/minecraft/client/renderer/chunk/SectionRenderDispatcher;uploadGlobalGeomBuffersToGPU()V",
                     shift = At.Shift.AFTER
             ),
             require = 0)
-    private void rtxremix$afterChunkUpload(CallbackInfo ci) {
+    private void rtxremix$afterChunkUpload(CallbackInfoReturnable<ChunkSectionsToRender> cir) {
         rtxremix$close(rtxremix$uploadScope);
     }
 
     private int rtxremix$chunksToUpload() {
-        // TODO(26.2): SectionRenderDispatcher no longer reports a pending-upload count.
+        // TODO(26.1): SectionRenderDispatcher no longer reports a pending-upload count.
         return -1;
     }
 
@@ -508,8 +529,7 @@ public abstract class WorldRendererMixin
         scope.blockEntityCount(-1);
         scope.blockCount(-1);
         scope.noCullBlockEntityCount(-1);
-        ClientLevel level = Minecraft.getInstance().level;
-        scope.blockBreakingCount(level == null ? -1 : level.destructionProgress().size());
+        scope.blockBreakingCount(destructionProgress.size());
         scope.renderLayerCalls(rtxremix$renderLayerCalls - rtxremix$phaseRenderLayerCallsStart);
         scope.renderLayerSkips(rtxremix$renderLayerSkips - rtxremix$phaseRenderLayerSkipsStart);
         if ("WorldRenderer.phase.blockentities".equals(rtxremix$profilerPhaseName)) {

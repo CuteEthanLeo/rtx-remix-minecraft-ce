@@ -10,10 +10,7 @@ import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.google.common.collect.Queues;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.TracingExecutor;
-import it.unimi.dsi.fastutil.longs.LongSet;
-import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.client.renderer.state.level.ChunkLoadingRenderState;
-import net.minecraft.core.BlockPos;
+import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.SectionOcclusionGraph;
 import net.minecraft.client.renderer.ViewArea;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -117,18 +114,22 @@ public abstract class ChunkRenderingDataPreparerMixin {
 
     @Inject(method = "update", at = @At("HEAD"))
     private void rtxremix$prepareHead(
-            CameraRenderState camera,
-            int fov,
-            ChunkLoadingRenderState chunkLoadingRenderState,
+            boolean smartCull,
+            Camera camera,
+            Frustum frustum,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            LongOpenHashSet loadedEmptySections,
             CallbackInfo ci) {
-        rtxremix$open(rtxremix$prepareScope, "ChunkVisibility.prepare", -1);
+        rtxremix$open(rtxremix$prepareScope, "ChunkVisibility.prepare", rtxremix$sizeOf(builtChunks));
     }
 
     @Inject(method = "update", at = @At("RETURN"))
     private void rtxremix$prepareReturn(
-            CameraRenderState camera,
-            int fov,
-            ChunkLoadingRenderState chunkLoadingRenderState,
+            boolean smartCull,
+            Camera camera,
+            Frustum frustum,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            LongOpenHashSet loadedEmptySections,
             CallbackInfo ci) {
         rtxremix$close(rtxremix$prepareScope);
     }
@@ -147,16 +148,22 @@ public abstract class ChunkRenderingDataPreparerMixin {
 
     @Inject(method = "runPartialUpdate", at = @At("HEAD"))
     private void rtxremix$graphHead(
-            CameraRenderState camera,
-            LongSet loadedExpectedChunks,
+            boolean smartCull,
+            Frustum frustum,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            Vec3 cameraPos,
+            LongOpenHashSet loadedEmptySections,
             CallbackInfo ci) {
-        rtxremix$open(rtxremix$graphScope, "ChunkVisibility.rebuildGraph", -1);
+        rtxremix$open(rtxremix$graphScope, "ChunkVisibility.rebuildGraph", rtxremix$sizeOf(builtChunks));
     }
 
     @Inject(method = "runPartialUpdate", at = @At("RETURN"))
     private void rtxremix$graphReturn(
-            CameraRenderState camera,
-            LongSet loadedExpectedChunks,
+            boolean smartCull,
+            Frustum frustum,
+            List<SectionRenderDispatcher.RenderSection> builtChunks,
+            Vec3 cameraPos,
+            LongOpenHashSet loadedEmptySections,
             CallbackInfo ci) {
         rtxremix$budgetHit(rtxremix$graphScope, rtxremix$propagationQueue.budgetHit());
         rtxremix$close(rtxremix$graphScope);
@@ -211,12 +218,12 @@ public abstract class ChunkRenderingDataPreparerMixin {
     }
 
     @Inject(method = "initializeQueueForFullUpdate", at = @At("HEAD"))
-    private void rtxremix$seedHead(BlockPos cameraPosition, Queue<?> queue, CallbackInfo ci) {
+    private void rtxremix$seedHead(Camera camera, Queue<?> queue, CallbackInfo ci) {
         rtxremix$open(rtxremix$seedScope, "ChunkVisibility.seedQueue", rtxremix$sizeOf(queue));
     }
 
     @Inject(method = "initializeQueueForFullUpdate", at = @At("RETURN"))
-    private void rtxremix$seedReturn(BlockPos cameraPosition, Queue<?> queue, CallbackInfo ci) {
+    private void rtxremix$seedReturn(Camera camera, Queue<?> queue, CallbackInfo ci) {
         rtxremix$close(rtxremix$seedScope);
     }
 
@@ -228,7 +235,6 @@ public abstract class ChunkRenderingDataPreparerMixin {
             boolean smartCull,
             Consumer<SectionRenderDispatcher.RenderSection> onSectionAdded,
             LongOpenHashSet emptySections,
-            LongOpenHashSet loadedChunks,
             CallbackInfo ci) {
         rtxremix$open(rtxremix$walkScope, "ChunkVisibility.walkVisibleGraph", rtxremix$sizeOf(queue));
     }
@@ -241,7 +247,6 @@ public abstract class ChunkRenderingDataPreparerMixin {
             boolean smartCull,
             Consumer<SectionRenderDispatcher.RenderSection> onSectionAdded,
             LongOpenHashSet emptySections,
-            LongOpenHashSet loadedChunks,
             CallbackInfo ci) {
         rtxremix$close(rtxremix$walkScope);
     }

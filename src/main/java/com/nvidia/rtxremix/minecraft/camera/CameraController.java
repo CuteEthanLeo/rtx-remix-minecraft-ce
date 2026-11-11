@@ -1243,8 +1243,8 @@ public final class CameraController {
      */
     private static boolean isPausedOrWillPause(Minecraft client) {
         MinecraftServer server = client.getSingleplayerServer();
-        boolean screenPauses = client.gui.screen() != null && client.gui.screen().isPauseScreen();
-        boolean overlayPauses = client.gui.overlay() != null && client.gui.overlay().isPausing();
+        boolean screenPauses = client.screen != null && client.screen.isPauseScreen();
+        boolean overlayPauses = client.getOverlay() != null && client.getOverlay().isPauseScreen();
         return isPausedOrWillPause(
                 client.isPaused(),
                 client.hasSingleplayerServer(),

@@ -10,7 +10,7 @@ import net.minecraft.client.particle.ParticleGroup;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-/** 26.x dropped {@code ParticleGroup.getAll()}; this reads the live queue in its place. */
+/** Reads the group's live particle queue, which {@code ParticleGroup.getAll()} stops exposing in 26.2. */
 @Mixin(ParticleGroup.class)
 public interface ParticleGroupAccessor {
     @Accessor("particles")

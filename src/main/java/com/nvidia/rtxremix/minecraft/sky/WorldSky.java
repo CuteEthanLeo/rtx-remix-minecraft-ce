@@ -26,7 +26,7 @@ public final class WorldSky {
 
     private static <T> T visual(EnvironmentAttribute<T> attribute, float tickDelta) {
         EnvironmentAttributeProbe interpolator =
-                Minecraft.getInstance().gameRenderer.mainCamera().attributeProbe();
+                Minecraft.getInstance().gameRenderer.getMainCamera().attributeProbe();
         return interpolator.getValue(attribute, tickDelta);
     }
 

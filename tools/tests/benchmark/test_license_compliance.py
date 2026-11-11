@@ -220,14 +220,14 @@ class AccessWidenerHeaderTests(unittest.TestCase):
     def test_format_header_is_still_the_first_line(self):
         lines = read_text(REPO_ROOT / self.PATH).splitlines()
         self.assertTrue(
-            lines[0].startswith("accessWidener "),
+            lines[0].split()[:1] == ["accessWidener"],
             "the accessWidener format header must remain line 1; Loom rejects anything above it",
         )
 
     def test_spdx_header_is_present_below_the_format_header(self):
         text = read_text(REPO_ROOT / self.PATH)
         self.assertIn(SPDX_LICENSE_LINE, text)
-        self.assertLess(text.index("accessWidener "), text.index("SPDX-License-Identifier"))
+        self.assertLess(text.index("accessWidener"), text.index("SPDX-License-Identifier"))
 
 
 class ContributionDocumentTests(unittest.TestCase):

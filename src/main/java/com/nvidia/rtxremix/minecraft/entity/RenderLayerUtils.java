@@ -9,6 +9,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.platform.CompareOp;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import com.nvidia.rtxremix.minecraft.mixin.RenderLayerSetupAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTextureSpecAccessor;
 import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTexturesAccessor;
@@ -123,7 +124,7 @@ final class RenderLayerUtils {
      * do not become triangles, such as lines.
      */
     static Optional<Topology> topology(RenderType layer) {
-        return switch (layer.primitiveTopology()) {
+        return switch (layer.mode()) {
             case QUADS -> Optional.of(Topology.QUADS);
             case TRIANGLE_STRIP -> Optional.of(Topology.TRIANGLE_STRIP);
             default -> Optional.empty();
@@ -148,7 +149,7 @@ final class RenderLayerUtils {
         // capturableTexture declined must not re-enter capture through here.
         return extractTexture(layer).isEmpty()
                 && topology(layer).filter(t -> t == Topology.TRIANGLE_STRIP).isPresent()
-                && layer.format().contains("Color");
+                && layer.format().contains(VertexFormatElement.COLOR);
     }
 
     /**
@@ -198,7 +199,7 @@ final class RenderLayerUtils {
                         || pipeline == RenderPipelines.CRUMBLING,
                 pipeline == RenderPipelines.ENTITY_SOLID,
                 pipeline == RenderPipelines.TEXT
-                        || pipeline == RenderPipelines.TEXT_GRAYSCALE);
+                        || pipeline == RenderPipelines.TEXT_INTENSITY);
     }
 
     /**

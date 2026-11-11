@@ -136,6 +136,8 @@ public class RemixRenderer {
     private boolean submitFrameCalled = false;
     private boolean presentFailureLogged = false;
     private boolean frameCopyFailed;
+    /** Whether GL handed over a frame since the last present. */
+    private boolean glFrameReceived;
 
     // Community Edition: Top Optimization. The present policy decides per frame
     // whether Present waits for GL on the GPU; see PresentWaitPolicy.
@@ -648,7 +650,7 @@ public class RemixRenderer {
             Minecraft client = Minecraft.getInstance();
             if (client != null && client.levelRenderer != null) {
                 LongSet built = RtxRemixMod.builtSections(client);
-                client.levelExtractor.allChanged();
+                client.levelRenderer.allChanged();
                 RtxRemixMod.recaptureTerrainForRemix(client, built);
             }
             pendingTerrainRecaptureAfterTextureReload = false;
@@ -881,7 +883,7 @@ public class RemixRenderer {
                 cameraEffectsSettings.onFrame(clock.nanos(), clock.frameSeconds());
             }
 
-            Camera camera = client.gameRenderer.mainCamera();
+            Camera camera = client.gameRenderer.getMainCamera();
             float tickDelta = client.getDeltaTracker().getGameTimeDeltaPartialTick(true);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());
             
@@ -1457,8 +1459,15 @@ public class RemixRenderer {
      * without calling present leaves the window frozen on the last presented image.
      * A failed GL-to-Remix copy therefore still presents, and a failure is logged once
      * per run rather than once per frame.
+     *
+     * <p>Vanilla does not blit a minimized window's frame but still swaps; with no frame
+     * handed over there is nothing new to present, so that swap presents nothing.
      */
     public void presentFrameVk() {
+        if (!glFrameReceived) {
+            return;
+        }
+        glFrameReceived = false;
         boolean failed = frameCopyFailed;
         frameCopyFailed = false;
         // A main-path submit this frame means a world frame; the fallback
@@ -1508,7 +1517,7 @@ public class RemixRenderer {
                 topOpt.generation(),
                 worldFrame,
                 RtxRemixMod.isRemixMenuOpen(),
-                Minecraft.getInstance().gui.screen() != null);
+                Minecraft.getInstance().screen != null);
         if (mode != previous) {
             if (topOpt.logTransitions()) {
                 LOGGER.info("Top Optimization: present {} -> {}", previous, mode);
@@ -1638,8 +1647,9 @@ public class RemixRenderer {
         }
     }
 
-    /** Receives the completed GUI/world texture before GlSurface presents it. Render thread only. */
+    /** Receives the completed GUI/world texture before it is blitted to the window. Render thread only. */
     public void copyGlFrameToRemix(int sourceFbo, int width, int height) {
+        glFrameReceived = true;
         long start = System.nanoTime();
         try (ProfileScope ignored = ProfileScope.begin("Interop.GLToVK")) {
             blitGlToRemix(sourceFbo, width, height);
@@ -1673,8 +1683,8 @@ public class RemixRenderer {
             if (interopGlVk.recreateImagesIf(interopInfo)) {
                 presentPolicy.discontinuity();
             }
-            // 26.2 copies here, at GlSurface's present, so a world frame also takes
-            // the Vulkan-to-GL ownership transfer for this copy.
+            // The copy happens here, at the final blit to the window, so a world frame
+            // also takes the Vulkan-to-GL ownership transfer for this copy.
             interopGlVk.waitForVk(interopInfo);
         }
 

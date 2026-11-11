@@ -376,7 +376,7 @@ public class BenchmarkController {
     }
 
     private String describeCurrentScreen(Minecraft client) {
-        return client.gui.screen() == null ? "none" : client.gui.screen().getClass().getName();
+        return client.screen == null ? "none" : client.screen.getClass().getName();
     }
 
     static boolean isWorldLoadScreenName(String screenSimpleName) {
@@ -384,8 +384,8 @@ public class BenchmarkController {
     }
 
     private boolean isWorldLoadScreen(Minecraft client) {
-        if (client.gui.screen() == null) return false;
-        return isWorldLoadScreenName(client.gui.screen().getClass().getSimpleName());
+        if (client.screen == null) return false;
+        return isWorldLoadScreenName(client.screen.getClass().getSimpleName());
     }
 
     private void maybeFallbackFromQuickPlay(Minecraft client) {
@@ -1027,9 +1027,8 @@ public class BenchmarkController {
         resetBenchmarkStatus();
         state = State.STILLS;
         currentFrame = 0;
-        // 26.2: the HUD hidden flag moved from Options.hideGui to Gui.hud.
-        hudHiddenBeforeStills = client.gui.hud.isHidden();
-        if (!hudHiddenBeforeStills) client.gui.hud.toggle();
+        hudHiddenBeforeStills = client.options.hideGui;
+        client.options.hideGui = true;
         LOGGER.info("Still shot capture starting: {} shot(s) from set '{}', settle {}",
                 shots.size(), shotSetName, shotSettle);
         writeBenchmarkStatus("stills-start", true);
@@ -1160,7 +1159,7 @@ public class BenchmarkController {
         Screenshot.grab(
                 benchmarkDir.toFile(),
                 shot.name() + ".png",
-                client.gameRenderer.mainRenderTarget(),
+                client.getMainRenderTarget(),
                 1,
                 text -> {
                     // Runs on the IO worker after the encode; the file is the
@@ -1192,9 +1191,8 @@ public class BenchmarkController {
         if (stillShots == null) {
             return;
         }
-        if (client != null && client.gui != null
-                && client.gui.hud.isHidden() != hudHiddenBeforeStills) {
-            client.gui.hud.toggle();
+        if (client != null && client.options != null) {
+            client.options.hideGui = hudHiddenBeforeStills;
         }
         stillShots = null;
         stillShotColumns = -1;
@@ -1336,7 +1334,7 @@ public class BenchmarkController {
         Screenshot.grab(
                 benchmarkDir.toFile(),
                 filename,
-                client.gameRenderer.mainRenderTarget(),
+                client.getMainRenderTarget(),
                 1,
                 text -> LOGGER.info("Screenshot: {}", text.getString())
         );

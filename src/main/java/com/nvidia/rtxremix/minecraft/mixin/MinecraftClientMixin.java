@@ -126,7 +126,7 @@ public abstract class MinecraftClientMixin {
         rtxremix$closeScope(rtxremix$soundScope);
     }
 
-    // 26.2: the frame is split into update/extract/render inside Minecraft.renderFrame; display
+    // The frame is split into update/extract/render inside Minecraft.renderFrame; display
     // prep opens at the top of renderFrame.
     @Inject(method = "renderFrame", at = @At("HEAD"))
     private void rtxremix$beforeDisplayPrep(boolean tick, CallbackInfo ci) {
@@ -165,13 +165,13 @@ public abstract class MinecraftClientMixin {
 
     /**
      * Apply interactive or benchmark camera poses before GameRenderer.update builds
-     * Minecraft's interpolated Camera for this frame (26.2 moved that out of render).
+     * Minecraft's interpolated Camera for this frame (that moved out of render).
      */
     @Inject(
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;)V"
+            target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"
         )
     )
     private void rtxremix$beforeCameraUpdate(boolean tick, CallbackInfo ci) {
@@ -215,7 +215,7 @@ public abstract class MinecraftClientMixin {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V"
+            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"
         ),
         require = 0
     )
@@ -234,7 +234,7 @@ public abstract class MinecraftClientMixin {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/GpuSurface;blitFromTexture(Lcom/mojang/blaze3d/systems/CommandEncoder;Lcom/mojang/blaze3d/textures/GpuTextureView;)V",
+            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V",
             shift = At.Shift.AFTER
         ),
         require = 0
@@ -247,7 +247,7 @@ public abstract class MinecraftClientMixin {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V"
+            target = "Lcom/mojang/blaze3d/systems/RenderSystem;flipFrame(Lcom/mojang/blaze3d/TracyFrameCapture;)V"
         )
     )
     private void rtxremix$beforeSwapBuffers(boolean tick, CallbackInfo ci) {
@@ -258,7 +258,7 @@ public abstract class MinecraftClientMixin {
         method = "renderFrame",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V",
+            target = "Lcom/mojang/blaze3d/systems/RenderSystem;flipFrame(Lcom/mojang/blaze3d/TracyFrameCapture;)V",
             shift = At.Shift.AFTER
         )
     )
@@ -310,7 +310,7 @@ public abstract class MinecraftClientMixin {
         rtxremix$transitionRenderPhase("MinecraftClient.render.afterFrameLimit");
     }
 
-    // 26.2: the run loop no longer yields; the post-frame phase starts when renderFrame returns.
+    // The run loop no longer yields; the post-frame phase starts when renderFrame returns.
     @Inject(method = "renderFrame", at = @At("RETURN"))
     private void rtxremix$afterYield(boolean tick, CallbackInfo ci) {
         rtxremix$transitionRenderPhase("MinecraftClient.render.postFrame");
@@ -347,7 +347,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/Gui;tick()V"
+            target = "Lnet/minecraft/client/gui/Gui;tick(Z)V"
         ),
         require = 0
     )
@@ -359,7 +359,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/Gui;tick()V",
+            target = "Lnet/minecraft/client/gui/Gui;tick(Z)V",
             shift = At.Shift.AFTER
         ),
         require = 0

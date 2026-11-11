@@ -60,7 +60,7 @@ public class TextureOverlay {
     private int destinationFbo;
 
     private void renderTextureOverlay(int texId) {
-        RenderTarget framebuffer = client.gameRenderer.mainRenderTarget();
+        RenderTarget framebuffer = client.getMainRenderTarget();
         if (framebuffer == null) {
             return;
         }

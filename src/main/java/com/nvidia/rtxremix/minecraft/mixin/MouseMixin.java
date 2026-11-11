@@ -34,6 +34,9 @@ public abstract class MouseMixin implements RemixMouseAccess {
     private MouseButtonInfo activeButton;
 
     @Shadow
+    private int clickDepth;
+
+    @Shadow
     private void onButton(long window, MouseButtonInfo input, int action) { }
 
     private boolean rtxremix$releasingActiveButton;
@@ -44,7 +47,8 @@ public abstract class MouseMixin implements RemixMouseAccess {
             return;
         }
 
-        // 26.2 removed touchscreen mode and its press counter; the release goes straight through.
+        // Touchscreen mode counts outstanding presses and suppresses intermediate releases.
+        clickDepth = minecraft.options.touchscreen().get() ? 1 : 0;
         rtxremix$releasingActiveButton = true;
         try {
             onButton(minecraft.getWindow().handle(), activeButton, GLFW.GLFW_RELEASE);

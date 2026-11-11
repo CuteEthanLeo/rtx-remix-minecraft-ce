@@ -24,22 +24,22 @@ import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
  * returns that never read it. A task cancelled before it ever runs leaves its region to the
  * collector, which only forgoes the reuse.
  */
-@Mixin(targets = "net.minecraft.client.renderer.chunk.SectionRenderDispatcher$RenderSection$CompileTask")
+@Mixin(targets = "net.minecraft.client.renderer.chunk.SectionRenderDispatcher$RenderSection$RebuildTask")
 public abstract class RebuildTaskMixin {
 
     @Shadow
     @Final
-    private RenderSectionRegion region;
+    protected RenderSectionRegion region;
 
     private RenderSectionRegion rtxremix$consumed;
 
     @Inject(method = "doTask", at = @At("HEAD"))
-    private void rtxremix$captureRegion(SectionBufferBuilderPack buffers, CallbackInfoReturnable<SectionRenderDispatcher.RenderSection.SectionTask.SectionTaskResult> cir) {
+    private void rtxremix$captureRegion(SectionBufferBuilderPack buffers, CallbackInfoReturnable<SectionRenderDispatcher.RenderSection.CompileTask.SectionTaskResult> cir) {
         rtxremix$consumed = region;
     }
 
     @Inject(method = "doTask", at = @At("RETURN"))
-    private void rtxremix$releaseRegion(SectionBufferBuilderPack buffers, CallbackInfoReturnable<SectionRenderDispatcher.RenderSection.SectionTask.SectionTaskResult> cir) {
+    private void rtxremix$releaseRegion(SectionBufferBuilderPack buffers, CallbackInfoReturnable<SectionRenderDispatcher.RenderSection.CompileTask.SectionTaskResult> cir) {
         RenderSectionRegion consumed = rtxremix$consumed;
         rtxremix$consumed = null;
         if (consumed != null) {

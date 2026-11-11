@@ -64,7 +64,7 @@ public class KeyboardMixin implements RemixKeyboardAccess {
             RtxRemixMod.toggleRemixMenu();
             return;
         }
-        if (client.gui.screen() != null
+        if (client.screen != null
                 || (action != GLFW.GLFW_PRESS && action != GLFW.GLFW_REPEAT)) {
             return;
         }

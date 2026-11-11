@@ -100,7 +100,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
             // 1.21.9+: the hand renderer submits commands; flushing the private queue
             // inside the open capture boundary is what writes the vertices.
             try {
-                heldItemRenderer.submitHandsWithItems(tickDelta, matrices, commandCapture.queue(), player, light);
+                heldItemRenderer.renderHandsWithItems(tickDelta, matrices, commandCapture.queue(), player, light);
                 commandCapture.flush();
             } catch (RuntimeException | Error e) {
                 commandCapture.discard();
@@ -112,7 +112,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
                 return;
             }
 
-            Camera camera = client.gameRenderer.mainCamera();
+            Camera camera = client.gameRenderer.getMainCamera();
             float fovScale = calculateFovScale(client, camera, tickDelta);
             setViewCorrection(viewCorrection, modelView, fovScale);
 

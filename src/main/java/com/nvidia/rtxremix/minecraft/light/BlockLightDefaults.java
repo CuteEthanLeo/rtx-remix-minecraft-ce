@@ -252,13 +252,14 @@ final class BlockLightDefaults {
     }
 
     private static Set<Block> glowingBlocks() {
-        Set<Block> blocks = new java.util.HashSet<>(List.of(
+        return Set.of(
                 Blocks.GLOWSTONE, Blocks.SEA_LANTERN, Blocks.SHROOMLIGHT, Blocks.JACK_O_LANTERN,
                 Blocks.OCHRE_FROGLIGHT, Blocks.VERDANT_FROGLIGHT, Blocks.PEARLESCENT_FROGLIGHT,
-                Blocks.REDSTONE_LAMP));
-        // 26.2: the copper bulb variants live in a WeatheringCopperCollection.
-        blocks.addAll(Blocks.COPPER_BULB.asList());
-        return Set.copyOf(blocks);
+                Blocks.REDSTONE_LAMP,
+                Blocks.COPPER_BULB, Blocks.EXPOSED_COPPER_BULB,
+                Blocks.WEATHERED_COPPER_BULB, Blocks.OXIDIZED_COPPER_BULB,
+                Blocks.WAXED_COPPER_BULB, Blocks.WAXED_EXPOSED_COPPER_BULB,
+                Blocks.WAXED_WEATHERED_COPPER_BULB, Blocks.WAXED_OXIDIZED_COPPER_BULB);
     }
 
     private static LightEntry amethystCrystal(Identifier id, BlockState state, BlockPos pos,
@@ -288,16 +289,22 @@ final class BlockLightDefaults {
     }
 
     private static Set<Block> candleBlocks() {
-        // 26.2: dyed candles live in a ColorCollection.
-        Set<Block> blocks = new java.util.HashSet<>(Blocks.DYED_CANDLE.asList());
-        blocks.add(Blocks.CANDLE);
-        return Set.copyOf(blocks);
+        return Set.of(
+                Blocks.CANDLE, Blocks.WHITE_CANDLE, Blocks.ORANGE_CANDLE, Blocks.MAGENTA_CANDLE,
+                Blocks.LIGHT_BLUE_CANDLE, Blocks.YELLOW_CANDLE, Blocks.LIME_CANDLE, Blocks.PINK_CANDLE,
+                Blocks.GRAY_CANDLE, Blocks.LIGHT_GRAY_CANDLE, Blocks.CYAN_CANDLE, Blocks.PURPLE_CANDLE,
+                Blocks.BLUE_CANDLE, Blocks.BROWN_CANDLE, Blocks.GREEN_CANDLE, Blocks.RED_CANDLE,
+                Blocks.BLACK_CANDLE);
     }
 
     private static Set<Block> candleCakeBlocks() {
-        Set<Block> blocks = new java.util.HashSet<>(Blocks.DYED_CANDLE_CAKE.asList());
-        blocks.add(Blocks.CANDLE_CAKE);
-        return Set.copyOf(blocks);
+        return Set.of(
+                Blocks.CANDLE_CAKE, Blocks.WHITE_CANDLE_CAKE, Blocks.ORANGE_CANDLE_CAKE,
+                Blocks.MAGENTA_CANDLE_CAKE, Blocks.LIGHT_BLUE_CANDLE_CAKE, Blocks.YELLOW_CANDLE_CAKE,
+                Blocks.LIME_CANDLE_CAKE, Blocks.PINK_CANDLE_CAKE, Blocks.GRAY_CANDLE_CAKE,
+                Blocks.LIGHT_GRAY_CANDLE_CAKE, Blocks.CYAN_CANDLE_CAKE, Blocks.PURPLE_CANDLE_CAKE,
+                Blocks.BLUE_CANDLE_CAKE, Blocks.BROWN_CANDLE_CAKE, Blocks.GREEN_CANDLE_CAKE,
+                Blocks.RED_CANDLE_CAKE, Blocks.BLACK_CANDLE_CAKE);
     }
 
     private static float[][] candleOffsets(int candles) {

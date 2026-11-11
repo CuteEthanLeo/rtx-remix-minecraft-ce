@@ -8,9 +8,9 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.rendertype.RenderType;
 
 /**
- * A buffer per render type. Minecraft 26.x removed {@code MultiBufferSource}: its feature
- * renderers write into a staged GPU buffer, so the capture passes keep this shape for
- * themselves and {@link RemixCommandCapture} replays submitted commands into it.
+ * A buffer per render type: the shape the capture passes render into.
+ * {@link RemixCommandCapture} has vanilla's feature dispatcher replay submitted commands
+ * into it through {@link CapturingImmediate}.
  */
 @FunctionalInterface
 public interface RemixBufferSource {

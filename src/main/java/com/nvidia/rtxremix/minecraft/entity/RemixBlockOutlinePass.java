@@ -102,7 +102,7 @@ public final class RemixBlockOutlinePass implements AutoCloseable {
             return;
         }
 
-        Vec3 camera = client.gameRenderer.mainCamera().position();
+        Vec3 camera = client.gameRenderer.getMainCamera().position();
         double cameraX = camera.x;
         double cameraY = camera.y;
         double cameraZ = camera.z;
@@ -133,7 +133,7 @@ public final class RemixBlockOutlinePass implements AutoCloseable {
 
         float tickDelta = client.getDeltaTracker().getGameTimeDeltaPartialTick(true);
         double fovDegrees = ((com.nvidia.rtxremix.minecraft.GameRendererFovAccess) client.gameRenderer)
-                .rtxremix$getFov(client.gameRenderer.mainCamera(), tickDelta, true);
+                .rtxremix$getFov(client.gameRenderer.getMainCamera(), tickDelta, true);
         fovDegrees = Math.max(MIN_FOV_DEGREES, Math.min(MAX_FOV_DEGREES, fovDegrees));
         double tanHalfFov = Math.tan(Math.toRadians(fovDegrees) * 0.5);
         double lineWidthPixels = OUTLINE_WIDTH_PIXELS * Math.max(

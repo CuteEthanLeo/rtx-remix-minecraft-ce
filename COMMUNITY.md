@@ -75,6 +75,15 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - 第三方模组的自定义流体外观被忽略，水和熔岩用原版流体模型。
 - 相机路径改时间只设置服务器时钟，客户端等同步后生效；区块加载时的邻居重标记过滤不生效。
 
+### Minecraft 26.1 分支（`mc/26.1`）移植状态
+
+从 `mc/26.2` 回移到 26.1（Fabric API 0.145.1+26.1），构建方式不变。**同样只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`）通过，尚未在游戏里验证。** 26.1 的渲染结构介于 1.21.11 和 26.2 之间：仍有 `MultiBufferSource`，区段脏标记仍在 `LevelRenderer` 和 `RenderSection` 上，最终画面经 `RenderTarget.blitToScreen` 和 `RenderSystem.flipFrame` 呈现，没有 `LevelExtractor`、`GlSurface` 和 `RotatingSectionStorage`。相对上面 26.2 的清单：
+
+- 实体捕获回到 1.21.11 的做法：私有的 `SubmitNodeStorage` 交给原版 `FeatureRenderDispatcher` 回放到捕获用的缓冲源，所以实体上的文字/名牌、拴绳、着火、移动中方块、影子和附魔光效重新回放；发光实体的描边不回放。
+- 区块加载时的邻居重标记过滤重新生效。
+- 26.2 的其余限制沿用：方块破坏裂纹不原位捕获，方块实体遍历的区段优化未移植，待上传区块数显示 -1，自定义流体外观被忽略，相机路径改时间只设置服务器时钟，手持物品火焰和烟雾特效没有调用点。
+- 窗口最小化时原版不向窗口输出画面，Remix 也不呈现。
+
 ## 安装（本地）
 
 1. 构建：`.\gradlew.bat package -Parch=win64`，得到 `build\distributions\rtx-remix-renderer-0.1.0-ce.1-…-win64.jar`。
