@@ -9,6 +9,20 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.6.1 - 2026-11-11
+
+### Fixed
+
+- The game starts on Minecraft 1.21.11. The ce.6 package for 1.21.11 stopped
+  during startup: the Copper Beacon's block and item were created without the
+  registry key Minecraft has required since 1.21.2, and four of the mod's
+  hooks no longer matched 1.21.11 (the frame's buffer swap, texture
+  registration, chunk loading, and the section builder's render-type check,
+  which Fabric's own renderer replaces too).
+- The Copper Beacon can be crafted and has a model in the hand and inventory.
+  Its recipe still used the ingredient format that 1.21.2 replaced, and it had
+  no item model definition, which items have needed since 1.21.4.
+
 ## Community Edition 0.1.0-ce.6 - 2026-11-11
 
 ### Added
