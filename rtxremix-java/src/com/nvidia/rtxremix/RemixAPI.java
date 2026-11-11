@@ -53,6 +53,9 @@ public class RemixAPI {
     public static final int COPY_OUTPUT_OBJECT_PICKING  = 3;
     public static final int COPY_OUTPUT_GUI             = 4;
 
+    /** Windows' ERROR_DLL_INIT_FAILED: a DLL's initialization routine failed during LoadLibrary. */
+    private static final int ERROR_DLL_INIT_FAILED = 1114;
+
     private RemixAPI() {}
 
     public static long makeVersion(int major, int minor, int patch) {
@@ -69,6 +72,17 @@ public class RemixAPI {
     public static RemixAPI load(String dllPath) {
         java.io.File dllFile = bindBridge(dllPath);
         int result = RemixBridge.initialize(dllFile.getAbsolutePath());
+        if (result == ErrorCode.LOAD_LIBRARY_FAILURE) {
+            int windowsError = RemixBridge.lastLoadLibraryError();
+            String hint = windowsError == ERROR_DLL_INIT_FAILED
+                    ? "; the runtime failed to initialize, which happens when the Java runtime ships an"
+                            + " msvcp140.dll older than the Remix runtime needs (JVMs load the copy beside"
+                            + " java.exe, and the Remix runtime then binds to it). Run with a current Java"
+                            + " build"
+                    : "";
+            throw new RemixException("Failed to load the Remix runtime " + dllFile.getAbsolutePath()
+                    + " (Windows error " + windowsError + hint + ")", result);
+        }
         if (result != ErrorCode.SUCCESS) {
             throw new RemixException("Failed to initialize Remix library", result);
         }

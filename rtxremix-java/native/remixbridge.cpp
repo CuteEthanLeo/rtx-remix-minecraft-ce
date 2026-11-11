@@ -354,6 +354,8 @@ static bool initTracyFunctionsLocked() {
 static HMODULE          g_remixDll   = nullptr;
 static remixapi_Interface g_remix    = {};
 static bool             g_inited     = false;
+// GetLastError() of the most recent failed LoadLibraryW of the runtime, 0 after a load succeeds.
+static DWORD            g_lastLoadError = 0;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -512,8 +514,10 @@ static jint initializeRuntime(const wchar_t* dllPath)
 
     g_remixDll = LoadLibraryW(dllPath);
     if (!g_remixDll) {
+        g_lastLoadError = GetLastError();
         return REMIXAPI_ERROR_CODE_LOAD_LIBRARY_FAILURE;
     }
+    g_lastLoadError = 0;
 
     auto pfnInit = (PFN_remixapi_InitializeLibrary)
         GetProcAddress(g_remixDll, "remixapi_InitializeLibrary");
@@ -594,6 +598,12 @@ Java_com_nvidia_rtxremix_RemixBridge_initialize(JNIEnv* env, jclass, jstring jDl
     env->ReleaseStringUTFChars(jDllPath, path);
 
     return initializeRuntime(wpath);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_nvidia_rtxremix_RemixBridge_lastLoadLibraryError(JNIEnv*, jclass)
+{
+    return (jint)g_lastLoadError;
 }
 
 // ─── process command line ────────────────────────────────────────────────
