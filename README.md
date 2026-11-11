@@ -10,7 +10,7 @@
 > 改动与维护方式见 [COMMUNITY.md](COMMUNITY.md)。
 >
 > **Downloads / 下载**: each Minecraft version has its own installer package on
-> [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases), tagged `v<mod version>+mc<Minecraft version>`. Download the `…-win64.zip`
+> [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases), tagged `v<mod version>+mc<Minecraft version>`. Every Minecraft version carries the same mod version. Download the `…-win64.zip`
 > whose tag ends in your Minecraft version, extract it, and run `install.bat`. A package only
 > works with the Minecraft version in its tag.
 >
@@ -18,16 +18,16 @@
 > Minecraft 版本一致的 `…-win64.zip`，解压后运行 `install.bat`。安装包只适用于标签里的那个
 > Minecraft 版本，不能混用。
 >
-> | Minecraft | Branch / 分支 | Download / 下载 |
-> |---|---|---|
-> | 1.21.1 | `main`, `mc/1.21.1` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.1`, such as [`v0.1.0-ce.7+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.7%2Bmc1.21.1) |
-> | 1.21.2 | `mc/1.21.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.2`, such as [`v0.1.0-ce.8.1+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8.1%2Bmc1.21.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.3 | `mc/1.21.3` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.3`, such as [`v0.1.0-ce.8.1+mc1.21.3`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8.1%2Bmc1.21.3). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.4 | `mc/1.21.4` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.4`, such as [`v0.1.0-ce.8.1+mc1.21.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8.1%2Bmc1.21.4). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.9 | `mc/1.21.9` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.9`, such as [`v0.1.0-ce.6.1+mc1.21.9`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6.1%2Bmc1.21.9). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.10 | `mc/1.21.10` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.10`, such as [`v0.1.0-ce.6.1+mc1.21.10`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6.1%2Bmc1.21.10). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.11 | `mc/1.21.11` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.11`, such as [`v0.1.0-ce.6.1+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6.1%2Bmc1.21.11). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 26.2 | `mc/26.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc26.2`, such as [`v0.1.0-ce.6+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc26.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
+> | Minecraft | Branch / 分支 | Download / 下载 | Status / 状态 |
+> |---|---|---|---|
+> | 1.21.1 | `main`, `mc/1.21.1` | [`v0.1.0-ce.9+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.1) | Tested in game / 已在游戏内实测 |
+> | 1.21.2 | `mc/1.21.2` | [`v0.1.0-ce.9+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.2) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.3 | `mc/1.21.3` | [`v0.1.0-ce.9+mc1.21.3`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.3) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.4 | `mc/1.21.4` | [`v0.1.0-ce.9+mc1.21.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.4) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.9 | `mc/1.21.9` | [`v0.1.0-ce.9+mc1.21.9`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.9) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.10 | `mc/1.21.10` | [`v0.1.0-ce.9+mc1.21.10`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.10) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.11 | `mc/1.21.11` | [`v0.1.0-ce.9+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.11) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 26.2 | `mc/26.2` | [`v0.1.0-ce.9+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc26.2) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 
 
 Play Minecraft Java Edition 1.21.1 with real-time path tracing on a GeForce RTX
