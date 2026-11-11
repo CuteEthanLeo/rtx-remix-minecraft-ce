@@ -11,7 +11,7 @@ import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ModelTransformationMode;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.util.Hand;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -31,21 +31,21 @@ public class HeldItemRendererMixin {
 
     private static final String rtxremix$RENDER_HELD_ITEM =
             "renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;"
-            + "Lnet/minecraft/item/ModelTransformationMode;Z"
+            + "Lnet/minecraft/item/ItemDisplayContext;"
             + "Lnet/minecraft/client/util/math/MatrixStack;"
             + "Lnet/minecraft/client/render/VertexConsumerProvider;I)V";
 
     @Inject(method = rtxremix$RENDER_HELD_ITEM, at = @At("HEAD"))
-    private void rtxremix$beginHeldItem(LivingEntity entity, ItemStack stack, ModelTransformationMode mode,
-                                        boolean leftHanded, MatrixStack matrices,
+    private void rtxremix$beginHeldItem(LivingEntity entity, ItemStack stack, ItemDisplayContext mode,
+                                        MatrixStack matrices,
                                         VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();
         if (context.isRemixPass()) context.setHeldItemHolder(entity);
     }
 
     @Inject(method = rtxremix$RENDER_HELD_ITEM, at = @At("RETURN"))
-    private void rtxremix$endHeldItem(LivingEntity entity, ItemStack stack, ModelTransformationMode mode,
-                                      boolean leftHanded, MatrixStack matrices,
+    private void rtxremix$endHeldItem(LivingEntity entity, ItemStack stack, ItemDisplayContext mode,
+                                      MatrixStack matrices,
                                       VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
         EntityRenderContext context = EntityRenderContext.get();
         if (context.isRemixPass()) context.clearHeldItemHolder();

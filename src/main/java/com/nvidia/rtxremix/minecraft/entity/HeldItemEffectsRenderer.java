@@ -15,13 +15,12 @@ import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.ModelTransformationMode;
+import net.minecraft.item.ItemDisplayContext;
 import net.minecraft.particle.ParticleType;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.particle.SimpleParticleType;
@@ -79,12 +78,15 @@ public final class HeldItemEffectsRenderer {
      *
      * @param matrices  the item renderer's stack, with the item's block-space
      *                  pose on top; left as found
-     * @param model     the item's baked model, whose display transform for
-     *                  {@code mode} is part of that pose
+     * @param displayScale the X scale of the item's display transform for
+     *                  {@code mode}, which is part of that pose. A hand draws its
+     *                  item scaled down (item/generated: 0.68 in first person, 0.55
+     *                  in third); the flame and smoke are world-sized, so the poses
+     *                  divide that scale back out
      */
-    public static void render(ItemStack stack, ModelTransformationMode mode,
+    public static void render(ItemStack stack, ItemDisplayContext mode,
                               MatrixStack matrices, VertexConsumerProvider consumers,
-                              BakedModel model) {
+                              float displayScale) {
         EntityRenderContext context = EntityRenderContext.get();
         if (!context.isRemixPass() || !HeldItemFlame.isHandMode(mode)) return;
         SimpleParticleType flameParticle = HeldItemFlame.particleFor(stack);
@@ -103,17 +105,13 @@ public final class HeldItemEffectsRenderer {
 
         Quaternionfc facing = client.gameRenderer.getCamera().getRotation();
         Quaternionfc frame = HeldItemFlame.riseFrame(mode, facing);
-        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickDelta(false);
+        double ticks = client.world.getTime() + client.getRenderTickCounter().getTickProgress(false);
         float phase = mode.ordinal();
         float cameraOffset = HeldItemFlame.cameraOffset(mode);
         // Null when the capture does not know where the eye is; the poses then stay at depth 1.
         Vector3fc eye = context.getEye();
         float depthFraction = HeldItemFlame.depthFraction(mode);
         Matrix4f itemPose = matrices.peek().getPositionMatrix();
-        // A hand draws its item scaled down (item/generated: 0.68 in first person,
-        // 0.55 in third). The flame and smoke are world-sized, so the poses divide
-        // that scale back out.
-        float displayScale = model.getTransformation().getTransformation(mode).scale.x;
         VertexConsumer buffer = consumers.getBuffer(EFFECT_LAYER);
 
         matrices.push();

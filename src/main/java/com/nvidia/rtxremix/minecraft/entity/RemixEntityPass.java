@@ -683,7 +683,7 @@ public class RemixEntityPass {
         EntityCaptureResult result = new EntityCaptureResult(
                 entity,
                 entity.getLerpedPos(tickDelta),
-                MathHelper.lerp(tickDelta, entity.prevYaw, entity.getYaw()),
+                MathHelper.lerp(tickDelta, entity.lastYaw, entity.getYaw()),
                 layers,
                 snapshot.boneData,
                 snapshot.boneCount,
@@ -727,7 +727,7 @@ public class RemixEntityPass {
                                                  float tickDelta,
                                                  boolean firstPersonLocalPlayer) {
         Vec3d entityPos = entity.getLerpedPos(tickDelta);
-        float yaw = MathHelper.lerp(tickDelta, entity.prevYaw, entity.getYaw());
+        float yaw = MathHelper.lerp(tickDelta, entity.lastYaw, entity.getYaw());
 
         // Light is discarded by the capture; any value reaches the same result.
         int light = LightmapTextureManager.MAX_LIGHT_COORDINATE;

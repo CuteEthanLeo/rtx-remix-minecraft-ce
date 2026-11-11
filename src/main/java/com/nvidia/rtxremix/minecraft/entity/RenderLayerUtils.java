@@ -4,9 +4,13 @@
  */
 package com.nvidia.rtxremix.minecraft.entity;
 
+import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.DepthTestFunction;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderPhase;
-import net.minecraft.client.render.VertexFormatElement;
 import net.minecraft.util.Identifier;
 
 import java.util.Collections;
@@ -20,8 +24,9 @@ import java.util.WeakHashMap;
  * <p>A renderer requests its {@code VertexConsumer} by layer,
  * {@code provider.getBuffer(RenderLayer.getEntityCutout(textureId))}, so the
  * layer is where geometry and material meet and the one place material
- * identity is read. Its {@link RenderPhase} state, reached through the access
- * widener, gives the texture the layer is submitted under, if any, the
+ * identity is read. Its texture {@link RenderPhase}, reached through the access
+ * widener, gives the texture the layer is submitted under, if any; its
+ * {@link RenderPipeline} gives the
  * {@link SurfaceMode} Remix shades with, and whether the geometry is streamed
  * afresh every frame; its draw mode gives the {@link Topology} and whether an
  * untextured layer carries geometry worth submitting at all.
@@ -89,8 +94,7 @@ final class RenderLayerUtils {
     }
 
     private static Optional<Identifier> capturableTextureUncached(RenderLayer layer) {
-        if (layer instanceof RenderLayer.MultiPhase multiPhase
-                && multiPhase.getPhases().depthTest == RenderPhase.ALWAYS_DEPTH_TEST) {
+        if (layer.getPipeline().getDepthTestFunction() == DepthTestFunction.NO_DEPTH_TEST) {
             return Optional.empty();
         }
         return extractTexture(layer);
@@ -98,8 +102,7 @@ final class RenderLayerUtils {
 
     private static Optional<Identifier> extractTexture(RenderLayer layer) {
         if (layer instanceof RenderLayer.MultiPhase multiPhase) {
-            RenderLayer.MultiPhaseParameters phases = multiPhase.getPhases();
-            RenderPhase.TextureBase textureBase = phases.texture;
+            RenderPhase.TextureBase textureBase = multiPhase.phases.texture;
 
             if (textureBase instanceof RenderPhase.Texture texture) {
                 return texture.getId();
@@ -156,8 +159,9 @@ final class RenderLayerUtils {
     }
 
     private static boolean isStreamedPerFrameUncached(RenderLayer layer) {
-        boolean beaconBeamProgram = layer instanceof RenderLayer.MultiPhase multiPhase
-                && multiPhase.getPhases().program == RenderPhase.BEACON_BEAM_PROGRAM;
+        RenderPipeline pipeline = layer.getPipeline();
+        boolean beaconBeamProgram = pipeline == RenderPipelines.BEACON_BEAM_OPAQUE
+                || pipeline == RenderPipelines.BEACON_BEAM_TRANSLUCENT;
         return classifyStreamedPerFrame(topology(layer).orElse(Topology.QUADS), beaconBeamProgram);
     }
 
@@ -166,9 +170,9 @@ final class RenderLayerUtils {
     }
 
     /**
-     * Converts Minecraft's render-phase state into the material behavior that
-     * Remix needs. This deliberately inspects phases rather than render-layer
-     * names so mod-created layers using the standard phases behave correctly.
+     * Converts Minecraft's render pipeline into the material behavior that
+     * Remix needs. This deliberately inspects pipelines rather than render-layer
+     * names so mod-created layers using the standard pipelines behave correctly.
      *
      * <p>The block-breaking crack multiplies the surface under it, a blend Remix
      * has no material for. Its texels are either fully opaque grey or fully
@@ -176,20 +180,17 @@ final class RenderLayerUtils {
      * behaviour and it is classified as translucent.
      */
     static SurfaceMode surfaceMode(RenderLayer layer) {
-        if (!(layer instanceof RenderLayer.MultiPhase multiPhase)) {
-            return SurfaceMode.CUTOUT;
-        }
-
-        RenderLayer.MultiPhaseParameters phases = multiPhase.getPhases();
+        RenderPipeline pipeline = layer.getPipeline();
+        BlendFunction blend = pipeline.getBlendFunction().orElse(null);
         return classifySurfaceMode(
-                phases.program == RenderPhase.EYES_PROGRAM
-                        || phases.program == RenderPhase.ENTITY_TRANSLUCENT_EMISSIVE_PROGRAM,
-                phases.transparency == RenderPhase.ADDITIVE_TRANSPARENCY,
-                phases.transparency == RenderPhase.TRANSLUCENT_TRANSPARENCY
-                        || phases.transparency == RenderPhase.CRUMBLING_TRANSPARENCY,
-                phases.program == RenderPhase.ENTITY_SOLID_PROGRAM,
-                phases.program == RenderPhase.TEXT_PROGRAM
-                        || phases.program == RenderPhase.TEXT_INTENSITY_PROGRAM);
+                pipeline == RenderPipelines.ENTITY_EYES
+                        || pipeline == RenderPipelines.ENTITY_TRANSLUCENT_EMISSIVE,
+                BlendFunction.ADDITIVE.equals(blend),
+                BlendFunction.TRANSLUCENT.equals(blend)
+                        || pipeline == RenderPipelines.RENDERTYPE_CRUMBLING,
+                pipeline == RenderPipelines.ENTITY_SOLID,
+                pipeline == RenderPipelines.RENDERTYPE_TEXT
+                        || pipeline == RenderPipelines.RENDERTYPE_TEXT_INTENSITY);
     }
 
     /**

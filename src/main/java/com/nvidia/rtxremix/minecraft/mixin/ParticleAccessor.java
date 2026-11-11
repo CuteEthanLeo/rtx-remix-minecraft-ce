@@ -13,14 +13,14 @@ public interface ParticleAccessor {
     @Accessor("x") double getX();
     @Accessor("y") double getY();
     @Accessor("z") double getZ();
-    @Accessor("prevPosX") double getPrevPosX();
-    @Accessor("prevPosY") double getPrevPosY();
-    @Accessor("prevPosZ") double getPrevPosZ();
+    @Accessor("lastX") double getLastX();
+    @Accessor("lastY") double getLastY();
+    @Accessor("lastZ") double getLastZ();
     @Accessor("red") float getRed();
     @Accessor("green") float getGreen();
     @Accessor("blue") float getBlue();
     @Accessor("alpha") float getAlpha();
     @Accessor("angle") float getAngle();
-    @Accessor("prevAngle") float getPrevAngle();
+    @Accessor("lastAngle") float getLastAngle();
     @Accessor("dead") boolean getDead();
 }

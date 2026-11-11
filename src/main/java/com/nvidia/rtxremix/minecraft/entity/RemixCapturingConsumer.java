@@ -648,7 +648,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
      * {@code vertex(float, float, float)}, bypassing bone detection. This override instead:
      * <ol>
      *   <li>Pushes the {@code MatrixStack.Entry} as a bone via {@link #detectBoneChange}</li>
-     *   <li>Reads LOCAL (model-space) positions directly from {@link BakedQuad#getVertexData()}</li>
+     *   <li>Reads LOCAL (model-space) positions directly from {@link BakedQuad#vertexData()}</li>
      *   <li>Emits via {@link #acceptModelSpaceVertex}</li>
      * </ol>
      *
@@ -677,12 +677,12 @@ public class RemixCapturingConsumer implements VertexConsumer {
         // rather than per vertex below.
         int quadBoneIndex = detectBoneChange(matrixEntry.getPositionMatrix());
 
-        int[] vd = quad.getVertexData();
+        int[] vd = quad.vertexData();
         int boundsMin = 0;
         int boundsMax = 0;
-        if (quad.getSprite() != null) {
-            boundsMin = HardcodedVertex.packHalf2x16(quad.getSprite().getMinU(), quad.getSprite().getMinV());
-            boundsMax = HardcodedVertex.packHalf2x16(quad.getSprite().getMaxU(), quad.getSprite().getMaxV());
+        if (quad.sprite() != null) {
+            boundsMin = HardcodedVertex.packHalf2x16(quad.sprite().getMinU(), quad.sprite().getMinV());
+            boundsMax = HardcodedVertex.packHalf2x16(quad.sprite().getMaxU(), quad.sprite().getMaxV());
         }
 
         // Per-face normal: same for all 4 vertices on a BakedQuad (offset 7 of first vertex).
@@ -709,17 +709,17 @@ public class RemixCapturingConsumer implements VertexConsumer {
         for (int v = 0; v < 4; v++) {
             quadColors[v] = bakedQuadVertexColor(vd, v, brightnesses, red, green, blue, alpha, overlay, colorize);
         }
-        boolean cardFace = isFullCardFace(vd, quad.getFace());
+        boolean cardFace = isFullCardFace(vd, quad.face());
         int[] rects = cardFace
                 && EntityRenderContext.get().getBlockItemLayer() != BlockTextureManager.L_GLASS
-                ? cardFaceRects(quad.getSprite())
+                ? cardFaceRects(quad.sprite())
                 : null;
         if (rects != null) {
-            emitCardFaceRects(vd, rects, quad.getSprite().getContents(), quadColors,
+            emitCardFaceRects(vd, rects, quad.sprite().getContents(), quadColors,
                     fnx, fny, fnz, boundsMin, boundsMax, quadBoneIndex);
             return;
         }
-        if (quad instanceof BakedQuadStaticGeometryCache cache) {
+        if ((Object) quad instanceof BakedQuadStaticGeometryCache cache) {
             pendingBakedQuadStart = vertexCount;
             pendingBakedQuadCache = cache;
             pendingBakedQuadVertexData = vd;

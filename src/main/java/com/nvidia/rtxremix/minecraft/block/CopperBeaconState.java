@@ -41,8 +41,8 @@ final class CopperBeaconState {
     }
 
     static Angles readAngles(NbtCompound nbt) {
-        float azimuth = nbt.getFloat(AZIMUTH_KEY);
-        float zenith = nbt.getFloat(ZENITH_KEY);
+        float azimuth = nbt.getFloat(AZIMUTH_KEY, 0.0f);
+        float zenith = nbt.getFloat(ZENITH_KEY, 0.0f);
         return new Angles(
                 Float.isFinite(azimuth) ? normalizeAzimuth(azimuth) : 0.0f,
                 Float.isFinite(zenith) ? clampZenith(zenith) : 0.0f);

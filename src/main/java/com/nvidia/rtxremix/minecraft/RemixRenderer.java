@@ -918,7 +918,7 @@ public class RemixRenderer {
             }
 
             Camera camera = client.gameRenderer.getCamera();
-            float tickDelta = client.getRenderTickCounter().getTickDelta(true);
+            float tickDelta = client.getRenderTickCounter().getTickProgress(true);
             particleFuture = startParticleRenderTask(tickDelta, ProfileScope.currentFrameIndex());
 
             perfTimer.begin(perfCamera);

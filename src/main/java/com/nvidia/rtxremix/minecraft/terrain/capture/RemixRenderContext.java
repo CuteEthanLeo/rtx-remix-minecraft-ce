@@ -394,11 +394,11 @@ final class RemixRenderContext {
                                         @Nullable Direction cullFace) {
             this.cullFaceVal = cullFace;
             this.materialVal = material;
-            this.tintIndexVal = quad.getTintIndex();
-            this.bakedSprite = quad.getSprite();
-            this.nominalFaceVal = quad.getFace();
+            this.tintIndexVal = quad.tintIndex();
+            this.bakedSprite = quad.sprite();
+            this.nominalFaceVal = quad.face();
 
-            int[] vd = quad.getVertexData();
+            int[] vd = quad.vertexData();
             for (int v = 0; v < 4; v++) {
                 int off = v * 8;
                 pos(v, Float.intBitsToFloat(vd[off]),

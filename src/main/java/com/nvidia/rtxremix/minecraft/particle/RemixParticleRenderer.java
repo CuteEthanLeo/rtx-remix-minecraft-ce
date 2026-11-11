@@ -385,11 +385,11 @@ public class RemixParticleRenderer {
                                           float tickDelta, ParticleBillboardBasis basis,
                                           float u0, float v0, float u1, float v1, int color,
                                           int boundsMin, int boundsMax) {
-        double px = MathHelper.lerp(tickDelta, pa.getPrevPosX(), pa.getX());
-        double py = MathHelper.lerp(tickDelta, pa.getPrevPosY(), pa.getY());
-        double pz = MathHelper.lerp(tickDelta, pa.getPrevPosZ(), pa.getZ());
+        double px = MathHelper.lerp(tickDelta, pa.getLastX(), pa.getX());
+        double py = MathHelper.lerp(tickDelta, pa.getLastY(), pa.getY());
+        double pz = MathHelper.lerp(tickDelta, pa.getLastZ(), pa.getZ());
 
-        float angle = MathHelper.lerp(tickDelta, pa.getPrevAngle(), pa.getAngle());
+        float angle = MathHelper.lerp(tickDelta, pa.getLastAngle(), pa.getAngle());
         float scale = ba.getScale();
         float cosA = MathHelper.cos(angle);
         float sinA = MathHelper.sin(angle);

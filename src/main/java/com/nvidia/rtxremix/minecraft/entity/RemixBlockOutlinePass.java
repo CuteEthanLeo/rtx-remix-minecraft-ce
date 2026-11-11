@@ -130,7 +130,7 @@ public final class RemixBlockOutlinePass implements AutoCloseable {
             return;
         }
 
-        float tickDelta = context.tickCounter().getTickDelta(true);
+        float tickDelta = context.tickCounter().getTickProgress(true);
         double fovDegrees = context.gameRenderer().getFov(context.camera(), tickDelta, true);
         fovDegrees = Math.max(MIN_FOV_DEGREES, Math.min(MAX_FOV_DEGREES, fovDegrees));
         double tanHalfFov = Math.tan(Math.toRadians(fovDegrees) * 0.5);

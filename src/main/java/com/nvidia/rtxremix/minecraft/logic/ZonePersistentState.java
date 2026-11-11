@@ -6,11 +6,11 @@ package com.nvidia.rtxremix.minecraft.logic;
 
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtInt;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.PersistentState;
+import net.minecraft.world.PersistentStateType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,9 +44,11 @@ public final class ZonePersistentState extends PersistentState {
     private static final String SPHERE_SHAPE = "sphere";
     private static final String BOX_SHAPE = "box";
 
-    private static final PersistentState.Type<ZonePersistentState> TYPE =
-            new PersistentState.Type<>(ZonePersistentState::new,
-                    ZonePersistentState::fromNbt,
+    static final PersistentStateType<ZonePersistentState> TYPE =
+            new PersistentStateType<>(DATA_ID, ZonePersistentState::new,
+                    NbtCompound.CODEC.xmap(
+                            ZonePersistentState::fromNbt,
+                            state -> state.writeNbt(new NbtCompound())),
                     DataFixTypes.SAVED_DATA_COMMAND_STORAGE);
 
     private final Map<String, ZoneDefinition> zonesByName = new HashMap<>();
@@ -70,7 +72,7 @@ public final class ZonePersistentState extends PersistentState {
      * object it does not need.</p>
      */
     public static ZonePersistentState getOrCreate(MinecraftServer server) {
-        return server.getOverworld().getPersistentStateManager().getOrCreate(TYPE, DATA_ID);
+        return server.getOverworld().getPersistentStateManager().getOrCreate(TYPE);
     }
 
     /**
@@ -85,7 +87,7 @@ public final class ZonePersistentState extends PersistentState {
      * depends on that behavior staying as it is.</p>
      */
     public static ZonePersistentState getIfPresent(MinecraftServer server) {
-        return server.getOverworld().getPersistentStateManager().get(TYPE, DATA_ID);
+        return server.getOverworld().getPersistentStateManager().get(TYPE);
     }
 
     /** Immutable, name-sorted copy safe to publish to the client/render registry. */
@@ -118,8 +120,7 @@ public final class ZonePersistentState extends PersistentState {
         return true;
     }
 
-    @Override
-    public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+    NbtCompound writeNbt(NbtCompound nbt) {
         nbt.putInt(VERSION_KEY, SCHEMA_VERSION);
         NbtList zones = new NbtList();
         for (ZoneDefinition zone : snapshot()) {
@@ -129,26 +130,25 @@ public final class ZonePersistentState extends PersistentState {
         return nbt;
     }
 
-    static ZonePersistentState fromNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
-        if (!nbt.contains(VERSION_KEY, NbtElement.INT_TYPE)) {
+    static ZonePersistentState fromNbt(NbtCompound nbt) {
+        if (!(nbt.get(VERSION_KEY) instanceof NbtInt versionTag)) {
             LOGGER.warn("Ignoring RTX Remix zone state without a schema version");
             return new ZonePersistentState(false);
         }
-        int version = nbt.getInt(VERSION_KEY);
+        int version = versionTag.intValue();
         if (version != SCHEMA_VERSION) {
             LOGGER.warn("Ignoring RTX Remix zone state schema version {} (expected {})",
                     version, SCHEMA_VERSION);
             return new ZonePersistentState(false);
         }
         ZonePersistentState state = new ZonePersistentState();
-        if (!nbt.contains(ZONES_KEY, NbtElement.LIST_TYPE)) {
+        if (!(nbt.get(ZONES_KEY) instanceof NbtList zones)) {
             return state;
         }
 
-        NbtList zones = nbt.getList(ZONES_KEY, NbtElement.COMPOUND_TYPE);
         for (int i = 0; i < zones.size(); i++) {
             try {
-                ZoneDefinition zone = readZone(zones.getCompound(i));
+                ZoneDefinition zone = readZone(zones.getCompoundOrEmpty(i));
                 ZoneDefinition previous = state.zonesByName.put(zone.name(), zone);
                 if (previous != null) {
                     LOGGER.warn("Duplicate saved RTX Remix zone '{}'; using the last definition", zone.name());
@@ -215,16 +215,12 @@ public final class ZonePersistentState extends PersistentState {
     }
 
     private static String requireString(NbtCompound nbt, String key) {
-        if (!nbt.contains(key, NbtElement.STRING_TYPE)) {
-            throw new IllegalArgumentException("missing string '" + key + "'");
-        }
-        return nbt.getString(key);
+        return nbt.getString(key).orElseThrow(
+                () -> new IllegalArgumentException("missing string '" + key + "'"));
     }
 
     private static double requireDouble(NbtCompound nbt, String key) {
-        if (!nbt.contains(key, NbtElement.NUMBER_TYPE)) {
-            throw new IllegalArgumentException("missing number '" + key + "'");
-        }
-        return nbt.getDouble(key);
+        return nbt.getDouble(key).orElseThrow(
+                () -> new IllegalArgumentException("missing number '" + key + "'"));
     }
 }

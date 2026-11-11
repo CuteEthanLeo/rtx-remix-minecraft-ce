@@ -117,7 +117,7 @@ public abstract class ChunkRenderingDataPreparerMixin {
         return RtxRemixMod.isRtxEnabled() ? rtxremix$visibilityExecutor : vanilla;
     }
 
-    @Inject(method = "method_52835", at = @At("HEAD"))
+    @Inject(method = "updateNow", at = @At("HEAD"))
     private void rtxremix$graphHead(
             boolean cullChunks,
             Frustum frustum,
@@ -128,7 +128,7 @@ public abstract class ChunkRenderingDataPreparerMixin {
         rtxremix$open(rtxremix$graphScope, "ChunkVisibility.rebuildGraph", rtxremix$sizeOf(builtChunks));
     }
 
-    @Inject(method = "method_52835", at = @At("RETURN"))
+    @Inject(method = "updateNow", at = @At("RETURN"))
     private void rtxremix$graphReturn(
             boolean cullChunks,
             Frustum frustum,
@@ -139,17 +139,17 @@ public abstract class ChunkRenderingDataPreparerMixin {
         rtxremix$close(rtxremix$graphScope);
     }
 
-    @Inject(method = "method_52821", at = @At("HEAD"))
+    @Inject(method = "scheduleLater", at = @At("HEAD"))
     private void rtxremix$seedHead(Camera camera, Queue<?> queue, CallbackInfo ci) {
         rtxremix$open(rtxremix$seedScope, "ChunkVisibility.seedQueue", rtxremix$sizeOf(queue));
     }
 
-    @Inject(method = "method_52821", at = @At("RETURN"))
+    @Inject(method = "scheduleLater", at = @At("RETURN"))
     private void rtxremix$seedReturn(Camera camera, Queue<?> queue, CallbackInfo ci) {
         rtxremix$close(rtxremix$seedScope);
     }
 
-    @Inject(method = "method_52825", at = @At("HEAD"))
+    @Inject(method = "update", at = @At("HEAD"))
     private void rtxremix$walkHead(
             ChunkRenderingDataPreparer.RenderableChunks renderableChunks,
             Vec3d cameraPos,
@@ -161,7 +161,7 @@ public abstract class ChunkRenderingDataPreparerMixin {
         rtxremix$open(rtxremix$walkScope, "ChunkVisibility.walkVisibleGraph", rtxremix$sizeOf(queue));
     }
 
-    @Inject(method = "method_52825", at = @At("RETURN"))
+    @Inject(method = "update", at = @At("RETURN"))
     private void rtxremix$walkReturn(
             ChunkRenderingDataPreparer.RenderableChunks renderableChunks,
             Vec3d cameraPos,

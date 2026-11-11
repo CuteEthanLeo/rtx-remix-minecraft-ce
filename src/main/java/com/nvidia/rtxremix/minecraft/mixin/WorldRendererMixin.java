@@ -42,7 +42,7 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexFormatElement;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.render.chunk.ChunkBuilder;
 import net.minecraft.client.render.chunk.ChunkRendererRegionBuilder;
@@ -525,15 +525,13 @@ public abstract class WorldRendererMixin
             method = "method_62205",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/render/CloudRenderer;renderClouds(ILnet/minecraft/client/option/CloudRenderMode;FLorg/joml/Matrix4f;Lorg/joml/Matrix4f;Lnet/minecraft/util/math/Vec3d;F)V"
+                    target = "Lnet/minecraft/client/render/CloudRenderer;renderClouds(ILnet/minecraft/client/option/CloudRenderMode;FLnet/minecraft/util/math/Vec3d;F)V"
             ))
     private void rtxremix$skipVanillaCloudDraw(
             net.minecraft.client.render.CloudRenderer cloudRenderer,
             int color,
             net.minecraft.client.option.CloudRenderMode renderMode,
             float cloudHeight,
-            Matrix4f positionMatrix,
-            Matrix4f projectionMatrix,
             net.minecraft.util.math.Vec3d cameraPos,
             float ticks,
             Operation<Void> original) {
@@ -544,7 +542,7 @@ public abstract class WorldRendererMixin
                         .shouldSuppressVanillaClouds()) {
             return;
         }
-        original.call(cloudRenderer, color, renderMode, cloudHeight, positionMatrix, projectionMatrix, cameraPos, ticks);
+        original.call(cloudRenderer, color, renderMode, cloudHeight, cameraPos, ticks);
     }
 
     // Weather capture moved to WeatherRenderingMixin with the draw (1.21.2).

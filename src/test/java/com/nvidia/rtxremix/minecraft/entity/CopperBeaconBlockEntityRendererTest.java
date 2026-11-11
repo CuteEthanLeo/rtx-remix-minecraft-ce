@@ -10,6 +10,7 @@ import com.nvidia.rtxremix.minecraft.block.CopperBeaconPose;
 import net.minecraft.client.model.ModelPart;
 import net.minecraft.client.render.model.ModelRotation;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.AxisRotation;
 import net.minecraft.util.math.Direction;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -92,15 +93,15 @@ class CopperBeaconBlockEntityRendererTest {
                         CopperBeaconBlockEntityRenderer.applyArticulation(yoke, head, lens, pose);
 
                         matrices.push();
-                        yoke.rotate(matrices);
-                        head.rotate(matrices);
+                        yoke.applyTransform(matrices);
+                        head.applyTransform(matrices);
                         matrices.peek().getPositionMatrix()
                                 .transformDirection(headDirection.set(0.0f, 0.0f, -1.0f))
                                 .normalize();
                         matrices.pop();
 
                         matrices.push();
-                        lens.rotate(matrices);
+                        lens.applyTransform(matrices);
                         matrices.peek().getPositionMatrix()
                                 .transformDirection(lensDirection.set(0.0f, 0.0f, -1.0f))
                                 .normalize();
@@ -290,7 +291,7 @@ class CopperBeaconBlockEntityRendererTest {
                     readBaseModelDirection(variant.get("model").getAsString());
             directions.put(
                     mount,
-                    ModelRotation.get(x, y)
+                    ModelRotation.rotate(AxisRotation.fromDegrees(x), AxisRotation.fromDegrees(y))
                             .getDirectionTransformation()
                             .map(unrotatedDirection));
         }

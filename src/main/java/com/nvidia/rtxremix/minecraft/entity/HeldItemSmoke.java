@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.entity;
 
-import net.minecraft.item.ModelTransformationMode;
+import net.minecraft.item.ItemDisplayContext;
 import org.joml.Matrix4f;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
@@ -93,7 +93,7 @@ final class HeldItemSmoke {
      * Whether smoke is drawn for a hand mode. Only first person has a switch;
      * everyone else's torches always smoke, as placed ones do.
      */
-    static boolean showsFor(ModelTransformationMode mode, boolean firstPersonSmokeEnabled) {
+    static boolean showsFor(ItemDisplayContext mode, boolean firstPersonSmokeEnabled) {
         return !mode.isFirstPerson() || firstPersonSmokeEnabled;
     }
 

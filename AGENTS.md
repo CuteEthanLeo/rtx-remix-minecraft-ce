@@ -166,9 +166,9 @@ Each policy has a `rtxremix.*` kill switch listed in `docs/TUNING.md`.
 
 **Allocation.** The collector's concurrent work is what stretches frames at
 high render distance, so the hot vanilla paths that run per section or per
-frame are ported allocation-free and kept that way: block model variant and
-part selection (`WeightedBakedModelMixin`, `MultipartBakedModelMixin`) and
-biome colour blending. The 1.21.1 allocation-free visibility walk
+frame are ported allocation-free and kept that way: biome colour blending.
+Since 1.21.5 vanilla's weighted and multipart block state models pick their
+parts without per-face lists, so the mod no longer replaces that selection. The 1.21.1 allocation-free visibility walk
 (`terrain/visibility/`) is not ported to 1.21.2's octree walk yet, and 1.21.2
 already reuses the integrated server's per-tick chunk list. Retained section meshes live
 in C-allocated direct buffers outside the JDK's direct-memory budget

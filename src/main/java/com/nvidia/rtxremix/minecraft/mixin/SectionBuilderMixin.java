@@ -42,7 +42,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *   <li>{@code isOpaqueFullCube} redirect: captures opacity bitmap,
  *       face masks, and light entries for every block, and emits the
  *       block's model quads directly to the Remix interleaved buffer.</li>
- *   <li>{@code getRenderType} redirect: reports every block invisible while
+ *   <li>{@code getRenderType} wrap: reports every block invisible while
  *       capturing, so vanilla skips its layer buffers, matrix stack, and
  *       {@code renderBlock} for geometry that is never drawn.</li>
  *   <li>{@code renderFluid} redirect: emits fluid quads directly,
@@ -140,13 +140,15 @@ public class SectionBuilderMixin {
     // While capturing, the block's quads were already emitted above, so vanilla's raster
     // path for it (layer buffer, matrix stack, renderBlock) is dead work. Reporting the
     // block invisible makes vanilla skip all of it.
-    @Redirect(method = "build",
-              at = @At(value = "INVOKE",
-                       target = "Lnet/minecraft/block/BlockState;getRenderType()Lnet/minecraft/block/BlockRenderType;"))
-    private BlockRenderType rtxremix$renderTypeForVanilla(BlockState state) {
-        return rtxremix$capturing()
-                ? BlockRenderType.INVISIBLE
-                : BlockQuadEmitter.getRenderTypeCached(state);
+    //
+    // Wrapped rather than redirected: since 1.21.5 Fabric's Indigo renderer redirects this
+    // same call to buffer the model itself, and two redirects of one call cannot both
+    // apply. The wrap leaves Indigo's hook in place for builds that are not captured.
+    @WrapOperation(method = "build",
+                   at = @At(value = "INVOKE",
+                            target = "Lnet/minecraft/block/BlockState;getRenderType()Lnet/minecraft/block/BlockRenderType;"))
+    private BlockRenderType rtxremix$renderTypeForVanilla(BlockState state, Operation<BlockRenderType> original) {
+        return rtxremix$capturing() ? BlockRenderType.INVISIBLE : original.call(state);
     }
 
     // renderFluid: emit fluid quads for Remix, skip GL

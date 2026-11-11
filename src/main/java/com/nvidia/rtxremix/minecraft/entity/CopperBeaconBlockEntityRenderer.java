@@ -27,6 +27,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Quaternionf;
 
 /** Renders the independently rotating yoke and lamp head above the static mount. */
@@ -74,7 +75,7 @@ public final class CopperBeaconBlockEntityRenderer
                         .uv(0, 0).cuboid(0.0f, -6.0f, -1.0f, 3.0f, 2.0f, 3.0f)
                         .uv(0, 0).cuboid(-5.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f)
                         .uv(0, 0).cuboid(3.0f, -5.0f, -1.0f, 2.0f, 8.0f, 3.0f),
-                ModelTransform.pivot(8.0f, 10.0f, 8.0f));
+                ModelTransform.origin(8.0f, 10.0f, 8.0f));
         yokeData.addChild(
                 "head",
                 ModelPartBuilder.create()
@@ -107,7 +108,7 @@ public final class CopperBeaconBlockEntityRenderer
                 "lens",
                 ModelPartBuilder.create()
                         .uv(0, 0).cuboid(-3.0f, -3.0f, -4.01f, 6.0f, 6.0f, 0.0f),
-                ModelTransform.pivot(8.0f, 10.0f, 8.0f));
+                ModelTransform.origin(8.0f, 10.0f, 8.0f));
         return TexturedModelData.of(modelData, 6, 6);
     }
 
@@ -118,7 +119,8 @@ public final class CopperBeaconBlockEntityRenderer
             MatrixStack matrices,
             VertexConsumerProvider vertexConsumers,
             int light,
-            int overlay) {
+            int overlay,
+            Vec3d cameraPos) {
         BlockState state = beacon.getCachedState();
         Direction up = state.get(CopperBeaconBlock.MOUNT);
         Direction forward = state.get(Properties.FACING);

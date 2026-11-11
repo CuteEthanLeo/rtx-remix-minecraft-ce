@@ -6,10 +6,12 @@ package com.nvidia.rtxremix.minecraft.logic;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtSizeTracker;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.world.PersistentState;
+import net.minecraft.world.PersistentStateManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -84,15 +86,15 @@ class ZonePersistentStateTest {
                 "rtx zone define valid --center 1 2 3 --inner 4 --outer 8", 0, 0, 0);
         ZonePersistentState source = new ZonePersistentState();
         source.put(valid);
-        NbtCompound nbt = source.writeNbt(new NbtCompound(), null);
+        NbtCompound nbt = source.writeNbt(new NbtCompound());
 
         NbtCompound malformed = new NbtCompound();
         malformed.putString("name", "broken");
         malformed.putString("channel", "mc.zone.broken");
         malformed.putString("shape", "sphere");
-        nbt.getList("zones", NbtElement.COMPOUND_TYPE).add(malformed);
+        nbt.getListOrEmpty("zones").add(malformed);
 
-        ZonePersistentState loaded = ZonePersistentState.fromNbt(nbt, null);
+        ZonePersistentState loaded = ZonePersistentState.fromNbt(nbt);
 
         assertEquals(1, loaded.snapshot().size());
         assertEquals(valid, loaded.snapshot().iterator().next());
@@ -104,7 +106,7 @@ class ZonePersistentStateTest {
         nbt.putInt("version", 999);
         nbt.put("zones", new NbtList());
 
-        ZonePersistentState loaded = ZonePersistentState.fromNbt(nbt, null);
+        ZonePersistentState loaded = ZonePersistentState.fromNbt(nbt);
 
         assertTrue(loaded.snapshot().isEmpty());
         assertFalse(loaded.isDirty());
@@ -130,7 +132,7 @@ class ZonePersistentStateTest {
         root.putInt("version", 1);
         root.put("zones", zones);
 
-        ZoneDefinition restored = ZonePersistentState.fromNbt(root, null).snapshot().iterator().next();
+        ZoneDefinition restored = ZonePersistentState.fromNbt(root).snapshot().iterator().next();
 
         assertEquals(second, restored);
         assertEquals(1.0f, restored.weight(100, 0, 0), 1e-6f);
@@ -159,27 +161,32 @@ class ZonePersistentStateTest {
         Path file = tempDir.resolve("rtx_remix_zones.dat");
 
         ensureGameVersionForPersistentStateSave();
-        NbtIo.writeCompressed(state.toNbt(null), file);
+        // Saving goes through a state manager and the state's registered type; the save
+        // reads neither the world nor the data fixer.
+        PersistentStateManager manager = new PersistentStateManager(
+                new PersistentState.Context(null, 0L), tempDir, null, DynamicRegistryManager.EMPTY);
+        manager.set(ZonePersistentState.TYPE, state);
+        manager.save();
 
         assertFalse(state.isDirty());
         NbtCompound root = NbtIo.readCompressed(file, NbtSizeTracker.ofUnlimitedBytes());
-        ZonePersistentState loaded = ZonePersistentState.fromNbt(root.getCompound("data"), null);
+        ZonePersistentState loaded = ZonePersistentState.fromNbt(root.getCompound("data").orElseThrow());
         assertEquals(List.of(zone), new ArrayList<>(loaded.snapshot()));
     }
 
     private static ZonePersistentState roundTrip(ZoneDefinition zone) {
         ZonePersistentState state = new ZonePersistentState();
         state.put(zone);
-        NbtCompound nbt = state.writeNbt(new NbtCompound(), null);
-        return ZonePersistentState.fromNbt(nbt, null);
+        NbtCompound nbt = state.writeNbt(new NbtCompound());
+        return ZonePersistentState.fromNbt(nbt);
     }
 
     private static NbtCompound writeOne(ZoneDefinition zone) {
         ZonePersistentState state = new ZonePersistentState();
         state.put(zone);
-        return state.writeNbt(new NbtCompound(), null)
-                .getList("zones", NbtElement.COMPOUND_TYPE)
-                .getCompound(0)
+        return state.writeNbt(new NbtCompound())
+                .getListOrEmpty("zones")
+                .getCompoundOrEmpty(0)
                 .copy();
     }
 

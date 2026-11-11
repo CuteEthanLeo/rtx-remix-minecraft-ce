@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.capture;
 
-import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
+import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 
@@ -24,7 +24,7 @@ public final class MeshQuadOutput implements Consumer<QuadView> {
      * @param mesh mesh to read on the calling thread
      * @param emitter destination whose {@link QuadEmitter#emit()} resets its quad state
      */
-    public static void output(Mesh mesh, QuadEmitter emitter) {
+    public static void output(MeshView mesh, QuadEmitter emitter) {
         MeshQuadOutput output = LOCAL.get();
         QuadEmitter previous = output.emitter;
         output.emitter = emitter;

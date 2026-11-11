@@ -26,9 +26,9 @@ import java.util.List;
 /**
  * Routes vanilla model-part rendering through the capture's allocation-free paths.
  *
- * <p>{@code rotate} on a {@link RecyclingMatrixStack} applies the part transform through
- * the stack's pooled quaternion. The math is vanilla's, read from the same pivot,
- * rotation and scale fields, so a renderer that sets a pivot directly, as the banner
+ * <p>{@code applyTransform} on a {@link RecyclingMatrixStack} applies the part transform through
+ * the stack's pooled quaternion. The math is vanilla's, read from the same origin,
+ * rotation and scale fields, so a renderer that sets an origin directly, as the banner
  * does for its flag, is honoured. The entity pass and the block-entity pass both
  * render on such a stack.
  *
@@ -42,9 +42,9 @@ import java.util.List;
 @Mixin(ModelPart.class)
 public abstract class ModelPartMixin {
 
-    @Shadow public float pivotX;
-    @Shadow public float pivotY;
-    @Shadow public float pivotZ;
+    @Shadow public float originX;
+    @Shadow public float originY;
+    @Shadow public float originZ;
     @Shadow public float pitch;
     @Shadow public float yaw;
     @Shadow public float roll;
@@ -53,7 +53,7 @@ public abstract class ModelPartMixin {
     @Shadow public float zScale;
 
     @Inject(
-            method = "rotate(Lnet/minecraft/client/util/math/MatrixStack;)V",
+            method = "applyTransform(Lnet/minecraft/client/util/math/MatrixStack;)V",
             at = @At("HEAD"),
             cancellable = true)
     private void rtxremix$applyPooledRotation(MatrixStack matrices, CallbackInfo ci) {
@@ -62,7 +62,7 @@ public abstract class ModelPartMixin {
         }
 
         recyclingMatrices.applyModelPartTransform(
-                pivotX, pivotY, pivotZ,
+                originX, originY, originZ,
                 pitch, yaw, roll,
                 xScale, yScale, zScale);
         ci.cancel();

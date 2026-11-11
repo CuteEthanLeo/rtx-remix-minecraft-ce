@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Tells the capture which item a render state is drawing: the terrain layer of a block
- * item, and the stack itself for the lit element {@code ItemRendererMixin} adds.
+ * item, and the stack itself for the lit element {@code ItemLayerRenderStateMixin} adds.
  *
  * <p>Minecraft routes ordinary opaque items through its translucent item layer,
  * and clear glass through its cutout one, so the render layer alone cannot tell

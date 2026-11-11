@@ -9,8 +9,6 @@ import com.nvidia.rtxremix.minecraft.terrain.SkyLightSurfaceAccess;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.ChunkData;
 import net.minecraft.world.Heightmap;
@@ -18,6 +16,7 @@ import net.minecraft.world.chunk.WorldChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -35,9 +34,9 @@ public abstract class WorldChunkMixin {
             WorldChunk self,
             Operation<Void> original,
             PacketByteBuf buf,
-            NbtCompound nbt,
+            Map<Heightmap.Type, long[]> heightmaps,
             Consumer<ChunkData.BlockEntityVisitor> consumer) {
-        boolean worldSurfaceInPacket = nbt.contains(Heightmap.Type.WORLD_SURFACE.getName(), NbtElement.LONG_ARRAY_TYPE);
+        boolean worldSurfaceInPacket = heightmaps.containsKey(Heightmap.Type.WORLD_SURFACE);
         if (!SkyLightSurfaceScanPolicy.seedFromHeightmap(SkyLightSurfaceScanPolicy.SEED_ALLOWED, worldSurfaceInPacket)) {
             if (SkyLightSurfaceScanPolicy.SEED_ALLOWED) {
                 SkyLightSurfaceScanPolicy.noteMissingHeightmap();

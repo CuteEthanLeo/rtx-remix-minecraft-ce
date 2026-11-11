@@ -6,6 +6,7 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.nvidia.rtxremix.minecraft.texture.GlyphPageMirror;
 import net.minecraft.client.font.GlyphAtlasTexture;
 import net.minecraft.client.font.RenderableGlyph;
@@ -18,11 +19,12 @@ import org.spongepowered.asm.mixin.injection.At;
  * Gives every glyph atlas page a {@link GlyphPageMirror} and brackets each glyph upload
  * so the upload mixins know which page the pixels are for.
  *
- * <p>{@code getGlyphRenderer} is the one place a page is written: it binds the texture
- * and calls the glyph's {@code upload} with the slot it found. The glyph implementations
- * reach GL through two different primitives, {@code NativeImage.uploadInternal} for
- * bitmap, TrueType and built-in glyphs and {@code GlStateManager._upload} for Unihex,
- * which is why the scope is opened here and the pixels are read where they are uploaded.
+ * <p>{@code bake} is the one place a page is written: it calls the glyph's
+ * {@code upload} with the slot it found and the page's texture. The glyph implementations
+ * reach the command encoder through two different overloads, one taking a
+ * {@code NativeImage} for bitmap, TrueType and built-in glyphs and one taking an
+ * {@code IntBuffer} for Unihex, which is why the scope is opened here and the pixels are
+ * read where they are uploaded.
  */
 @Mixin(GlyphAtlasTexture.class)
 public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
@@ -43,12 +45,13 @@ public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {
 
     @WrapOperation(
         method = "bake",
-        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/RenderableGlyph;upload(II)V")
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/client/font/RenderableGlyph;upload(IILcom/mojang/blaze3d/textures/GpuTexture;)V")
     )
-    private void rtxremix$mirrorGlyphUpload(RenderableGlyph glyph, int x, int y, Operation<Void> original) {
+    private void rtxremix$mirrorGlyphUpload(RenderableGlyph glyph, int x, int y, GpuTexture texture,
+                                            Operation<Void> original) {
         GlyphPageMirror.beginUpload(rtxremix$glyphPageMirror());
         try {
-            original.call(glyph, x, y);
+            original.call(glyph, x, y, texture);
         } finally {
             GlyphPageMirror.endUpload();
         }

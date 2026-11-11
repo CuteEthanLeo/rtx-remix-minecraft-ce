@@ -56,6 +56,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.slf4j.Logger;
@@ -676,11 +677,11 @@ public class LightManager {
 
         AffineTransformation transform =
                 renderState.transformation().interpolate(display.getLerpProgress(tickDelta));
-        Matrix4f matrix = transform.getMatrix();
+        Matrix4fc matrix = transform.getMatrix();
 
         // Matches DisplayEntityRenderer.getBillboardRotation for BillboardMode.FIXED.
-        float yaw = MathHelper.lerpAngleDegrees(tickDelta, display.prevYaw, display.getYaw());
-        float pitch = MathHelper.lerp(tickDelta, display.prevPitch, display.getPitch());
+        float yaw = MathHelper.lerpAngleDegrees(tickDelta, display.lastYaw, display.getYaw());
+        float pitch = MathHelper.lerp(tickDelta, display.lastPitch, display.getPitch());
         Quaternionf billboard = scratchBillboard.rotationYXZ(
                 -MathHelper.RADIANS_PER_DEGREE * yaw,
                 MathHelper.RADIANS_PER_DEGREE * pitch,

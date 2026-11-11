@@ -14,8 +14,8 @@ import java.nio.ByteBuffer;
  * moment the upload returns, so the GL texture is the only complete copy of the page.
  * Remix needs the pixels to build a material for text quads, so this mirror follows
  * every glyph upload. {@code GlyphAtlasTextureMixin} opens an upload scope around the
- * glyph's {@code upload} call, and the upload mixins on {@code NativeImage} and
- * {@code GlStateManager} write the same rectangle here that they hand to GL.
+ * glyph's {@code upload} call, and {@code GlResourceManagerUploadMixin} writes the same
+ * rectangle here that the command encoder hands to GL.
  *
  * <p>The mirror stores what the text shaders read, not what was uploaded. A colour page
  * is an RGBA8 texture and keeps the uploaded channels as {@code glTexSubImage2D}
@@ -23,9 +23,9 @@ import java.nio.ByteBuffer;
  * page is an R8 texture that {@code rendertype_text_intensity} samples as {@code .rrrr},
  * so red is spread across all four channels here.
  *
- * <p>Glyph uploads run only on the render thread ({@code NativeImage.uploadInternal}
- * asserts it) and every reader of {@link #data()} runs there too, so the page and the
- * upload scope carry no synchronisation.
+ * <p>Glyph uploads run only on the render thread, which owns the GL context, and
+ * every reader of {@link #data()} runs there too, so the page and the upload scope
+ * carry no synchronisation.
  */
 public final class GlyphPageMirror {
 

@@ -52,13 +52,27 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - **第三人称玩家影子**：静态审查没有找到压掉影子的代码，需要在游戏里按复现步骤确认（见下方「验证」）后再修。
 - 雨滴落在**水面**（湖、河）上的环形涟漪：仍用「雨中加快、加细的双层波浪」近似。露天地面上的积水坑和雨滴涟漪已经加入（见上表「积水坑」「雨滴涟漪」）。
 
-### Minecraft 1.21.4 分支（`mc/1.21.4`）移植状态
+### Minecraft 1.21.5 分支（`mc/1.21.5`）移植状态
 
-这个分支在 `mc/1.21.3`（即 1.21.2 的移植）的基础上前移到 1.21.4，没有停用任何功能。1.21.4 重做了物品渲染（物品模型定义和 `ItemRenderState`），所以手持物品的图层分类和手持火焰改挂在 `ItemModelManager` / `ItemRenderState` 上；雨雪改从 `VertexConsumerProvider` 捕获；星星改为逐顶点抄录；玩家皮肤改由注册时带图像的 `NativeImageBackedTexture` 进入贴图缓存；Fabric 渲染 API 去掉了 `RenderContext`，第三方模型改经 `QuadEmitter` 捕获。手持火焰对由多个烘焙层组成的物品只在第一层发一次。下面是 1.21.2 移植时的说明，同样适用。它从 1.21.1 移植到 1.21.2，**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。和 1.21.1 相比：
+这个分支在 `mc/1.21.4` 的基础上前移到 1.21.5，没有停用任何功能。**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。1.21.5 把原版的 GL 层换成了 `RenderPipeline` / `GpuDevice` / `RenderPass`，方块模型换成了 `BlockStateModel` / `BlockModelPart`，NBT 读取改为带默认值的形式。和 1.21.4 相比：
+
+- 雨雪叠加（含雨的折射着色器）改成两条 `RenderPipeline`，经 `RenderPass` 画到主帧缓冲；不再手工保存和恢复 GL 混合、深度、剔除状态，由渲染通道自己设置。Remix 的最终颜色图通过 `ExternalGlTexture` 包装后作为采样器传入。`rain_refraction.json` 着色器定义文件删除。
+- 字形页镜像和动画精灵上传转发改挂在命令编码器的 `writeToTexture`（`GlResourceManagerUploadMixin`）和带 `GpuTexture` 参数的 `SpriteContents.upload` 上。
+- Remix 画面叠加到主帧缓冲改为直接状态访问的帧缓冲拷贝（`TextureOverlay`），不再画全屏四边形。
+- 实体图层的材质分类（不透明、镂空、半透明、自发光、信标光柱、穿透文字）改从图层的 `RenderPipeline` 读取，而不是 `RenderPhase` 的着色器和透明度阶段。
+- 方块模型：原版的三种 `BlockStateModel`（简单、加权、多部件）且选出的部件都是烘焙四边形时走原版路径，其余（模组自己的模型或 Fabric 网格部件）走 Fabric 的 `emitQuads`。每个方块只取一次随机种子，和 1.21.5 原版的区块构建一致。
+- 加权和多部件模型的零分配选择 mixin 删除：1.21.5 原版不再为每个面建列表。
+- 动态顶点缓冲复用策略（`DynamicBufferUpload`、`VertexBufferMixin`）删除：1.21.5 原版每种顶点格式保留一块即时缓冲并原地改写。空区块缓冲的跳过（`BuiltChunkBuffersMixin`）删除：1.21.5 原版在上传时才按需创建区块缓冲。
+- 矩阵栈条目池删除：1.21.5 原版的 `MatrixStack` 自己复用条目，`RecyclingMatrixStack` 只保留模型部件变换用的四元数。
+- 手持火焰改挂在 `ItemRenderState.LayerRenderState.render` 上，显示缩放取自图层的变换；由多个烘焙层组成的物品仍只在第一层发一次。
+- 星星顶点改在 `SkyRendering.createStars` 里逐顶点抄录。
+- 铜信标被替换时掉落染料改由原版的 `BlockEntity.onBlockReplaced` 处理（1.21.5 取消了带新状态参数的 `onStateReplaced`）。
+- 天空光表面扫描的种子判断改读区块包里的高度图表（1.21.5 的区块包不再用 NBT 携带高度图）。
+
+下面是 1.21.2 移植时的说明，同样适用。和 1.21.1 相比：
 
 - 区块可见性遍历的零分配移植和增量传播的每帧预算没有移植，改走原版遍历；1.21.1 的粗粒度视锥索引由 1.21.2 原版自带的八叉树取代；区块存储环形重定位改走原版（1.21.2 原版已经只重定位变化的槽位）。`rtxremix.vanillaVisibilityWalk`、`rtxremix.logVisibleSet` 在这个分支不存在。
 - 集成服务器每 tick 区块列表复用、deadmau5 耳朵的名字缓存：1.21.2 原版已经不再分配，相应 mixin 删除。
-- 动态顶点缓冲照旧复用同一块显存；索引缓冲走原版（1.21.2 每次上传换新的缓冲对象）。
 - 第三人称手持物品的持有者改从实体渲染分发器当前渲染的实体取得（1.21.2 的手持图层只拿得到渲染状态）。
 - 雨雪捕获、星空顶点、云和粒子的原版绘制跳过、区块加载的邻居重建过滤都已改到 1.21.2 的新位置（`WeatherRendering`、`SkyRendering`、渲染通道 lambda、`ClientPlayNetworkHandler.scheduleRenderChunk`）。
 - 性能统计中的方块实体数显示 -1（1.21.2 原版不再统计）。
@@ -203,13 +217,19 @@ Known gaps: the third-person player shadow still needs an in-game reproduction b
 water (lakes, rivers) are still approximated by faster, finer wave layers (puddles and ripples on open ground are
 implemented, see above).
 
-The `mc/1.21.4` branch moves the `mc/1.21.2` port forward to 1.21.4 and drops no feature. 1.21.4 reworked item
-rendering, so held-item layer classification and the held flame hook into `ItemModelManager` and `ItemRenderState`;
-rain and snow are captured from the `VertexConsumerProvider`, stars vertex by vertex, player skins through the
-image-backed texture they now register as, and third-party Fabric models through `QuadEmitter` now that
-`RenderContext` is gone. It is ported from 1.21.1 and is verified only by the build, the JVM tests, and
-`MixinTargetsApplyTest`, which loads every mixin target under Fabric Loader; rendering is not yet verified in game.
-It runs vanilla's chunk visibility walk (the allocation-free port and the propagation budget are not ported; vanilla's
+The `mc/1.21.5` branch moves forward from `mc/1.21.4` to 1.21.5 and drops no feature. It is verified only by the
+build, the JVM tests, and `MixinTargetsApplyTest`, which loads every mixin target under Fabric Loader; rendering is
+not yet verified in game. 1.21.5 replaced vanilla's GL layer with `RenderPipeline`, `GpuDevice` and `RenderPass`, and
+block models with `BlockStateModel` and `BlockModelPart`. Relative to 1.21.4: the rain and snow overlay, rain
+refraction included, draws through two render pipelines in a render pass and no longer saves and restores GL state by
+hand; the glyph page mirror and animated sprite forwarding hook the command encoder's texture writes; the Remix image
+is composited with a direct-state-access framebuffer blit; entity layers are classified from their pipeline rather
+than their shader and transparency phases; vanilla's three block state models go through their baked parts and every
+other model through Fabric's `emitQuads`; the held flame hooks `ItemRenderState.LayerRenderState.render`; and the
+Copper Beacon's dye is dropped by vanilla's `BlockEntity.onBlockReplaced`. Removed because 1.21.5 vanilla no longer
+needs them: the allocation-free weighted and multipart part selection, the dynamic vertex buffer reuse policy, the
+skipped section buffers, and the matrix stack entry pool. Inherited from the 1.21.2 port:
+it runs vanilla's chunk visibility walk (the allocation-free port and the propagation budget are not ported; vanilla's
 new octree replaces the coarse frustum index), drops the server tick-list and deadmau5 name mixins that 1.21.2 made
 unnecessary, and reports the block entity count as -1.
 

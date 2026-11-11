@@ -24,7 +24,6 @@ import net.minecraft.state.property.EnumProperty;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.ItemScatterer;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.BlockRotation;
 import net.minecraft.util.math.BlockPos;
@@ -151,21 +150,6 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
             beacon.onPoweredChanged(powered, world.getTime());
         }
         world.setBlockState(pos, state.with(POWERED, powered), Block.NOTIFY_LISTENERS);
-    }
-
-    @Override
-    protected void onStateReplaced(
-            BlockState state,
-            World world,
-            BlockPos pos,
-            BlockState newState,
-            boolean moved) {
-        if (!state.isOf(newState.getBlock())) {
-            if (world.getBlockEntity(pos) instanceof CopperBeaconBlockEntity beacon) {
-                ItemScatterer.spawn(world, pos, beacon);
-            }
-        }
-        super.onStateReplaced(state, world, pos, newState, moved);
     }
 
     @Override

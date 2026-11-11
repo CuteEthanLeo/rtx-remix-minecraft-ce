@@ -4,6 +4,11 @@
  */
 package com.nvidia.rtxremix.minecraft.texture;
 
+import com.mojang.blaze3d.systems.CommandEncoder;
+import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.TextureFormat;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
@@ -12,6 +17,8 @@ import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,8 +100,8 @@ class DynamicTextureCacheTest {
     @Test
     void clearDropsAClosedImageTextureEvenWhileTheManagerKeepsItRegistered() {
         Identifier id = Identifier.of("minecraft", "dynamic/closed-map");
+        NativeImageBackedTexture texture = newImageTexture();
         TextureManager manager = new TextureManager(null);
-        NativeImageBackedTexture texture = new NativeImageBackedTexture(new NativeImage(1, 1, true));
         manager.registerTexture(id, texture);
         DynamicTextureCache.onRegisterTexture(id, texture, texture.getImage());
         assertNotNull(DynamicTextureCache.get(id));
@@ -110,10 +117,10 @@ class DynamicTextureCacheTest {
     @Test
     void clearKeepsALiveImageTextureWhenAClosedTextureSharesItsId() {
         Identifier id = Identifier.of("minecraft", "dynamic/replaced-map");
-        NativeImageBackedTexture closed = new NativeImageBackedTexture(new NativeImage(1, 1, true));
+        NativeImageBackedTexture closed = newImageTexture();
         DynamicTextureCache.onRegisterTexture(id, closed, closed.getImage());
         closed.close();
-        try (NativeImageBackedTexture live = new NativeImageBackedTexture(new NativeImage(1, 1, true))) {
+        try (NativeImageBackedTexture live = newImageTexture()) {
             DynamicTextureCache.onRegisterTexture(id, live, live.getImage());
             DynamicTextureCache.Pixels captured = DynamicTextureCache.get(id);
 
@@ -126,7 +133,7 @@ class DynamicTextureCacheTest {
     @Test
     void capacityPruningDropsClosedImageTexturesWithoutWaitingForCollection() {
         Identifier closedId = Identifier.of("minecraft", "dynamic/pruned-map");
-        NativeImageBackedTexture closed = new NativeImageBackedTexture(new NativeImage(1, 1, true));
+        NativeImageBackedTexture closed = newImageTexture();
         DynamicTextureCache.onRegisterTexture(closedId, closed, closed.getImage());
         closed.close();
         List<AbstractTexture> live = new ArrayList<>();
@@ -209,5 +216,55 @@ class DynamicTextureCacheTest {
 
     private static AbstractTexture newTexture() {
         return new AbstractTexture() {};
+    }
+
+    /** An image texture needs a device to allocate its GPU side; the suite has no GL context. */
+    private static NativeImageBackedTexture newImageTexture() {
+        installHeadlessDevice();
+        return new NativeImageBackedTexture(() -> "test", new NativeImage(1, 1, true));
+    }
+
+    private static void installHeadlessDevice() {
+        if (RenderSystem.tryGetDevice() != null) {
+            return;
+        }
+        CommandEncoder encoder = (CommandEncoder) Proxy.newProxyInstance(
+                CommandEncoder.class.getClassLoader(),
+                new Class<?>[] {CommandEncoder.class},
+                (proxy, method, arguments) -> null);
+        GpuDevice device = (GpuDevice) Proxy.newProxyInstance(
+                GpuDevice.class.getClassLoader(),
+                new Class<?>[] {GpuDevice.class},
+                (proxy, method, arguments) -> switch (method.getName()) {
+                    case "createCommandEncoder" -> encoder;
+                    case "createTexture" -> new HeadlessTexture(
+                            (TextureFormat) arguments[1], (int) arguments[2], (int) arguments[3], (int) arguments[4]);
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+        try {
+            Field deviceField = RenderSystem.class.getDeclaredField("DEVICE");
+            deviceField.setAccessible(true);
+            deviceField.set(null, device);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static final class HeadlessTexture extends GpuTexture {
+        private boolean closed;
+
+        HeadlessTexture(TextureFormat format, int width, int height, int mipLevels) {
+            super("test", format, width, height, mipLevels);
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+
+        @Override
+        public boolean isClosed() {
+            return closed;
+        }
     }
 }

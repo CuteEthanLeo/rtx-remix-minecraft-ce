@@ -4,34 +4,47 @@
  */
 package com.nvidia.rtxremix.minecraft.weather;
 
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.DestFactor;
+import com.mojang.blaze3d.platform.SourceFactor;
+import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.ProjectionType;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
+import com.nvidia.rtxremix.minecraft.gl.ExternalGlTexture;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Defines;
-import net.minecraft.client.gl.ShaderProgramKey;
-import net.minecraft.client.gl.ShaderProgramKeys;
-import net.minecraft.client.render.BufferRenderer;
+import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.gl.GlBackend;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.texture.GlTexture;
+import net.minecraft.client.texture.TextureManager;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
-import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL45;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
 /**
  * Draws rain and snow with GL directly onto the composited Remix colour image,
  * depth-testing against the interop depth texture so weather is occluded by
@@ -46,28 +59,41 @@ public final class RemixWeatherRenderer {
     private static final float FAR_PLANE = 1000.0f;
     private static final Identifier RAIN_TEXTURE =
             Identifier.ofVanilla("textures/environment/rain.png");
+    /** Vanilla's weather layer blend: colour over, destination alpha kept. */
+    private static final BlendFunction WEATHER_BLEND = new BlendFunction(
+            SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA, SourceFactor.ONE, DestFactor.ZERO);
     /**
-     * The rain refraction program. Since 1.21.2 the shader loader reads every program
-     * definition under {@code shaders/} on resource reload and compiles one on first use, so
-     * the key is all the registration there is.
+     * The rain refraction pipeline. A pipeline compiles on first use from the shader sources
+     * the shader loader read under {@code shaders/} on resource reload, so building it is all
+     * the registration there is.
      */
-    private static final ShaderProgramKey RAIN_SHADER = new ShaderProgramKey(
-            Identifier.of(RtxRemixCommonMod.MOD_ID, "core/rain_refraction"),
-            VertexFormats.POSITION_TEXTURE_COLOR_LIGHT,
-            Defines.EMPTY);
-
+    private static final RenderPipeline RAIN_PIPELINE = RenderPipeline.builder(RenderPipelines.MATRICES_COLOR_SNIPPET)
+            .withLocation(Identifier.of(RtxRemixCommonMod.MOD_ID, "pipeline/rain_refraction"))
+            .withVertexShader(Identifier.of(RtxRemixCommonMod.MOD_ID, "core/rain_refraction"))
+            .withFragmentShader(Identifier.of(RtxRemixCommonMod.MOD_ID, "core/rain_refraction"))
+            .withSampler("Sampler0")
+            .withSampler("Sampler1")
+            .withVertexFormat(VertexFormats.POSITION_TEXTURE_COLOR_LIGHT, VertexFormat.DrawMode.QUADS)
+            .withBlend(WEATHER_BLEND)
+            .withCull(false)
+            .withDepthWrite(false)
+            .build();
+    /** Vanilla's particle program, which snow draws with, under the same fixed state as rain. */
+    private static final RenderPipeline SNOW_PIPELINE = RenderPipeline.builder(RenderPipelines.PARTICLE_SNIPPET)
+            .withLocation(Identifier.of(RtxRemixCommonMod.MOD_ID, "pipeline/snow"))
+            .withBlend(WEATHER_BLEND)
+            .withCull(false)
+            .withDepthWrite(false)
+            .build();
     private final List<DeferredDraw> draws = new ArrayList<>(2);
     private Matrix4f projection;
     private Matrix4f modelView;
     private LightmapTextureManager lightmap;
     private DepthSeeder depthSeeder;
+    private ExternalGlTexture finalColor;
     private int capturedQuadCount;
     private int lastDrawCount;
     private int lastQuadCount;
-
-    /** Kept for the mod's init sequence; the shader loader finds the program on its own. */
-    public static void registerShaders() {
-    }
 
     public void beginCaptureFrame(LightmapTextureManager lightmapTextureManager) {
         closePendingDraws();
@@ -113,43 +139,25 @@ public final class RemixWeatherRenderer {
             throw new IllegalStateException("Weather camera state was not initialized");
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        client.getFramebuffer().beginWrite(true);
+        Framebuffer framebuffer = MinecraftClient.getInstance().getFramebuffer();
         try {
             if (depthSeeder == null) {
                 depthSeeder = new DepthSeeder();
             }
-            depthSeeder.seed(
-                    depthTexture,
-                    client.getWindow().getFramebufferWidth(),
-                    client.getWindow().getFramebufferHeight());
+            depthSeeder.seed(depthTexture, framebuffer);
             lastDrawCount = draws.size();
             lastQuadCount = capturedQuadCount;
-            renderDeferredDraws(finalColorTexture);
+            renderDeferredDraws(framebuffer, finalColorTexture);
         } catch (RuntimeException exception) {
             closePendingDraws();
             throw exception;
         }
     }
 
-    private void renderDeferredDraws(int finalColorTexture) {
+    private void renderDeferredDraws(Framebuffer framebuffer, int finalColorTexture) {
         Matrix4f savedProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         ProjectionType savedProjectionType = RenderSystem.getProjectionType();
         Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
-        boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-        boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
-        boolean cull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
-        boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-        int[] scissorBox = readScissorBox();
-        boolean depthMask = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-        int depthFunction = GL11.glGetInteger(GL11.GL_DEPTH_FUNC);
-        int blendSourceRgb = GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB);
-        int blendDestinationRgb = GL11.glGetInteger(GL14.GL_BLEND_DST_RGB);
-        int blendSourceAlpha = GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA);
-        int blendDestinationAlpha = GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA);
-        int blendEquationRgb = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_RGB);
-        int blendEquationAlpha = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_ALPHA);
-        boolean[] colorMask = readColorMask();
         float[] shaderColor = RenderSystem.getShaderColor().clone();
 
         RenderSystem.setProjectionMatrix(projection, ProjectionType.PERSPECTIVE);
@@ -157,41 +165,11 @@ public final class RemixWeatherRenderer {
         modelViewStack.set(modelView);
 
         try {
-            lightmap.enable();
-            GL11.glEnable(GL11.GL_BLEND);
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-            GL11.glDisable(GL11.GL_CULL_FACE);
-            GL11.glDisable(GL11.GL_SCISSOR_TEST);
-            GL11.glDepthFunc(GL11.GL_LEQUAL);
-            GL11.glDepthMask(false);
-            GL11.glColorMask(true, true, true, true);
-            GL14.glBlendFuncSeparate(
-                    GL11.GL_SRC_ALPHA,
-                    GL11.GL_ONE_MINUS_SRC_ALPHA,
-                    GL11.GL_ONE,
-                    GL11.GL_ZERO);
-            GL20.glBlendEquationSeparate(GL14.GL_FUNC_ADD, GL14.GL_FUNC_ADD);
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            renderRain(finalColorTexture);
-            renderSnow();
+            renderRain(framebuffer, finalColorTexture);
+            renderSnow(framebuffer);
         } finally {
-            lightmap.disable();
             closePendingDraws();
-            restoreCapability(GL11.GL_DEPTH_TEST, depthTest);
-            restoreCapability(GL11.GL_BLEND, blend);
-            restoreCapability(GL11.GL_CULL_FACE, cull);
-            restoreCapability(GL11.GL_SCISSOR_TEST, scissor);
-            GL11.glScissor(scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
-            GL11.glDepthFunc(depthFunction);
-            GL11.glDepthMask(depthMask);
-            GL11.glColorMask(
-                    colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
-            GL14.glBlendFuncSeparate(
-                    blendSourceRgb,
-                    blendDestinationRgb,
-                    blendSourceAlpha,
-                    blendDestinationAlpha);
-            GL20.glBlendEquationSeparate(blendEquationRgb, blendEquationAlpha);
             modelViewStack.popMatrix();
             RenderSystem.setProjectionMatrix(savedProjection, savedProjectionType);
             RenderSystem.setShaderColor(
@@ -199,12 +177,11 @@ public final class RemixWeatherRenderer {
         }
     }
 
-    private void renderRain(int finalColorTexture) {
+    private void renderRain(Framebuffer framebuffer, int finalColorTexture) {
         if (!hasRainDraw()) {
             return;
         }
-        RenderSystem.setShaderTexture(1, finalColorTexture);
-        renderDraws(true, RAIN_SHADER);
+        renderDraws(framebuffer, true, RAIN_PIPELINE, wrapFinalColor(finalColorTexture));
     }
 
     private boolean hasRainDraw() {
@@ -216,33 +193,57 @@ public final class RemixWeatherRenderer {
         return false;
     }
 
-    private void renderSnow() {
-        renderDraws(false, ShaderProgramKeys.PARTICLE);
+    private void renderSnow(Framebuffer framebuffer) {
+        renderDraws(framebuffer, false, SNOW_PIPELINE, null);
     }
 
-    private void renderDraws(boolean rain, ShaderProgramKey shader) {
-        if (RenderSystem.setShader(shader) == null) {
-            throw new IllegalStateException("Weather shader " + shader + " failed to load");
+    private GpuTexture wrapFinalColor(int finalColorTexture) {
+        int width = GL45.glGetTextureLevelParameteri(finalColorTexture, 0, GL11.GL_TEXTURE_WIDTH);
+        int height = GL45.glGetTextureLevelParameteri(finalColorTexture, 0, GL11.GL_TEXTURE_HEIGHT);
+        if (finalColor == null || !finalColor.wraps(finalColorTexture, width, height)) {
+            finalColor = new ExternalGlTexture("Remix final color", finalColorTexture, width, height);
         }
+        return finalColor;
+    }
+
+    /**
+     * Draws the pending rain or snow buffers in one pass over the main framebuffer. The pass
+     * applies the pipeline's blend, depth and cull state itself, and every later vanilla pass
+     * applies its own, so nothing is saved or restored here.
+     */
+    private void renderDraws(
+            Framebuffer framebuffer, boolean rain, RenderPipeline pipeline, GpuTexture sceneColor) {
+        TextureManager textureManager = MinecraftClient.getInstance().getTextureManager();
         for (int i = 0; i < draws.size(); i++) {
             DeferredDraw draw = draws.get(i);
             if (draw == null || draw.rain() != rain) {
                 continue;
             }
-            RenderSystem.setShaderTexture(0, draw.texture());
-            try {
-                BufferRenderer.drawWithGlobalProgram(draw.buffer());
-            } finally {
+            try (BuiltBuffer buffer = draw.buffer()) {
                 draws.set(i, null);
+                BuiltBuffer.DrawParameters parameters = buffer.getDrawParameters();
+                GpuBuffer vertices = pipeline.getVertexFormat().uploadImmediateVertexBuffer(buffer.getBuffer());
+                RenderSystem.ShapeIndexBuffer sequentialIndices = RenderSystem.getSequentialBuffer(parameters.mode());
+                GpuBuffer indices = sequentialIndices.getIndexBuffer(parameters.indexCount());
+                try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                        framebuffer.getColorAttachment(),
+                        OptionalInt.empty(),
+                        framebuffer.getDepthAttachment(),
+                        OptionalDouble.empty())) {
+                    pass.setPipeline(pipeline);
+                    pass.setVertexBuffer(0, vertices);
+                    pass.bindSampler("Sampler0", textureManager.getTexture(draw.texture()).getGlTexture());
+                    if (sceneColor != null) {
+                        pass.bindSampler("Sampler1", sceneColor);
+                    } else {
+                        pass.bindSampler("Sampler2", lightmap.getGlTexture());
+                    }
+                    pass.setIndexBuffer(indices, sequentialIndices.getIndexType());
+                    pass.drawIndexed(0, parameters.indexCount());
+                }
             }
         }
     }
-
-    private static void restoreCapability(int capability, boolean enabled) {
-        if (enabled) GL11.glEnable(capability);
-        else GL11.glDisable(capability);
-    }
-
     private static int[] readScissorBox() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             IntBuffer values = stack.mallocInt(4);
@@ -348,8 +349,19 @@ public final class RemixWeatherRenderer {
             vertexArray = GL30.glGenVertexArrays();
         }
 
-        private void seed(int depthTexture, int width, int height) {
-            int previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        /**
+         * Copies the traced depth into the main framebuffer's depth attachment. The
+         * framebuffer is bound through the state manager so its binding cache stays true; the
+         * render passes that follow bind their own targets.
+         */
+        private void seed(int depthTexture, Framebuffer framebuffer) {
+            int width = framebuffer.textureWidth;
+            int height = framebuffer.textureHeight;
+            int target = ((GlTexture) framebuffer.getColorAttachment()).getOrCreateFramebuffer(
+                    ((GlBackend) RenderSystem.getDevice()).getFramebufferManager(),
+                    framebuffer.getDepthAttachment());
+            GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, target);
+            GlStateManager._viewport(0, 0, width, height);            int previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
             int previousVertexArray = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
             int previousActiveTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
             boolean previousDepthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);

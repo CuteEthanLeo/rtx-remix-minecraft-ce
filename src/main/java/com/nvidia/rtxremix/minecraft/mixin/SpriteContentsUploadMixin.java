@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.SpriteContents;
@@ -22,10 +23,10 @@ public abstract class SpriteContentsUploadMixin {
     @Shadow @Final int width;
     @Shadow @Final int height;
 
-    @Inject(method = "upload(IIII[Lnet/minecraft/client/texture/NativeImage;)V",
+    @Inject(method = "upload(IIII[Lnet/minecraft/client/texture/NativeImage;Lcom/mojang/blaze3d/textures/GpuTexture;)V",
             at = @At("HEAD"))
     private void rtxremix$onAnimationUpload(int texX, int texY, int srcX, int srcY,
-                                    NativeImage[] mips, CallbackInfo ci) {
+                                    NativeImage[] mips, GpuTexture texture, CallbackInfo ci) {
         // Guard: only forward patches for animated sprites.
         // upload() is also called during initial atlas stitching for ALL sprites.
         if (((SpriteContentsAccessor) (Object) this).getAnimation() == null) return;
@@ -33,7 +34,7 @@ public abstract class SpriteContentsUploadMixin {
         if (mips == null || mips.length == 0 || mips[0] == null) return;
 
         NativeImage mip0 = mips[0];
-        long basePtr = ((NativeImageAccessor) (Object) mip0).getPointer();
+        long basePtr = mip0.imageId();
         int imgWidth = mip0.getWidth();
         int imgHeight = mip0.getHeight();
         long pixelPtr = basePtr + ((long) srcY * imgWidth + srcX) * 4;

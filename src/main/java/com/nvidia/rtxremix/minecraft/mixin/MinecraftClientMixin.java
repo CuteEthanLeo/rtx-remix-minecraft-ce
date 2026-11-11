@@ -130,7 +130,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/RenderSystem;clear(I)V"
+            target = "Lcom/mojang/blaze3d/systems/CommandEncoder;clearColorAndDepthTextures(Lcom/mojang/blaze3d/textures/GpuTexture;ILcom/mojang/blaze3d/textures/GpuTexture;D)V"
         ),
         require = 0
     )
@@ -209,7 +209,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/Framebuffer;endWrite()V"
+            target = "Lnet/minecraft/client/gl/Framebuffer;blitToScreen()V"
         ),
         require = 0
     )
@@ -228,7 +228,7 @@ public abstract class MinecraftClientMixin {
         method = "render",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/gl/Framebuffer;draw(II)V",
+            target = "Lnet/minecraft/client/gl/Framebuffer;blitToScreen()V",
             shift = At.Shift.AFTER
         ),
         require = 0

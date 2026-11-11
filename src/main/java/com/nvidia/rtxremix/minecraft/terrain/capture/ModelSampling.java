@@ -7,12 +7,16 @@ package com.nvidia.rtxremix.minecraft.terrain.capture;
 import com.nvidia.rtxremix.minecraft.light.BlockLightRuleManager;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.BlockView;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.random.LocalRandom;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Samples the baked model of the block currently being meshed, so a block light
@@ -47,7 +51,8 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
     private final BlockPos.Mutable origin = new BlockPos.Mutable();
     private final BlockPos.Mutable neighbor = new BlockPos.Mutable();
 
-    private BakedModel model;
+    private BlockStateModel model;
+    private final List<BlockModelPart> parts = new ArrayList<>();
     private boolean modelResolved;
 
     private float[] vertices = new float[3 * 256];
@@ -126,23 +131,27 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         }
         if (model == null) return;
 
+        // Seed once and let the model pick its parts exactly as the emission loop
+        // does, so a multi-variant model resolves to the same variant here as on screen.
+        random.setSeed(seed);
+        model.addParts(random, parts);
         for (Direction dir : DIRECTIONS) {
-            // Re-seed per direction exactly as the emission loop does, so a
-            // multi-variant model resolves to the same variant here as on screen.
-            random.setSeed(seed);
-            for (BakedQuad quad : model.getQuads(state, dir, random)) {
-                int[] vd = quad.getVertexData();
-                ensureCapacity(vertexCount + 4);
-                for (int v = 0; v < 4; v++) {
-                    int off = v * 8;
-                    int w = vertexCount * 3;
-                    vertices[w] = Float.intBitsToFloat(vd[off]);
-                    vertices[w + 1] = Float.intBitsToFloat(vd[off + 1]);
-                    vertices[w + 2] = Float.intBitsToFloat(vd[off + 2]);
-                    vertexCount++;
+            for (int p = 0, partCount = parts.size(); p < partCount; p++) {
+                for (BakedQuad quad : parts.get(p).getQuads(dir)) {
+                    int[] vd = quad.vertexData();
+                    ensureCapacity(vertexCount + 4);
+                    for (int v = 0; v < 4; v++) {
+                        int off = v * 8;
+                        int w = vertexCount * 3;
+                        vertices[w] = Float.intBitsToFloat(vd[off]);
+                        vertices[w + 1] = Float.intBitsToFloat(vd[off + 1]);
+                        vertices[w + 2] = Float.intBitsToFloat(vd[off + 2]);
+                        vertexCount++;
+                    }
                 }
             }
         }
+        parts.clear();
     }
 
     private void ensureCapacity(int wantedVertices) {

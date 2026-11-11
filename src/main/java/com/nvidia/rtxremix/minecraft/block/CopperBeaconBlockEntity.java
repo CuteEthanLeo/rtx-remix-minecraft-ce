@@ -417,25 +417,25 @@ public final class CopperBeaconBlockEntity extends BlockEntity
         super.readNbt(nbt, registryLookup);
         intensityMultiplier = finiteClamped(
                 nbt.contains(INTENSITY_KEY)
-                        ? nbt.getFloat(INTENSITY_KEY)
+                        ? nbt.getFloat(INTENSITY_KEY, 0.0f)
                         : DEFAULT_INTENSITY_MULTIPLIER,
                 MIN_INTENSITY_MULTIPLIER,
                 MAX_INTENSITY_MULTIPLIER,
                 DEFAULT_INTENSITY_MULTIPLIER);
         coneAngle = finiteClamped(
-                nbt.contains(CONE_ANGLE_KEY) ? nbt.getFloat(CONE_ANGLE_KEY) : DEFAULT_CONE_ANGLE,
+                nbt.contains(CONE_ANGLE_KEY) ? nbt.getFloat(CONE_ANGLE_KEY, 0.0f) : DEFAULT_CONE_ANGLE,
                 MIN_CONE_ANGLE,
                 MAX_CONE_ANGLE,
                 DEFAULT_CONE_ANGLE);
         saturation = finiteClamped(
-                nbt.contains(SATURATION_KEY) ? nbt.getFloat(SATURATION_KEY) : DEFAULT_SATURATION,
+                nbt.contains(SATURATION_KEY) ? nbt.getFloat(SATURATION_KEY, 0.0f) : DEFAULT_SATURATION,
                 MIN_SATURATION,
                 MAX_SATURATION,
                 DEFAULT_SATURATION);
-        redstoneControlled = nbt.getBoolean(REDSTONE_CONTROLLED_KEY);
-        frozenTick = nbt.getLong(FROZEN_TICK_KEY);
+        redstoneControlled = nbt.getBoolean(REDSTONE_CONTROLLED_KEY, false);
+        frozenTick = nbt.getLong(FROZEN_TICK_KEY, 0L);
         if (nbt.contains(YAW_KEY)) {
-            yaw = CopperBeaconAxisState.readNbt(nbt.getCompound(YAW_KEY));
+            yaw = CopperBeaconAxisState.readNbt(nbt.getCompoundOrEmpty(YAW_KEY));
         } else {
             CopperBeaconState.Angles angles = CopperBeaconState.readAngles(nbt);
             yaw = new CopperBeaconAxisState(
@@ -447,7 +447,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
                     0L);
         }
         if (nbt.contains(PITCH_KEY)) {
-            pitch = CopperBeaconAxisState.readNbt(nbt.getCompound(PITCH_KEY));
+            pitch = CopperBeaconAxisState.readNbt(nbt.getCompoundOrEmpty(PITCH_KEY));
         } else {
             CopperBeaconState.Angles angles = CopperBeaconState.readAngles(nbt);
             pitch = new CopperBeaconAxisState(
@@ -459,7 +459,7 @@ public final class CopperBeaconBlockEntity extends BlockEntity
                     0L);
         }
         dye = nbt.get(DYE_KEY) != null
-                ? ItemStack.fromNbt(registryLookup, nbt.getCompound(DYE_KEY)).orElse(ItemStack.EMPTY)
+                ? ItemStack.fromNbt(registryLookup, nbt.getCompoundOrEmpty(DYE_KEY)).orElse(ItemStack.EMPTY)
                 : ItemStack.EMPTY;
     }
 

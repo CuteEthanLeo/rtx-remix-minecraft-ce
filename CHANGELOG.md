@@ -11,6 +11,13 @@ also part of every mod file name.
 
 ## Community Edition 0.1.0-ce.9 - 2026-11-11
 
+### Added
+
+- A package for Minecraft 1.21.5, moved forward from the 1.21.4 branch with
+  every feature kept. Rain and snow, text, animated textures, entity layers
+  and block models follow the render pipeline and block model APIs 1.21.5
+  introduced.
+
 ### Changed
 
 - Every supported Minecraft version now carries the same Community Edition

@@ -16,7 +16,7 @@ import com.nvidia.rtxremix.minecraft.light.LightEntry;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
-import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
+import net.fabricmc.fabric.api.renderer.v1.model.MeshBakedGeometry;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -26,8 +26,13 @@ import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.client.render.model.GeometryBakedModel;
+import net.minecraft.client.render.model.MultipartBlockStateModel;
+import net.minecraft.client.render.model.SimpleBlockStateModel;
+import net.minecraft.client.render.model.WeightedBlockStateModel;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.tag.FluidTags;
@@ -38,7 +43,6 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.LocalRandom;
-import net.minecraft.util.math.random.Random;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockRenderView;
@@ -47,7 +51,6 @@ import net.minecraft.world.BlockView;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * Per-block mesh emission for RTX Remix, designed to be driven from
@@ -82,6 +85,8 @@ public final class BlockQuadEmitter {
             ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     private final RemixRenderContext renderContext = new RemixRenderContext();
+    /** The parts vanilla's own selection picked for the block being emitted. */
+    private final List<BlockModelPart> modelParts = new ArrayList<>();
     private final LocalRandom random = new LocalRandom(42);
     private final BlockPos.Mutable mutablePos = new BlockPos.Mutable();
     private final BlockPos.Mutable neighborPos = new BlockPos.Mutable();
@@ -140,11 +145,6 @@ public final class BlockQuadEmitter {
      * pickle cluster rotates its pickles around the block.
      */
     private long modelRandomSeed = 42L;
-
-    private final Supplier<Random> randomSupplier = () -> {
-        random.setSeed(modelRandomSeed);
-        return random;
-    };
 
     // Per-section state set by beginSection / processBlock
     /**
@@ -325,9 +325,9 @@ public final class BlockQuadEmitter {
         mutablePos.set(pos);
         tintValidMask = 0;
 
-        // Vanilla derives model randomisation from the block position, in the
-        // same BlockModelRenderer.render this emitter replaces. It also
-        // re-seeds before every getQuads call, which the loops below match.
+        // Vanilla derives model randomisation from the block position and seeds
+        // once per block, before the model picks its parts in the section build
+        // this emitter replaces; both model paths below do the same.
         modelRandomSeed = state.getRenderingSeed(pos);
 
         float lx = ChunkSectionPos.getLocalCoord(pos.getX());
@@ -357,14 +357,45 @@ public final class BlockQuadEmitter {
             lz += (float) modelOffset.z;
         }
 
-        BakedModel model = blockRenderManager.getModel(state);
+        BlockStateModel model = blockRenderManager.getModel(state);
         String layerName = classifyBlockLayer(state);
 
-        if (model instanceof FabricBakedModel fbm && !fbm.isVanillaAdapter()) {
-            emitFrapiBlock(world, state, model, fbm, layerName, lx, ly, lz);
+        if (selectVanillaParts(model)) {
+            emitVanillaBlock(world, state, layerName, lx, ly, lz);
         } else {
-            emitVanillaBlock(world, state, model, layerName, lx, ly, lz);
+            emitFrapiBlock(world, state, model, layerName, lx, ly, lz);
         }
+    }
+
+    /**
+     * Fills {@link #modelParts} with the parts {@code model} picks for this block and
+     * reports whether baked quads are all there is to it.
+     *
+     * <p>The Fabric rendering API has no flag for that, so it is read off the types: one
+     * of vanilla's three block state models whose chosen parts are all baked geometry
+     * that is not a Fabric mesh. Anything else, a mod's own state model or part, or a
+     * part whose geometry is a mesh and therefore has no baked quads, goes through
+     * {@code emitQuads}. A mod's state model nested inside a vanilla weighted or
+     * multipart model is captured by the parts it adds.
+     */
+    private boolean selectVanillaParts(BlockStateModel model) {
+        Class<?> modelClass = model.getClass();
+        if (modelClass != SimpleBlockStateModel.class
+                && modelClass != WeightedBlockStateModel.class
+                && modelClass != MultipartBlockStateModel.class) {
+            return false;
+        }
+        modelParts.clear();
+        random.setSeed(modelRandomSeed);
+        model.addParts(random, modelParts);
+        for (int i = 0, n = modelParts.size(); i < n; i++) {
+            if (!(modelParts.get(i) instanceof GeometryBakedModel part)
+                    || part.quads() instanceof MeshBakedGeometry) {
+                modelParts.clear();
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -399,8 +430,8 @@ public final class BlockQuadEmitter {
         }
     }
 
-    private void emitVanillaBlock(BlockRenderView world, BlockState state,
-                                   BakedModel model, String layerName,
+    /** Emits the baked quads of the parts {@link #selectVanillaParts} picked. */
+    private void emitVanillaBlock(BlockRenderView world, BlockState state, String layerName,
                                    float lx, float ly, float lz) {
 
         for (Direction dir : ALL_DIRECTIONS) {
@@ -408,13 +439,14 @@ public final class BlockQuadEmitter {
                 continue;
             }
 
-            random.setSeed(modelRandomSeed);
-            List<BakedQuad> bakedQuads = model.getQuads(state, dir, random);
-
-            for (BakedQuad bq : bakedQuads) {
-                stageBakedQuad(bq, layerName, state, world, lx, ly, lz);
+            for (int p = 0, partCount = modelParts.size(); p < partCount; p++) {
+                List<BakedQuad> bakedQuads = modelParts.get(p).getQuads(dir);
+                for (int q = 0, quadCount = bakedQuads.size(); q < quadCount; q++) {
+                    stageBakedQuad(bakedQuads.get(q), layerName, state, world, lx, ly, lz);
+                }
             }
         }
+        modelParts.clear();
 
         flushBlock(world);
     }
@@ -422,7 +454,7 @@ public final class BlockQuadEmitter {
     private void stageBakedQuad(BakedQuad bq, String layerName,
                                  BlockState state, BlockRenderView world,
                                  float lx, float ly, float lz) {
-        int[] vd = bq.getVertexData();
+        int[] vd = bq.vertexData();
 
         for (int v = 0; v < 4; v++) {
             int off = v * 8;
@@ -448,13 +480,13 @@ public final class BlockQuadEmitter {
         }
 
         int color = 0xFFFFFFFF;
-        if (bq.getTintIndex() >= 0 && blockColors != null) {
-            int tint = getBlockTint(state, world, bq.getTintIndex());
+        if (bq.tintIndex() >= 0 && blockColors != null) {
+            int tint = getBlockTint(state, world, bq.tintIndex());
             int r = (tint >> 16) & 0xFF, g = (tint >> 8) & 0xFF, b = tint & 0xFF;
             color = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
 
-        Sprite sprite = bq.getSprite();
+        Sprite sprite = bq.sprite();
         Identifier spriteId = sprite != null ? sprite.getContents().getId() : null;
         if (isWaterSprite(spriteId)) {
             emitBlockWaterQuad(nx, ny, nz, color, layerName);
@@ -516,16 +548,17 @@ public final class BlockQuadEmitter {
     }
 
     private void emitFrapiBlock(BlockRenderView world, BlockState state,
-                                 BakedModel model, FabricBakedModel fbm,
+                                 BlockStateModel model,
                                  String layerName, float lx, float ly, float lz) {
 
         frapiState = state;
         frapiWorld = world;
 
-        renderContext.prepare(world, state, mutablePos.toImmutable(), this::frapiCullTest);
+        BlockPos pos = mutablePos.toImmutable();
+        renderContext.prepare(world, state, pos, this::frapiCullTest);
 
-        fbm.emitBlockQuads(renderContext.getEmitter(), world, state, mutablePos.toImmutable(), randomSupplier,
-                renderContext.cullTest());
+        random.setSeed(modelRandomSeed);
+        model.emitQuads(renderContext.getEmitter(), world, pos, state, random, renderContext.cullTest());
 
         List<SectionBlockData.BlockQuad> frapiQuads = renderContext.harvest();
         for (SectionBlockData.BlockQuad fq : frapiQuads) {
