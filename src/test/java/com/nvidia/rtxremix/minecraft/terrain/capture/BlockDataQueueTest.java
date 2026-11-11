@@ -146,13 +146,13 @@ class BlockDataQueueTest {
 
         List<BlockDataQueue.QueuedCapture> pending = new ArrayList<>();
         assertEquals(1, BlockDataQueue.drain(pending));
-        assertTrue(BlockDataQueue.isCurrent(pending.getFirst()));
+        assertTrue(BlockDataQueue.isCurrent(pending.get(0)));
 
         BlockDataQueue.markChunkUnloaded(cx, cz);
         BlockDataQueue.CaptureToken replacement = BlockDataQueue.beginCapture(cx, cz);
 
         assertNotEquals(oldCapture.chunkToken(), replacement.chunkToken());
-        assertFalse(BlockDataQueue.isCurrent(pending.getFirst()),
+        assertFalse(BlockDataQueue.isCurrent(pending.get(0)),
                 "A drained capture must not survive unload/reload while pending");
     }
 

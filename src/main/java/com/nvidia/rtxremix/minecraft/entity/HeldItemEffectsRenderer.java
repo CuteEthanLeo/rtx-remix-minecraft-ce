@@ -26,7 +26,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleType;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 import net.minecraft.registry.Registries;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -91,7 +91,7 @@ public final class HeldItemEffectsRenderer {
                               BakedModel model) {
         EntityRenderContext context = EntityRenderContext.get();
         if (!context.isRemixPass() || !HeldItemFlame.isHandMode(mode)) return;
-        SimpleParticleType flameParticle = HeldItemFlame.particleFor(stack);
+        DefaultParticleType flameParticle = HeldItemFlame.particleFor(stack);
         if (flameParticle == null) return;
         // Null outside a hand: an item_display posed with a hand transform reaches
         // this hook with no HeldItemRenderer above it. Nothing in HeldLightState
@@ -173,12 +173,12 @@ public final class HeldItemEffectsRenderer {
 
     private static void vertex(VertexConsumer buffer, MatrixStack.Entry entry,
                                float x, float y, float u, float v, int grey, int alpha) {
-        buffer.vertex(entry, x, y, 0.0f)
+        buffer.vertex(entry.getPositionMatrix(), x, y, 0.0f)
                 .color(grey, grey, grey, alpha)
                 .texture(u, v)
                 .overlay(OverlayTexture.DEFAULT_UV)
                 .light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0.0f, 0.0f, 1.0f)
+                .normal(entry.getNormalMatrix(), 0.0f, 0.0f, 1.0f)
                 .next();
     }
 }

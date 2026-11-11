@@ -30,9 +30,9 @@ public final class CopperBeaconScreenHandler extends ScreenHandler {
     public static final int PLAYER_INVENTORY_Y = 153;
 
     public static final ScreenHandlerType<CopperBeaconScreenHandler> TYPE =
-            new ExtendedScreenHandlerType<>(
-                    CopperBeaconScreenHandler::new,
-                    CopperBeaconScreenData.PACKET_CODEC);
+            new ExtendedScreenHandlerType<>((syncId, playerInventory, buffer) ->
+                    new CopperBeaconScreenHandler(
+                            syncId, playerInventory, CopperBeaconScreenData.read(buffer)));
 
     private static final int DYE_SLOT = 0;
     private static final int PLAYER_START = 1;

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -40,7 +40,7 @@ class RtxOptionFactoryTest {
     }
 
     private static SimpleOption<?> toOption(RtxSetting<?> setting) {
-        return RtxOptionFactory.toOption(setting);
+        return RtxOptionFactory.toOption(setting, new DeferredSliderApply(() -> 0L));
     }
 
     @Test
@@ -52,7 +52,7 @@ class RtxOptionFactoryTest {
         for (RtxSetting.Kind kind : RtxSetting.Kind.values()) {
             // GameOptions is only written when a widget's value changes.
             String message = toOption(settingOf(kind))
-                    .createWidget(null).getMessage().getString();
+                    .createWidget(null, 0, 0, 150).getMessage().getString();
 
             assertEquals(1, occurrences(message, LABEL_KEY), kind + " shows \"" + message + "\"");
         }
@@ -122,37 +122,38 @@ class RtxOptionFactoryTest {
 
     @Test
     void factoryPreservesDeferredApplyForIntegerAndFloatSliders() {
+        List<Object> applied = new ArrayList<>();
         RtxSetting<Integer> integerSetting =
                 RtxSetting.ofInt("t.int", SettingGroup.RENDER_DISTANCE, "k", "k.tip",
-                        0, 10, 5, () -> 5, value -> { })
+                        0, 10, 5, () -> 5, applied::add)
                         .deferSliderApply();
         RtxSetting<Double> floatSetting =
                 RtxSetting.ofFloat("t.float", SettingGroup.RENDER_DISTANCE, "k", "k.tip",
-                        0.0, 1.0, 0.5, () -> 0.5, value -> { })
+                        0.0, 1.0, 0.5, () -> 0.5, applied::add)
                         .deferSliderApply();
+        long[] nowMs = {0L};
+        DeferredSliderApply deferred = new DeferredSliderApply(() -> nowMs[0]);
 
-        assertFalse(sliderCallbacks(toOption(integerSetting))
-                .applyValueImmediately());
-        assertFalse(sliderCallbacks(toOption(floatSetting))
-                .applyValueImmediately());
+        RtxOptionFactory.sliderApplier(integerSetting, deferred).accept(7);
+        RtxOptionFactory.sliderApplier(floatSetting, deferred).accept(0.25);
+        deferred.applyDue();
+        assertEquals(List.of(), applied);
+
+        nowMs[0] = DeferredSliderApply.DELAY_MS;
+        deferred.applyDue();
+        assertEquals(List.of(7, 0.25), applied);
     }
 
     @Test
-    void immediateSliderPolicyPreservesTheOriginalCallbacks() {
-        var callbacks = SimpleOption.DoubleSliderCallbacks.INSTANCE;
+    void immediateSliderAppliesOnEveryChange() {
+        List<Object> applied = new ArrayList<>();
+        RtxSetting<Integer> setting =
+                RtxSetting.ofInt("t.int", SettingGroup.RENDER_DISTANCE, "k", "k.tip",
+                        0, 10, 5, () -> 5, applied::add);
 
-        assertTrue(callbacks.applyValueImmediately());
-        assertSame(callbacks, RtxOptionFactory.sliderApplyPolicy(callbacks, true));
-    }
+        RtxOptionFactory.sliderApplier(setting, new DeferredSliderApply(() -> 0L)).accept(7);
 
-    private static SimpleOption.SliderCallbacks<?> sliderCallbacks(SimpleOption<?> option) {
-        try {
-            Field callbacksField = SimpleOption.class.getDeclaredField("callbacks");
-            callbacksField.setAccessible(true);
-            return (SimpleOption.SliderCallbacks<?>) callbacksField.get(option);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("Could not inspect SimpleOption callbacks", e);
-        }
+        assertEquals(List.of(7), applied);
     }
 
     @ParameterizedTest

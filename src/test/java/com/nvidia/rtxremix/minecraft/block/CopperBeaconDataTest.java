@@ -23,6 +23,7 @@ import net.minecraft.recipe.Recipe;
 import net.minecraft.recipe.ShapedRecipe;
 import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryOps;
 import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -58,7 +59,7 @@ class CopperBeaconDataTest {
         if (!Registries.ITEM.containsId(ID)) {
             SpotLightBlock.registerAll();
         }
-        ops = DynamicRegistryManager.of(Registries.REGISTRIES).getOps(JsonOps.INSTANCE);
+        ops = RegistryOps.of(JsonOps.INSTANCE, DynamicRegistryManager.of(Registries.REGISTRIES));
     }
 
     @Test

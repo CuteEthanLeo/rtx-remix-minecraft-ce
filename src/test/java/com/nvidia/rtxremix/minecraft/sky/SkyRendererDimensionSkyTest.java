@@ -4,6 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
+import com.nvidia.rtxremix.minecraft.util.HalfFloat;
 import net.minecraft.client.render.DimensionEffects;
 import org.junit.jupiter.api.Test;
 
@@ -35,10 +36,10 @@ class SkyRendererDimensionSkyTest {
         int texelCount = AtmosphericSkyGenerator.WIDTH * AtmosphericSkyGenerator.HEIGHT;
         for (int texel = 0; texel < texelCount; texel++) {
             int base = texel * BYTES_PER_TEXEL;
-            assertEquals(0.25f, Float.float16ToFloat(pixels.getShort(base)));
-            assertEquals(0.5f, Float.float16ToFloat(pixels.getShort(base + 2)));
-            assertEquals(1.0f, Float.float16ToFloat(pixels.getShort(base + 4)));
-            assertEquals(1.0f, Float.float16ToFloat(pixels.getShort(base + 6)));
+            assertEquals(0.25f, HalfFloat.toFloat(pixels.getShort(base)));
+            assertEquals(0.5f, HalfFloat.toFloat(pixels.getShort(base + 2)));
+            assertEquals(1.0f, HalfFloat.toFloat(pixels.getShort(base + 4)));
+            assertEquals(1.0f, HalfFloat.toFloat(pixels.getShort(base + 6)));
         }
     }
 

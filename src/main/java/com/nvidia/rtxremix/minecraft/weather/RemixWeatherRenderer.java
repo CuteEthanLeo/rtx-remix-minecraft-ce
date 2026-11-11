@@ -14,12 +14,12 @@ import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.Camera;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -139,7 +139,7 @@ public final class RemixWeatherRenderer {
 
     private void renderDeferredDraws(int finalColorTexture) {
         Matrix4f savedProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
-        Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+        MatrixStack modelViewStack = RenderSystem.getModelViewStack();
         boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         boolean blend = GL11.glIsEnabled(GL11.GL_BLEND);
         boolean cull = GL11.glIsEnabled(GL11.GL_CULL_FACE);
@@ -157,8 +157,8 @@ public final class RemixWeatherRenderer {
         float[] shaderColor = RenderSystem.getShaderColor().clone();
 
         RenderSystem.setProjectionMatrix(projection, VertexSorter.BY_Z);
-        modelViewStack.pushMatrix();
-        modelViewStack.set(modelView);
+        modelViewStack.push();
+        modelViewStack.peek().getPositionMatrix().set(modelView);
         RenderSystem.applyModelViewMatrix();
 
         try {
@@ -197,7 +197,7 @@ public final class RemixWeatherRenderer {
                     blendSourceAlpha,
                     blendDestinationAlpha);
             GL20.glBlendEquationSeparate(blendEquationRgb, blendEquationAlpha);
-            modelViewStack.popMatrix();
+            modelViewStack.pop();
             RenderSystem.applyModelViewMatrix();
             RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
             RenderSystem.setShaderColor(

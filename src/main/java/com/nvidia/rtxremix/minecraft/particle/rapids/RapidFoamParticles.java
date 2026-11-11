@@ -7,15 +7,15 @@ package com.nvidia.rtxremix.minecraft.particle.rapids;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry;
 import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
 
 public final class RapidFoamParticles {
-    public static final SimpleParticleType RAPID_FOAM = FabricParticleTypes.simple(false);
-    public static final SimpleParticleType RAPID_FOAM_DOT = FabricParticleTypes.simple(false);
-    public static final SimpleParticleType RAPID_MIST = FabricParticleTypes.simple(false);
+    public static final DefaultParticleType RAPID_FOAM = FabricParticleTypes.simple(false);
+    public static final DefaultParticleType RAPID_FOAM_DOT = FabricParticleTypes.simple(false);
+    public static final DefaultParticleType RAPID_MIST = FabricParticleTypes.simple(false);
 
     private RapidFoamParticles() {}
 

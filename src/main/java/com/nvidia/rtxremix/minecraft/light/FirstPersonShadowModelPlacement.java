@@ -139,7 +139,7 @@ final class FirstPersonShadowModelPlacement {
             }
         }
 
-        Vec3d selected = candidates.getFirst();
+        Vec3d selected = candidates.get(0);
         double selectedMotion = Double.POSITIVE_INFINITY;
         double totalHysteresis = TARGET_CLEARANCE_HYSTERESIS * lights.size();
         for (Vec3d candidate : candidates) {
@@ -174,15 +174,14 @@ final class FirstPersonShadowModelPlacement {
         double surfaceGap = displacedHeadCenter.distanceTo(light.position)
                 - HEAD_KEEP_OUT_RADIUS
                 - light.emitterRadius;
-        float normalized = (float) Math.clamp(surfaceGap / light.targetGap, 0.0, 1.0);
+        float normalized = (float) Math.min(1.0, Math.max(surfaceGap / light.targetGap, 0.0));
         return normalized * normalized * (3.0f - 2.0f * normalized);
     }
 
     static SpringStep advanceSpring(
             Vec3d position, Vec3d velocity, Vec3d target,
             float dtSeconds, double angularFrequency) {
-        double dt = Math.clamp(
-                dtSeconds, 0.0f, HeldLightPlacement.MAX_FRAME_DT_SECONDS);
+        double dt = Math.min(HeldLightPlacement.MAX_FRAME_DT_SECONDS, Math.max(dtSeconds, 0.0f));
         double omega = Math.max(0.0, angularFrequency);
         if (dt == 0.0 || omega == 0.0) {
             return new SpringStep(position, velocity);

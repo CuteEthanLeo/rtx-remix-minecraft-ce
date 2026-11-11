@@ -9,7 +9,7 @@ from pathlib import Path, PureWindowsPath
 
 import pytest
 
-from rtx_tools import client
+from rtx_tools import client, prism
 from rtx_tools.benchmark import util
 from rtx_tools.client import LaunchBlocked, LaunchRequest
 
@@ -85,9 +85,9 @@ def recommended_heap_mib() -> int:
     return -(-int(number) * unit_bytes // 1024**2)
 
 
-def write_jdk(home: Path, *, version: str = "21.0.5", machine: int = 0x8664) -> Path:
+def write_jdk(home: Path, *, version: str = f"{prism.GAME_JAVA_MAJOR}.0.5", machine: int = 0x8664) -> Path:
     """A JDK home as the launcher reads one: its release file and a bin/javaw.exe whose PE header names `machine`
-    (0x8664 x64, 0xAA64 ARM64)."""
+    (0x8664 x64, 0xAA64 ARM64). The default version is one of the game's Java major."""
     (home / "bin").mkdir(parents=True, exist_ok=True)
     (home / "release").write_text(f'IMPLEMENTOR="Test"\nJAVA_VERSION="{version}"\n', encoding="utf-8")
     header = bytearray(0x40)

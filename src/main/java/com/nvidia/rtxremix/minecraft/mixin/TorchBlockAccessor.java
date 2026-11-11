@@ -5,7 +5,7 @@
 package com.nvidia.rtxremix.minecraft.mixin;
 
 import net.minecraft.block.TorchBlock;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
@@ -13,5 +13,5 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(TorchBlock.class)
 public interface TorchBlockAccessor {
     @Accessor("particle")
-    SimpleParticleType getParticle();
+    DefaultParticleType getParticle();
 }

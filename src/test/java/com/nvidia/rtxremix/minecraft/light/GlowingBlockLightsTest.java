@@ -81,7 +81,7 @@ class GlowingBlockLightsTest {
         };
         List<LightEntry> lights = resolve(Blocks.SEA_LANTERN.getDefaultState(), POS, buried);
         assertEquals(1, lights.size());
-        assertEquals(1.0f, lights.getFirst().directionY(), 0.0f);
+        assertEquals(1.0f, lights.get(0).directionY(), 0.0f);
     }
 
     @Test
@@ -95,7 +95,7 @@ class GlowingBlockLightsTest {
         List<LightEntry> lights = resolve(pumpkin, POS,
                 BlockLightRuleManager.fixedCentroid(centroid));
         assertEquals(1, lights.size());
-        assertEquals(1.0f, lights.getFirst().directionX(), 0.0f);
+        assertEquals(1.0f, lights.get(0).directionX(), 0.0f);
     }
 
     @Test

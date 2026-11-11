@@ -383,7 +383,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;updateCrosshairTarget(F)V"
+            target = "Lnet/minecraft/client/render/GameRenderer;updateTargetedEntity(F)V"
         ),
         require = 0
     )
@@ -395,7 +395,7 @@ public abstract class MinecraftClientMixin {
         method = "tick",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/client/render/GameRenderer;updateCrosshairTarget(F)V",
+            target = "Lnet/minecraft/client/render/GameRenderer;updateTargetedEntity(F)V",
             shift = At.Shift.AFTER
         ),
         require = 0

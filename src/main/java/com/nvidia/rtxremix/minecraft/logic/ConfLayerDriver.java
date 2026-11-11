@@ -729,7 +729,7 @@ public final class ConfLayerDriver {
         float dtSeconds = frameDtSeconds();
 
         setTarget(LogicChannels.UNDERWATER, underwater ? 1.0f : 0.0f);
-        setTarget(LogicChannels.VIEW_DISTANCE, Math.clamp(viewDistanceStrength, 0.0f, 1.0f));
+        setTarget(LogicChannels.VIEW_DISTANCE, Math.min(1.0f, Math.max(viewDistanceStrength, 0.0f)));
         // Time layers follow the shared Overworld clock only; other dimensions
         // contribute no time-of-day strength.
         TimeLayerStrengths time = World.OVERWORLD.equals(world.getRegistryKey())
@@ -1106,6 +1106,6 @@ public final class ConfLayerDriver {
         if (previous == 0) {
             return 0.0f;
         }
-        return Math.clamp((now - previous) / 1.0e9f, 0.0f, MAX_FRAME_DT_SECONDS);
+        return Math.min(MAX_FRAME_DT_SECONDS, Math.max((now - previous) / 1.0e9f, 0.0f));
     }
 }

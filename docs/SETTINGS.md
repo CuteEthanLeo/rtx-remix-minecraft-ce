@@ -149,13 +149,13 @@ must rebuild those bindings. `RtxSettingsFactory` defines controls,
 
 ### Deferred Does Not Mean Apply On Release
 
-`RtxSetting.deferSliderApply()` makes
-`RtxOptionFactory.sliderApplyPolicy` return `applyValueImmediately() == false`.
-In Minecraft 1.21.1, `SimpleOption.OptionSliderWidgetImpl` then rearms
-`timeToApply = now + 600 ms` on each drag step and applies the pending value
-from `renderWidget` after that pause. `SliderWidget.onRelease` does not apply
-it. The category's `close()` also calls
-`OptionListWidget.applyAllPendingValues()`.
+`RtxSetting.deferSliderApply()` makes `RtxOptionFactory.sliderApplier` hand
+the slider's option a debounced applier from the screen's
+`DeferredSliderApply`. Minecraft 1.20.4's option slider applies on every drag
+step and keeps no pending value, so the pause is the mod's own: each step
+rearms a 600 ms wait, and `RtxOptionListScreen.render` applies the value once
+it has rested that long. Releasing the slider does not apply it. The
+category's `close()` also calls `DeferredSliderApply.applyAll()`.
 
 An expensive applier can therefore run once per long pause during a drag, not
 only once at its end. `clouds.vanillaEdgeSmoothness` and `clouds.size` accept

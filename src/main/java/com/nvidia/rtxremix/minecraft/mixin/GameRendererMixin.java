@@ -13,7 +13,6 @@ import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
-import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -59,9 +58,9 @@ public abstract class GameRendererMixin {
                     shift = At.Shift.BEFORE
             ))
     private void rtxremix$submitBeforeScreenOverlays(
+            MatrixStack matrices,
             Camera camera,
             float tickDelta,
-            Matrix4f positionMatrix,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }
@@ -74,6 +73,7 @@ public abstract class GameRendererMixin {
     private void rtxremix$submitAtRenderWorldTail(
             float tickDelta,
             long limitTime,
+            MatrixStack matrices,
             CallbackInfo ci) {
         RtxRemixMod.submitRemixFrameIfReady();
     }

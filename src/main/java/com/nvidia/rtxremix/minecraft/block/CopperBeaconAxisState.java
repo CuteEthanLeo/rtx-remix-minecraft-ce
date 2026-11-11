@@ -161,6 +161,6 @@ public record CopperBeaconAxisState(
     }
 
     private static float finiteClamped(float value, float minimum, float maximum, float fallback) {
-        return Float.isFinite(value) ? Math.clamp(value, minimum, maximum) : fallback;
+        return Float.isFinite(value) ? Math.min(maximum, Math.max(value, minimum)) : fallback;
     }
 }

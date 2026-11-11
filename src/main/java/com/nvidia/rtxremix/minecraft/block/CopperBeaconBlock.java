@@ -24,6 +24,7 @@ import net.minecraft.state.property.DirectionProperty;
 import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.ItemScatterer;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.BlockRotation;
@@ -100,12 +101,12 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected BlockState rotate(BlockState state, BlockRotation rotation) {
+    public BlockState rotate(BlockState state, BlockRotation rotation) {
         return super.rotate(state, rotation).with(MOUNT, rotation.rotate(state.get(MOUNT)));
     }
 
     @Override
-    protected BlockState mirror(BlockState state, BlockMirror mirror) {
+    public BlockState mirror(BlockState state, BlockMirror mirror) {
         return super.mirror(state, mirror).with(MOUNT, mirror.apply(state.get(MOUNT)));
     }
 
@@ -116,11 +117,12 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected ActionResult onUse(
+    public ActionResult onUse(
             BlockState state,
             World world,
             BlockPos pos,
             PlayerEntity player,
+            Hand hand,
             BlockHitResult hit) {
         if (world.isClient) {
             return ActionResult.SUCCESS;
@@ -133,7 +135,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected void neighborUpdate(
+    public void neighborUpdate(
             BlockState state,
             World world,
             BlockPos pos,
@@ -155,7 +157,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected void onStateReplaced(
+    public void onStateReplaced(
             BlockState state,
             World world,
             BlockPos pos,
@@ -170,7 +172,7 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected BlockState getStateForNeighborUpdate(
+    public BlockState getStateForNeighborUpdate(
             BlockState state,
             Direction direction,
             BlockState neighborState,
@@ -184,17 +186,17 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     }
 
     @Override
-    protected FluidState getFluidState(BlockState state) {
+    public FluidState getFluidState(BlockState state) {
         return state.get(WATERLOGGED) ? Fluids.WATER.getStill(false) : super.getFluidState(state);
     }
 
     @Override
-    protected BlockRenderType getRenderType(BlockState state) {
+    public BlockRenderType getRenderType(BlockState state) {
         return BlockRenderType.MODEL;
     }
 
     @Override
-    protected VoxelShape getOutlineShape(
+    public VoxelShape getOutlineShape(
             BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
         return CopperBeaconShapes.forMount(state.get(MOUNT));
     }

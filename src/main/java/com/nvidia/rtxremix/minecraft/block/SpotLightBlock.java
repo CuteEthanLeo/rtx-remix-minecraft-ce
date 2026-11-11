@@ -128,12 +128,12 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
     }
 
     @Override
-    protected BlockState rotate(BlockState state, BlockRotation rotation) {
+    public BlockState rotate(BlockState state, BlockRotation rotation) {
         return state.with(FACING, rotation.rotate(state.get(FACING)));
     }
 
     @Override
-    protected BlockState mirror(BlockState state, BlockMirror mirror) {
+    public BlockState mirror(BlockState state, BlockMirror mirror) {
         return state.with(FACING, mirror.apply(state.get(FACING)));
     }
 }

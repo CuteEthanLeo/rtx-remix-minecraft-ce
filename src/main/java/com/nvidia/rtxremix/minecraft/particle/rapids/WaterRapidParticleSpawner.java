@@ -12,7 +12,7 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.fluid.FlowableFluid;
 import net.minecraft.fluid.FluidState;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
@@ -283,7 +283,7 @@ public final class WaterRapidParticleSpawner {
     }
 
     private static Particle addParticle(MinecraftClient client, SpawnBudget budget,
-                                        SimpleParticleType type,
+                                        DefaultParticleType type,
                                         double x, double y, double z,
                                         double vx, double vy, double vz) {
         if (!budget.hasRemaining()) {

@@ -71,7 +71,7 @@ class RemixRenderContextTest {
 
         assertEquals(1, visits[0]);
         assertEquals(1, context.harvest().size());
-        SectionBlockData.BlockQuad captured = context.harvest().getFirst();
+        SectionBlockData.BlockQuad captured = context.harvest().get(0);
         assertArrayEquals(new float[]{0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0},
                 captured.positions());
         assertArrayEquals(new float[]{0, 0, 0.125f, 0.25f, 0.25f, 0.5f, 0.375f, 0.75f},
@@ -107,7 +107,7 @@ class RemixRenderContextTest {
         output.accept(mesh, context);
 
         assertEquals(1, context.harvest().size());
-        assertEquals(2.0f, context.harvest().getFirst().positions()[0]);
+        assertEquals(2.0f, context.harvest().get(0).positions()[0]);
         context.popTransform();
         context.popTransform();
         assertFalse(context.hasTransform());
@@ -239,8 +239,8 @@ class RemixRenderContextTest {
 
         assertEquals(2, outer.harvest().size());
         assertEquals(1, inner.harvest().size());
-        assertEquals(1.0f, outer.harvest().getLast().ny());
-        assertEquals(-1.0f, inner.harvest().getFirst().nz());
+        assertEquals(1.0f, outer.harvest().get(1).ny());
+        assertEquals(-1.0f, inner.harvest().get(0).nz());
     }
 
     private static RemixRenderContext context() {

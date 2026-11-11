@@ -7,7 +7,6 @@
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
-import com.mojang.serialization.Codec;
 import com.nvidia.rtxremix.minecraft.UnfocusedFramerateLimit;
 import com.nvidia.rtxremix.minecraft.community.clouds.VolumetricClouds;
 import net.minecraft.client.gui.tooltip.Tooltip;
@@ -17,7 +16,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.util.Locale;
-import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /** Converts an RtxSetting into a vanilla SimpleOption for OptionListWidget. */
@@ -55,8 +54,11 @@ final class RtxOptionFactory {
 
     private RtxOptionFactory() {}
 
+    /**
+     * @param deferredSliders takes the applier of a slider whose setting defers its apply
+     */
     @SuppressWarnings("unchecked")
-    public static SimpleOption<?> toOption(RtxSetting<?> setting) {
+    public static SimpleOption<?> toOption(RtxSetting<?> setting, DeferredSliderApply deferredSliders) {
         switch (setting.kind()) {
             case BOOL -> {
                 RtxSetting<Boolean> s = (RtxSetting<Boolean>) setting;
@@ -73,12 +75,10 @@ final class RtxOptionFactory {
                 int sliderMin = sentinelSliderValue > 0 ? 1 : (int) s.min() / s.step();
                 int sliderMax = sentinelSliderValue > 0 ? sentinelSliderValue : (int) s.max() / s.step();
                 var callbacks =
-                        sliderApplyPolicy(
-                                new SimpleOption.ValidatingIntSliderCallbacks(
-                                        sliderMin, sliderMax, true).withModifier(
-                                                value -> intValueFromSlider(s, value),
-                                                value -> sliderValueFromInt(s, value)),
-                                s.applySliderValueImmediately());
+                        new SimpleOption.ValidatingIntSliderCallbacks(
+                                sliderMin, sliderMax).withModifier(
+                                        value -> intValueFromSlider(s, value),
+                                        value -> sliderValueFromInt(s, value));
                 return new SimpleOption<>(
                         setting.labelKey(),
                         v -> tooltip(s, v),
@@ -86,20 +86,18 @@ final class RtxOptionFactory {
                                 .append(": ").append(intValueText(s.id(), value)),
                         callbacks,
                         s.get(),
-                        s::apply);
+                        sliderApplier(s, deferredSliders));
             }
             case FLOAT -> {
                 RtxSetting<Double> s = (RtxSetting<Double>) setting;
                 double min = s.min();
                 double max = s.max();
                 var callbacks =
-                        sliderApplyPolicy(
-                                SimpleOption.DoubleSliderCallbacks.INSTANCE.withModifier(
-                                        progress -> floatValueFromSlider(
-                                                s.id(), progress, min, max),
-                                        value -> sliderValueFromFloat(
-                                                s.id(), value, min, max)),
-                                s.applySliderValueImmediately());
+                        SimpleOption.DoubleSliderCallbacks.INSTANCE.withModifier(
+                                progress -> floatValueFromSlider(
+                                        s.id(), progress, min, max),
+                                value -> sliderValueFromFloat(
+                                        s.id(), value, min, max));
                 return new SimpleOption<>(
                         setting.labelKey(),
                         v -> tooltip(s, v),
@@ -107,7 +105,7 @@ final class RtxOptionFactory {
                                 .append(": ").append(floatValueText(s.id(), value)),
                         callbacks,
                         s.get(),
-                        s::apply);
+                        sliderApplier(s, deferredSliders));
             }
             default -> throw new IllegalStateException("Unknown kind: " + setting.kind());
         }
@@ -127,37 +125,15 @@ final class RtxOptionFactory {
         return (optionText, value) -> valueText.apply(value);
     }
 
-    static <T> SimpleOption.SliderCallbacks<T> sliderApplyPolicy(
-            SimpleOption.SliderCallbacks<T> callbacks, boolean applyImmediately) {
-        if (applyImmediately) {
-            return callbacks;
+    /**
+     * The change callback for a slider's option: the setting's own applier, or its
+     * debounced form when the setting defers its apply.
+     */
+    static <T> Consumer<T> sliderApplier(RtxSetting<T> setting, DeferredSliderApply deferredSliders) {
+        if (setting.applySliderValueImmediately()) {
+            return setting::apply;
         }
-        return new SimpleOption.SliderCallbacks<>() {
-            @Override
-            public double toSliderProgress(T value) {
-                return callbacks.toSliderProgress(value);
-            }
-
-            @Override
-            public T toValue(double sliderProgress) {
-                return callbacks.toValue(sliderProgress);
-            }
-
-            @Override
-            public Optional<T> validate(T value) {
-                return callbacks.validate(value);
-            }
-
-            @Override
-            public Codec<T> codec() {
-                return callbacks.codec();
-            }
-
-            @Override
-            public boolean applyValueImmediately() {
-                return false;
-            }
-        };
+        return deferredSliders.defer(setting::apply, setting.get());
     }
 
     private static <T> Tooltip tooltip(RtxSetting<T> setting, T value) {

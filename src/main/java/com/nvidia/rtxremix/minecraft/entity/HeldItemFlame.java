@@ -11,7 +11,7 @@ import net.minecraft.block.TorchBlock;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
@@ -96,11 +96,11 @@ public final class HeldItemFlame {
      * null when the item has none.
      *
      * <p>Only the torch family qualifies today: its block spawns its own
-     * {@link SimpleParticleType} every display tick. Redstone torches are
+     * {@link DefaultParticleType} every display tick. Redstone torches are
      * excluded because theirs is a puff of red dust rather than a flame, and an
      * unlit torch variant is excluded because there is nothing lit to show.
      */
-    public static SimpleParticleType particleFor(ItemStack stack) {
+    public static DefaultParticleType particleFor(ItemStack stack) {
         if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof BlockItem blockItem)) {
             return null;
         }

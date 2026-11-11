@@ -112,7 +112,7 @@ final class HeldLightPlacement {
         if (target <= previous) {
             return target;
         }
-        float clampedDt = Math.clamp(dtSeconds, 0.0f, MAX_FRAME_DT_SECONDS);
+        float clampedDt = Math.min(MAX_FRAME_DT_SECONDS, Math.max(dtSeconds, 0.0f));
         return Math.min(target, previous + OUTWARD_SPEED * clampedDt);
     }
 

@@ -64,6 +64,8 @@ public final class RemixFirstPersonPass implements AutoCloseable {
     private final Matrix4f correctedBone = new Matrix4f();
     private final Matrix4f viewCorrection = new Matrix4f();
     private final Matrix4f inverseModelView = new Matrix4f();
+    private final Matrix4f cameraRotation = new Matrix4f();
+    private final MatrixStack handMatrices = new MatrixStack();
     private final Vector3f eye = new Vector3f();
 
     private RemixEntityPass.EntityCaptureResult pendingResult;
@@ -94,21 +96,33 @@ public final class RemixFirstPersonPass implements AutoCloseable {
         context.begin(true);
 
         try {
-            // Vanilla roots the hand stack at the inverse camera rotation and carries
-            // the camera rotation, tilt and bob in the model-view, so the model-view's
-            // origin is where the eye sits in the capture's space.
-            Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix());
+            // Minecraft 1.20.4 roots the hand stack at the camera and leaves the
+            // model-view without the camera rotation. The stack is re-rooted here at
+            // the inverse of that rotation, with the rotation taken into the
+            // model-view, so the capture's space has world axes like every other
+            // capture's and the model-view's origin is where the eye sits in it. Only
+            // the position matrix takes the root, as in the versions whose own hand
+            // stack is rooted this way.
+            Camera camera = client.gameRenderer.getCamera();
+            cameraRotation.rotationXYZ(
+                    camera.getPitch() * (float) (Math.PI / 180.0),
+                    camera.getYaw() * (float) (Math.PI / 180.0) + (float) Math.PI,
+                    0.0f);
+            Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(cameraRotation);
             modelView.invert(inverseModelView).transformPosition(eye.set(0.0f, 0.0f, 0.0f));
             context.setEye(eye.x, eye.y, eye.z);
 
-            heldItemRenderer.renderItem(tickDelta, matrices, immediate, player, light);
+            MatrixStack.Entry hand = matrices.peek();
+            MatrixStack.Entry rooted = handMatrices.peek();
+            cameraRotation.invert(rooted.getPositionMatrix()).mul(hand.getPositionMatrix());
+            rooted.getNormalMatrix().set(hand.getNormalMatrix());
+            heldItemRenderer.renderItem(tickDelta, handMatrices, immediate, player, light);
 
             List<RemixVertexConsumerProvider.CapturedLayer> layers = provider.endEntity();
             if (layers.isEmpty()) {
                 return;
             }
 
-            Camera camera = client.gameRenderer.getCamera();
             float fovScale = calculateFovScale(client, camera, tickDelta);
             setViewCorrection(viewCorrection, modelView, fovScale);
 

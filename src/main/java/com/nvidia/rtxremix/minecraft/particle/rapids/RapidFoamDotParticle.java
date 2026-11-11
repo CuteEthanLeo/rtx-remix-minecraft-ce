@@ -12,7 +12,7 @@ import net.minecraft.client.particle.ParticleTextureSheet;
 import net.minecraft.client.particle.SpriteBillboardParticle;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.particle.DefaultParticleType;
 
 @Environment(EnvType.CLIENT)
 public class RapidFoamDotParticle extends SpriteBillboardParticle {
@@ -38,7 +38,7 @@ public class RapidFoamDotParticle extends SpriteBillboardParticle {
     }
 
     @Environment(EnvType.CLIENT)
-    public static final class Factory implements ParticleFactory<SimpleParticleType> {
+    public static final class Factory implements ParticleFactory<DefaultParticleType> {
         private final SpriteProvider spriteProvider;
 
         public Factory(SpriteProvider spriteProvider) {
@@ -46,7 +46,7 @@ public class RapidFoamDotParticle extends SpriteBillboardParticle {
         }
 
         @Override
-        public Particle createParticle(SimpleParticleType type, ClientWorld world,
+        public Particle createParticle(DefaultParticleType type, ClientWorld world,
                                        double x, double y, double z,
                                        double velocityX, double velocityY, double velocityZ) {
             return new RapidFoamDotParticle(world, x, y, z, velocityX, velocityY, velocityZ, spriteProvider);

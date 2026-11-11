@@ -6,6 +6,7 @@ package com.nvidia.rtxremix.minecraft.community.clouds;
 
 import com.nvidia.rtxremix.minecraft.gl.PixelUnpackScope;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
+import com.nvidia.rtxremix.minecraft.util.HalfFloat;
 import com.nvidia.rtxremix.minecraft.community.LightningFlash;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
@@ -547,7 +548,7 @@ public final class CloudSkyCompositor {
     }
 
     private static float half(ByteBuffer buffer, int offset) {
-        return Float.float16ToFloat(buffer.getShort(offset));
+        return HalfFloat.toFloat(buffer.getShort(offset));
     }
 
     // ------------------------------------------------------------------

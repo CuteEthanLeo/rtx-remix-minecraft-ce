@@ -16,6 +16,7 @@ import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 import java.util.Arrays;
@@ -30,7 +31,7 @@ import java.util.WeakHashMap;
  * <p>Every consumer is fed inside a Remix capture pass, so the geometry it stores is
  * local to the pose that produced it and the pose itself is recorded as a bone
  * through {@link EntityRenderContext}. The matrix-aware paths
- * ({@code vertex(MatrixStack.Entry, ...)}, {@code vertex(Matrix4f, ...)} and
+ * ({@code vertex(Matrix4f, ...)} and
  * {@code quad(...)} for {@link BakedQuad} input) register the pose and keep the
  * untransformed coordinates, and {@code CuboidMixin} hands over whole cuboids by
  * identity through {@link #acceptCuboid}. Rigid instancing needs exactly that: a
@@ -244,18 +245,9 @@ public class RemixCapturingConsumer implements VertexConsumer {
 
     /**
      * Captures a posed vertex as local geometry plus a bone: the position is stored
-     * untransformed and the entry's pose becomes the part's instance transform.
-     */
-    @Override
-    public VertexConsumer vertex(MatrixStack.Entry matrix, float x, float y, float z) {
-        beginVertex(detectBoneChange(matrix.getPositionMatrix()));
-        vx = x; vy = y; vz = z;
-        return this;
-    }
-
-    /**
-     * Captures direct matrix-based quads, most notably held-map backgrounds,
-     * map pixels, and map decorations, as local geometry plus a bone transform.
+     * untransformed and the pose becomes the part's instance transform. Direct
+     * matrix-based quads arrive here, most notably held-map backgrounds, map pixels,
+     * and map decorations.
      *
      * <p>The vanilla default implementation transforms the position first and
      * then calls {@link #vertex(float, float, float)}. That bakes animated hand
@@ -335,7 +327,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
 
     /** The normal stays local like the position; the instance transform poses both. */
     @Override
-    public VertexConsumer normal(MatrixStack.Entry matrix, float x, float y, float z) {
+    public VertexConsumer normal(Matrix3f matrix, float x, float y, float z) {
         return normal(x, y, z);
     }
 
@@ -438,7 +430,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
     }
 
     private static int tintChannel(float value) {
-        return Math.clamp(Math.round(value * 255.0f), 0, OPAQUE);
+        return Math.min(OPAQUE, Math.max(Math.round(value * 255.0f), 0));
     }
 
     /** Overlay rows below this hold the red damage tint; the rest hold the white flash. */
@@ -471,7 +463,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
             return argbColor;
         }
 
-        int u = Math.clamp(packedOverlay & 0xFFFF, 0, OVERLAY_MAX_U);
+        int u = Math.min(OVERLAY_MAX_U, Math.max(packedOverlay & 0xFFFF, 0));
         int v = (packedOverlay >>> 16) & 0xFFFF;
 
         int overlayGreen;
@@ -663,12 +655,12 @@ public class RemixCapturingConsumer implements VertexConsumer {
      */
     @Override
     public void quad(MatrixStack.Entry matrixEntry, BakedQuad quad,
-                     float red, float green, float blue, float alpha, int light, int overlay) {
+                     float red, float green, float blue, int light, int overlay) {
         quadLightScratch[0] = light;
         quadLightScratch[1] = light;
         quadLightScratch[2] = light;
         quadLightScratch[3] = light;
-        this.quad(matrixEntry, quad, quadUnitBrightness, red, green, blue, alpha,
+        this.quad(matrixEntry, quad, quadUnitBrightness, red, green, blue,
                 quadLightScratch, overlay, false);
     }
 
@@ -703,7 +695,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
      */
     @Override
     public void quad(MatrixStack.Entry matrixEntry, BakedQuad quad, float[] brightnesses,
-                     float red, float green, float blue, float alpha, int[] lights, int overlay,
+                     float red, float green, float blue, int[] lights, int overlay,
                      boolean colorize) {
         // The pose is fixed for the whole quad, so resolve the pivot once here
         // rather than per vertex below.
@@ -739,7 +731,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
         flushOpenVertex();
         int quadStart = vertexCount;
         for (int v = 0; v < 4; v++) {
-            quadColors[v] = bakedQuadVertexColor(vd, v, brightnesses, red, green, blue, alpha, overlay, colorize);
+            quadColors[v] = bakedQuadVertexColor(vd, v, brightnesses, red, green, blue, 1.0f, overlay, colorize);
         }
         boolean cardFace = isFullCardFace(vd, quad.getFace());
         int[] rects = cardFace

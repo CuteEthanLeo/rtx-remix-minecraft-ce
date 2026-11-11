@@ -5,54 +5,46 @@
 package com.nvidia.rtxremix.minecraft.block;
 
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.Identifier;
 
 /** One validated control edit from an open Copper Beacon screen. */
-public record CopperBeaconUpdatePayload(int syncId, Field field, float value)
-        implements CustomPayload {
+public record CopperBeaconUpdatePayload(int syncId, Field field, float value) {
 
-    public static final Id<CopperBeaconUpdatePayload> ID = new Id<>(
-            new Identifier(RtxRemixCommonMod.MOD_ID, "copper_beacon_update"));
-    public static final PacketCodec<RegistryByteBuf, CopperBeaconUpdatePayload> PACKET_CODEC =
-            new PacketCodec<>() {
-                @Override
-                public CopperBeaconUpdatePayload decode(RegistryByteBuf buffer) {
-                    return new CopperBeaconUpdatePayload(
-                            buffer.readVarInt(),
-                            Field.byId(buffer.readVarInt()),
-                            buffer.readFloat());
-                }
+    public static final Identifier ID =
+            new Identifier(RtxRemixCommonMod.MOD_ID, "copper_beacon_update");
 
-                @Override
-                public void encode(
-                        RegistryByteBuf buffer, CopperBeaconUpdatePayload payload) {
-                    buffer.writeVarInt(payload.syncId);
-                    buffer.writeVarInt(payload.field.ordinal());
-                    buffer.writeFloat(payload.value);
-                }
-            };
-
-    public static void register() {
-        PayloadTypeRegistry.playC2S().register(ID, PACKET_CODEC);
-        ServerPlayNetworking.registerGlobalReceiver(ID, (payload, context) ->
-                context.server().execute(() -> {
-                    if (context.player().currentScreenHandler
-                                    instanceof CopperBeaconScreenHandler handler
-                            && handler.syncId == payload.syncId
-                            && handler.canUse(context.player())) {
-                        handler.applyUpdate(payload.field, payload.value);
-                    }
-                }));
+    public static CopperBeaconUpdatePayload read(PacketByteBuf buffer) {
+        return new CopperBeaconUpdatePayload(
+                buffer.readVarInt(),
+                Field.byId(buffer.readVarInt()),
+                buffer.readFloat());
     }
 
-    @Override
-    public Id<? extends CustomPayload> getId() {
-        return ID;
+    /** This edit as the buffer {@link #read} decodes. */
+    public PacketByteBuf toBuffer() {
+        PacketByteBuf buffer = PacketByteBufs.create();
+        buffer.writeVarInt(syncId);
+        buffer.writeVarInt(field.ordinal());
+        buffer.writeFloat(value);
+        return buffer;
+    }
+
+    public static void register() {
+        ServerPlayNetworking.registerGlobalReceiver(ID, (server, player, networkHandler, buffer, responseSender) -> {
+            // Decoded here, on the network thread: the buffer is released once this returns.
+            CopperBeaconUpdatePayload payload = read(buffer);
+            server.execute(() -> {
+                if (player.currentScreenHandler
+                                instanceof CopperBeaconScreenHandler handler
+                        && handler.syncId == payload.syncId
+                        && handler.canUse(player)) {
+                    handler.applyUpdate(payload.field, payload.value);
+                }
+            });
+        });
     }
 
     public enum Field {

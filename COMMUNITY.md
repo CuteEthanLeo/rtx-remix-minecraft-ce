@@ -52,17 +52,21 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - **第三人称玩家影子**：静态审查没有找到压掉影子的代码，需要在游戏里按复现步骤确认（见下方「验证」）后再修。
 - 雨滴落在**水面**（湖、河）上的环形涟漪：仍用「雨中加快、加细的双层波浪」近似。露天地面上的积水坑和雨滴涟漪已经加入（见上表「积水坑」「雨滴涟漪」）。
 
-### Minecraft 1.20.6 分支（`mc/1.20.6`）移植状态
+### Minecraft 1.20.4 分支（`mc/1.20.4`）移植状态
 
-这个分支从 1.21.1 往回移植到 1.20.6，**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。功能和性能策略全部保留，没有删除任何一项；和 1.21.1 相比只是挂钩位置和适配方式不同：
+这个分支从 1.21.1 经 1.20.6 往回移植到 1.20.4，**目前只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`，在 Fabric Loader 下加载每个注入目标）通过，尚未在游戏里验证渲染**。功能和性能策略全部保留，没有删除任何一项；和 1.21.1 相比只是挂钩位置和适配方式不同：
 
-- 地形捕获：1.20.6 没有 `SectionBuilder`，方块循环在 `ChunkBuilder.BuiltChunk.RebuildTask.render` 里，捕获 mixin 改名为 `RebuildTaskCaptureMixin`；区块段坐标取自所属 `BuiltChunk` 的原点；空区块段没有渲染区域，直接跳过。区块数据发布的挂钩移到重建任务的完成回调（`RebuildTaskMixin`）。渲染区域快照是二维数组，引用计数按二维遍历。
+- 地形捕获：1.20.4 没有 `SectionBuilder`，方块循环在 `ChunkBuilder.BuiltChunk.RebuildTask.render` 里，捕获 mixin 改名为 `RebuildTaskCaptureMixin`；区块段坐标取自所属 `BuiltChunk` 的原点；空区块段没有渲染区域，直接跳过。区块数据发布的挂钩移到重建任务的完成回调（`RebuildTaskMixin`）。渲染区域快照是二维数组，引用计数按二维遍历。
 - 顶点接口是 1.21 之前的旧式（`vertex(...)…next()`）：实体捕获在 `next()` 时结束一个顶点，不再在法线处结束；`fixedColor` 不生效（原版只在描边缓冲上用它）。模型染色以四个浮点数传入，四舍五入还原成 ARGB 字节。
-- 相机朝向：1.20.6 的 `Camera.getRotation()` 朝 +Z，和 1.21.1 差绕 Y 轴半圈，粒子公告板、手持火焰和雨雪视图统一经 `CameraFacing` 换算。
-- 帧内插值：1.20.6 没有新式 `RenderTickCounter`，由 `ClientTickDelta` 读取（暂停时用暂停瞬间的值，世界 tick 冻结时手持火焰用 1）。
+- 相机朝向：1.20.4 的 `Camera.getRotation()` 朝 +Z，和 1.21.1 差绕 Y 轴半圈，粒子公告板、手持火焰和雨雪视图统一经 `CameraFacing` 换算。
+- 帧内插值：1.20.4 没有新式 `RenderTickCounter`，由 `ClientTickDelta` 读取（暂停时用暂停瞬间的值，世界 tick 冻结时手持火焰用 1）。
 - 雨雪捕获包住 `Tessellator.draw()`，批次留在共享的 `Tessellator` 缓冲里直到 Remix 画完或释放；星空顶点取自 `renderStars` 的返回值。
-- 设置页面：1.20.6 的 `GameOptionsScreen` 不带选项列表，由 `RtxOptionListScreen` 按原版 `SimpleOptionsScreen` 的方式创建和布局。
-- 数据包目录用 1.20.6 的复数名（`recipes`、`loot_tables`、`tags/blocks`）；铜信标镜片颜色由染料的浮点颜色分量还原。
+- 设置页面：1.20.4 的 `GameOptionsScreen` 不做任何布局，原版 `OptionListWidget` 也只能放选项，所以标题、页脚和列表由 `RtxOptionListScreen` 搭建，带分组标题和「名称 + 滑块」行的列表是 mod 自己的 `RtxOptionList`；在世界里列表背景透明，能看到设置的效果。1.20.4 的选项滑块每拖一步就生效、没有待定值，延迟生效（停 600 毫秒或关闭页面时才应用）改由 mod 的 `DeferredSliderApply` 实现；拖动过程中原版每一步仍会写一次 `options.txt`。
+- 数据包目录用 1.20.4 的复数名（`recipes`、`loot_tables`、`tags/blocks`），配方结果用 1.20.4 的 `"item"` 字段；铜信标镜片颜色由染料的浮点颜色分量还原。
+- Java：1.20.4 运行在 Java 17 上，mod 按 Java 17 编译（构建仍需要 JDK 21），安装器安装和选用的是 Java 17（`packaging/installer.ps1` 的 `$script:JAVA_MAJOR`）。Java 21 才有的接口换成等价写法：`Math.clamp`、`List.getFirst/getLast`、`Math.ceilDiv`、半精度浮点转换（`util/HalfFloat`）。`ReachedChunkSet` 不再覆盖 Java 21 的有序集合方法（Java 17 没有这些方法）。
+- 联网与存档：1.20.4 没有 `CustomPayload` 编解码注册，铜信标的设置包和界面打开数据改用 `PacketByteBuf` 和 Fabric 按标识符收发的接口；方块实体和区域存档的 NBT 读写不带注册表参数，镜片里的染料按 1.20.4 的物品 NBT 保存（和 1.20.6 的存档格式不同，跨版本搬动世界时镜片里的染料不会保留）。
+- 第一人称手部：1.20.4 的手部矩阵栈以相机为根、模型视图矩阵不含相机旋转，`RemixFirstPersonPass` 把它换算成以相机旋转的逆为根，和其他捕获保持同一坐标约定。
+- 其余适配：`VertexConsumer` 用矩阵而不是矩阵栈条目的重载、模型四边形不带透明度参数；`MatrixStack.Entry` 没有跳过法线归一化的标记，`MatrixStackEntryAccessor` 删除；`WorldRenderer` 的 `render`、`renderLayer`、`renderClouds`、粒子绘制以及 `GameRenderer` 的 `renderHand`、`renderWorld` 都带 `MatrixStack` 参数；模型视图栈是 `MatrixStack`。
 
 ## 安装（本地）
 
@@ -204,16 +208,26 @@ Known gaps: the third-person player shadow still needs an in-game reproduction b
 water (lakes, rivers) are still approximated by faster, finer wave layers (puddles and ripples on open ground are
 implemented, see above).
 
-The `mc/1.20.6` branch is ported back from 1.21.1 and is verified only by the build, the JVM tests, and
+The `mc/1.20.4` branch is ported back from 1.21.1 by way of 1.20.6 and is verified only by the build, the JVM tests, and
 `MixinTargetsApplyTest`, which loads every mixin target under Fabric Loader; rendering is not yet verified in game.
 No feature or performance policy was dropped. What differs from 1.21.1 is where the hooks sit: terrain capture rides
-`ChunkBuilder.BuiltChunk.RebuildTask.render` (`RebuildTaskCaptureMixin`, since 1.20.6 has no `SectionBuilder`) and
+`ChunkBuilder.BuiltChunk.RebuildTask.render` (`RebuildTaskCaptureMixin`, since 1.20.4 has no `SectionBuilder`) and
 takes the section from the built chunk's origin; the chunk-data publish hook is the rebuild task's completion callback;
 entity capture closes a vertex at the old `next()` call, ignores `fixedColor`, and rounds float model tints back to
-bytes; `CameraFacing` turns 1.20.6's +Z-facing camera rotation half a turn about Y for particles, the held flame, and
+bytes; `CameraFacing` turns 1.20.4's +Z-facing camera rotation half a turn about Y for particles, the held flame, and
 the weather view; `ClientTickDelta` supplies the partial tick; weather capture wraps `Tessellator.draw()` and leaves
-each batch in the shared builder until it is drawn or released; star vertices come from `renderStars`; the settings
-screens build their option list in `RtxOptionListScreen`; and the data folders use 1.20.6's plural names.
+each batch in the shared builder until it is drawn or released; star vertices come from `renderStars`; and the data
+folders use 1.20.4's plural names, with the recipe result in its `"item"` form. Further, for 1.20.4: the game runs
+on Java 17, so the mod is compiled for Java 17 (the build still needs JDK 21), the installer installs and selects
+Java 17 (`$script:JAVA_MAJOR` in `packaging/installer.ps1`), and Java 21 library calls are written out (`Math.clamp`,
+`List.getFirst`, `Math.ceilDiv`, half-float conversion in `util/HalfFloat`; `ReachedChunkSet` no longer overrides the
+sequenced-collection methods Java 17 lacks). The settings screens lay out their own title, footer, and list
+(`RtxOptionListScreen`, `RtxOptionList`), because 1.20.4's option list takes only options, and deferred sliders are
+debounced by the mod's `DeferredSliderApply`, because 1.20.4's option slider applies on every drag step; vanilla
+still writes `options.txt` on each step. The Copper Beacon's settings packet and screen-opening data use
+`PacketByteBuf` with Fabric's identifier-based networking, and its NBT has no registry parameter; the lens dye is
+saved as 1.20.4 item NBT. `RemixFirstPersonPass` re-roots 1.20.4's camera-rooted hand stack at the inverse camera
+rotation. `MatrixStackEntryAccessor` is removed, since 1.20.4's stack entries carry no normalization flag.
 
 Maintenance: merge `upstream/main`, then update `CommunityEdition.UPSTREAM_BASE`; append the hash of every replaced
 shipped conf to `rtx-remix-superseded-defaults.txt`; keep NVIDIA's SPDX line on modified files and add the Community

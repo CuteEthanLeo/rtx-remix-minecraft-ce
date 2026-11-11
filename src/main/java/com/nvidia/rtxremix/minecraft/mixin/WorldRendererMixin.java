@@ -111,7 +111,7 @@ public abstract class WorldRendererMixin
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$syncRebuildScope = new ThreadLocal<>();
 
     @Shadow
-    private ChunkBuilder chunkBuilder;
+    private ChunkBuilder field_45614;
 
     @Shadow
     @Nullable
@@ -132,7 +132,7 @@ public abstract class WorldRendererMixin
 
     @Shadow
     @Final
-    private ObjectArrayList<ChunkBuilder.BuiltChunk> builtChunks;
+    private ObjectArrayList<ChunkBuilder.BuiltChunk> field_45616;
 
     @Shadow
     @Final
@@ -287,7 +287,7 @@ public abstract class WorldRendererMixin
 
     @Override
     public LongSet rtxremix$queueSectionsForRemix(LongSet sections) {
-        if (chunks == null || chunkBuilder == null || world == null || sections.isEmpty()) {
+        if (chunks == null || field_45614 == null || world == null || sections.isEmpty()) {
             return LongSets.emptySet();
         }
 
@@ -330,7 +330,7 @@ public abstract class WorldRendererMixin
         LongOpenHashSet queued = new LongOpenHashSet(loadedSections.size());
         try {
             for (ChunkBuilder.BuiltChunk builtChunk : loadedSections) {
-                builtChunk.scheduleRebuild(chunkBuilder, regionBuilder);
+                builtChunk.scheduleRebuild(field_45614, regionBuilder);
                 // Prevent WorldRenderer.updateChunks from queueing this same slot a
                 // second time when it next walks vanilla's visible section list.
                 builtChunk.cancelRebuild();
@@ -466,13 +466,13 @@ public abstract class WorldRendererMixin
 
     @Inject(method = "render", at = @At("HEAD"))
     private void rtxremix$renderHead(
+            MatrixStack matrices,
             float tickDelta,
             long limitTime,
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
             LightmapTextureManager lightmapTextureManager,
-            Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
             CallbackInfo ci) {
         rtxremix$openJfrOnly(
@@ -492,13 +492,13 @@ public abstract class WorldRendererMixin
 
     @Inject(method = "render", at = @At("RETURN"))
     private void rtxremix$renderReturn(
+            MatrixStack matrices,
             float tickDelta,
             long limitTime,
             boolean renderBlockOutline,
             Camera camera,
             GameRenderer gameRenderer,
             LightmapTextureManager lightmapTextureManager,
-            Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
             CallbackInfo ci) {
         rtxremix$closeProfilerPhase();
@@ -522,10 +522,10 @@ public abstract class WorldRendererMixin
     @Inject(method = "renderLayer", at = @At("HEAD"), cancellable = true)
     private void rtxremix$skipVanillaTerrainLayer(
             RenderLayer renderLayer,
+            MatrixStack matrices,
             double x,
             double y,
             double z,
-            Matrix4f matrix4f,
             Matrix4f positionMatrix,
             CallbackInfo ci) {
         rtxremix$renderLayerCalls++;
@@ -539,22 +539,26 @@ public abstract class WorldRendererMixin
             method = "render",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/client/render/LightmapTextureManager;Lnet/minecraft/client/render/Camera;F)V"
+                    target = "Lnet/minecraft/client/particle/ParticleManager;renderParticles(Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;Lnet/minecraft/client/render/LightmapTextureManager;Lnet/minecraft/client/render/Camera;F)V"
             ))
     private void rtxremix$skipVanillaParticleDraw(
             ParticleManager particleManager,
+            MatrixStack matrices,
+            VertexConsumerProvider.Immediate vertexConsumers,
             LightmapTextureManager lightmapTextureManager,
             Camera camera,
             float tickDelta) {
         if (!RtxRemixMod.isRemixWorldRendering()) {
-            particleManager.renderParticles(lightmapTextureManager, camera, tickDelta);
+            particleManager.renderParticles(matrices, vertexConsumers, lightmapTextureManager, camera, tickDelta);
         }
     }
 
-    @Inject(method = "renderClouds", at = @At("HEAD"), cancellable = true)
+    @Inject(
+            method = "renderClouds(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FDDD)V",
+            at = @At("HEAD"),
+            cancellable = true)
     private void rtxremix$skipVanillaCloudDraw(
             MatrixStack matrices,
-            Matrix4f positionMatrix,
             Matrix4f projectionMatrix,
             float tickDelta,
             double cameraX,
@@ -795,11 +799,11 @@ public abstract class WorldRendererMixin
     }
 
     private int rtxremix$chunksToUpload() {
-        return chunkBuilder == null ? -1 : chunkBuilder.getChunksToUpload();
+        return field_45614 == null ? -1 : field_45614.getChunksToUpload();
     }
 
     private int rtxremix$chunksToBatch() {
-        return chunkBuilder == null ? -1 : chunkBuilder.getToBatchCount();
+        return field_45614 == null ? -1 : field_45614.getToBatchCount();
     }
 
     private void rtxremix$transitionProfilerPhase(String vanillaPhaseName) {
@@ -831,8 +835,8 @@ public abstract class WorldRendererMixin
     }
 
     private void rtxremix$annotateProfilerPhase(ProfileScope scope) {
-        if (builtChunks != null) {
-            int visibleChunks = builtChunks.size();
+        if (field_45616 != null) {
+            int visibleChunks = field_45616.size();
             scope.visibleChunkCount(visibleChunks);
             scope.captureCount(visibleChunks);
         }

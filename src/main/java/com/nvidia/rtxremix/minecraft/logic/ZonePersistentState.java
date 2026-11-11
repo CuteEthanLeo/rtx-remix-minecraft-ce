@@ -8,7 +8,6 @@ import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.PersistentState;
 import org.slf4j.Logger;
@@ -119,7 +118,7 @@ public final class ZonePersistentState extends PersistentState {
     }
 
     @Override
-    public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+    public NbtCompound writeNbt(NbtCompound nbt) {
         nbt.putInt(VERSION_KEY, SCHEMA_VERSION);
         NbtList zones = new NbtList();
         for (ZoneDefinition zone : snapshot()) {
@@ -129,7 +128,7 @@ public final class ZonePersistentState extends PersistentState {
         return nbt;
     }
 
-    static ZonePersistentState fromNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+    static ZonePersistentState fromNbt(NbtCompound nbt) {
         if (!nbt.contains(VERSION_KEY, NbtElement.INT_TYPE)) {
             LOGGER.warn("Ignoring RTX Remix zone state without a schema version");
             return new ZonePersistentState(false);

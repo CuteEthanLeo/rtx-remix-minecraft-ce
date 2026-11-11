@@ -78,8 +78,9 @@ class RemixBlockDamagePassTest {
     void projectionMatchesVanillaOverlayConsumerOnEveryFace() {
         for (Direction face : Direction.values()) {
             Recorder vanillaOut = new Recorder();
+            MatrixStack.Entry identity = new MatrixStack().peek();
             VertexConsumer vanilla = new OverlayVertexConsumer(
-                    vanillaOut, new MatrixStack().peek(), 1.0F);
+                    vanillaOut, identity.getPositionMatrix(), identity.getNormalMatrix(), 1.0F);
             Recorder projectorOut = new Recorder();
             VertexConsumer projector = new RemixBlockDamagePass.CrackProjector().target(projectorOut);
 
@@ -111,7 +112,11 @@ class RemixBlockDamagePassTest {
     void projectedUvIsPresentWhenTheCapturingConsumerClosesTheVertex() {
         EntityRenderContext.get().begin(true);
         Recorder vanillaOut = new Recorder();
-        feedFace(new OverlayVertexConsumer(vanillaOut, new MatrixStack().peek(), 1.0F), Direction.NORTH);
+        MatrixStack.Entry identity = new MatrixStack().peek();
+        feedFace(
+                new OverlayVertexConsumer(
+                        vanillaOut, identity.getPositionMatrix(), identity.getNormalMatrix(), 1.0F),
+                Direction.NORTH);
         List<Recorder.Vertex> expected = vanillaOut.finish();
 
         RemixCapturingConsumer capture = new RemixCapturingConsumer(null, true);

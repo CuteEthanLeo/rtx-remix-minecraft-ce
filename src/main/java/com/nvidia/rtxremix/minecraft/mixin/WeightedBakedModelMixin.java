@@ -56,7 +56,7 @@ public abstract class WeightedBakedModelMixin {
             Weighted.Present<BakedModel> variant = variants.get(i);
             remaining -= variant.getWeight().getValue();
             if (remaining < 0) {
-                cir.setReturnValue(variant.data().getQuads(state, face, random));
+                cir.setReturnValue(variant.getData().getQuads(state, face, random));
                 return;
             }
         }

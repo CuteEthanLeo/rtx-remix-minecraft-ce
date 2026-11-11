@@ -360,7 +360,9 @@ public final class BlockQuadEmitter {
         BakedModel model = blockRenderManager.getModel(state);
         String layerName = classifyBlockLayer(state);
 
-        if (model instanceof FabricBakedModel fbm && !fbm.isVanillaAdapter()) {
+        // Every BakedModel is a FabricBakedModel through Fabric's interface injection.
+        FabricBakedModel fbm = model;
+        if (fbm != null && !fbm.isVanillaAdapter()) {
             emitFrapiBlock(world, state, model, fbm, layerName, lx, ly, lz);
         } else {
             emitVanillaBlock(world, state, model, layerName, lx, ly, lz);

@@ -17,10 +17,10 @@ import net.minecraft.item.DyeItem;
 import net.minecraft.util.DyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Persistent optics, dye inventory, and articulated motion for one Copper Beacon. */
 public final class CopperBeaconBlockEntity extends BlockEntity
-        implements Inventory, ExtendedScreenHandlerFactory<CopperBeaconScreenData> {
+        implements Inventory, ExtendedScreenHandlerFactory {
 
     private static final Set<CopperBeaconBlockEntity> LOADED =
             ConcurrentHashMap.newKeySet();
@@ -323,8 +323,8 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     }
 
     @Override
-    public CopperBeaconScreenData getScreenOpeningData(ServerPlayerEntity player) {
-        return new CopperBeaconScreenData(pos);
+    public void writeScreenOpeningData(ServerPlayerEntity player, PacketByteBuf buffer) {
+        new CopperBeaconScreenData(pos).write(buffer);
     }
 
     @Override
@@ -407,8 +407,8 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.writeNbt(nbt, registryLookup);
+    protected void writeNbt(NbtCompound nbt) {
+        super.writeNbt(nbt);
         nbt.putFloat(INTENSITY_KEY, intensityMultiplier);
         nbt.putFloat(CONE_ANGLE_KEY, coneAngle);
         nbt.putFloat(SATURATION_KEY, saturation);
@@ -421,13 +421,13 @@ public final class CopperBeaconBlockEntity extends BlockEntity
         pitch.writeNbt(pitchNbt);
         nbt.put(PITCH_KEY, pitchNbt);
         if (!dye.isEmpty()) {
-            nbt.put(DYE_KEY, dye.encode(registryLookup));
+            nbt.put(DYE_KEY, dye.writeNbt(new NbtCompound()));
         }
     }
 
     @Override
-    protected void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.readNbt(nbt, registryLookup);
+    public void readNbt(NbtCompound nbt) {
+        super.readNbt(nbt);
         intensityMultiplier = finiteClamped(
                 nbt.contains(INTENSITY_KEY)
                         ? nbt.getFloat(INTENSITY_KEY)
@@ -472,13 +472,13 @@ public final class CopperBeaconBlockEntity extends BlockEntity
                     0L);
         }
         dye = nbt.get(DYE_KEY) != null
-                ? ItemStack.fromNbt(registryLookup, nbt.getCompound(DYE_KEY)).orElse(ItemStack.EMPTY)
+                ? ItemStack.fromNbt(nbt.getCompound(DYE_KEY))
                 : ItemStack.EMPTY;
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup registryLookup) {
-        return createNbt(registryLookup);
+    public NbtCompound toInitialChunkDataNbt() {
+        return createNbt();
     }
 
     @Nullable
@@ -503,6 +503,6 @@ public final class CopperBeaconBlockEntity extends BlockEntity
     }
 
     private static float finiteClamped(float value, float minimum, float maximum, float fallback) {
-        return Float.isFinite(value) ? Math.clamp(value, minimum, maximum) : fallback;
+        return Float.isFinite(value) ? Math.min(maximum, Math.max(value, minimum)) : fallback;
     }
 }

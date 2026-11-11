@@ -64,14 +64,14 @@ final class CopperBeaconState {
     }
 
     static int applySaturation(int argb, float saturation) {
-        float amount = Math.clamp(saturation, 0.0f, 2.0f);
+        float amount = Math.min(2.0f, Math.max(saturation, 0.0f));
         int red = (argb >>> 16) & 0xFF;
         int green = (argb >>> 8) & 0xFF;
         int blue = argb & 0xFF;
         int gray = Math.round(red * 0.2126f + green * 0.7152f + blue * 0.0722f);
-        int saturatedRed = Math.clamp(Math.round(gray + (red - gray) * amount), 0, 255);
-        int saturatedGreen = Math.clamp(Math.round(gray + (green - gray) * amount), 0, 255);
-        int saturatedBlue = Math.clamp(Math.round(gray + (blue - gray) * amount), 0, 255);
+        int saturatedRed = Math.min(255, Math.max(Math.round(gray + (red - gray) * amount), 0));
+        int saturatedGreen = Math.min(255, Math.max(Math.round(gray + (green - gray) * amount), 0));
+        int saturatedBlue = Math.min(255, Math.max(Math.round(gray + (blue - gray) * amount), 0));
         return (argb & 0xFF000000)
                 | (saturatedRed << 16)
                 | (saturatedGreen << 8)

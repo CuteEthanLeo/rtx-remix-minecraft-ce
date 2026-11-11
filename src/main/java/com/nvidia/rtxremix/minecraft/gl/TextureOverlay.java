@@ -79,8 +79,8 @@ public class TextureOverlay {
         );
         RenderSystem.setProjectionMatrix(projMatrix, VertexSorter.BY_Z);
 
-        RenderSystem.getModelViewStack().pushMatrix();
-        RenderSystem.getModelViewStack().identity();
+        RenderSystem.getModelViewStack().push();
+        RenderSystem.getModelViewStack().loadIdentity();
         RenderSystem.applyModelViewMatrix();
 
         RenderSystem.setShader(GameRenderer::getPositionTexProgram);
@@ -100,7 +100,7 @@ public class TextureOverlay {
 
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
 
-        RenderSystem.getModelViewStack().popMatrix();
+        RenderSystem.getModelViewStack().pop();
         RenderSystem.applyModelViewMatrix();
         RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
 

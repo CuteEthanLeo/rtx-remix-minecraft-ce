@@ -150,22 +150,6 @@ public final class ReachedChunkSet extends LinkedHashSet<ChunkInfo> {
     }
 
     @Override
-    public ChunkInfo getFirst() {
-        if (count == 0) {
-            throw new NoSuchElementException();
-        }
-        return order[0];
-    }
-
-    @Override
-    public ChunkInfo getLast() {
-        if (count == 0) {
-            throw new NoSuchElementException();
-        }
-        return order[count - 1];
-    }
-
-    @Override
     public boolean remove(Object o) {
         throw unsupported();
     }
@@ -182,31 +166,6 @@ public final class ReachedChunkSet extends LinkedHashSet<ChunkInfo> {
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        throw unsupported();
-    }
-
-    @Override
-    public void addFirst(ChunkInfo info) {
-        throw unsupported();
-    }
-
-    @Override
-    public void addLast(ChunkInfo info) {
-        throw unsupported();
-    }
-
-    @Override
-    public ChunkInfo removeFirst() {
-        throw unsupported();
-    }
-
-    @Override
-    public ChunkInfo removeLast() {
-        throw unsupported();
-    }
-
-    @Override
-    public LinkedHashSet<ChunkInfo> reversed() {
         throw unsupported();
     }
 

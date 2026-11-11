@@ -183,10 +183,7 @@ public final class BeaconBeam {
     }
 
     static float heldConeAngle(double placementFraction) {
-        float blend = (float) Math.clamp(
-                (1.0 - placementFraction) / HELD_NEAR_WALL_TRANSITION_FRACTION,
-                0.0,
-                1.0);
+        float blend = (float) Math.min(1.0, Math.max((1.0 - placementFraction) / HELD_NEAR_WALL_TRANSITION_FRACTION, 0.0));
         blend = blend * blend * (3.0f - 2.0f * blend);
         return CONE_ANGLE_DEGREES
                 + (HELD_NEAR_WALL_CONE_ANGLE_DEGREES - CONE_ANGLE_DEGREES) * blend;

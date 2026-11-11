@@ -4,21 +4,29 @@
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.option.GameOptionsScreen;
-import net.minecraft.client.gui.widget.OptionListWidget;
+import net.minecraft.client.gui.widget.TextWidget;
+import net.minecraft.client.gui.widget.ThreePartsLayoutWidget;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.text.Text;
+import net.minecraft.util.Util;
 
 /**
- * An options screen whose body is one option list.
+ * An options screen whose body is one option list between a title and a footer.
  *
- * <p>Minecraft 1.20.6's {@code GameOptionsScreen} lays out only a header and a footer, so the
- * list is created and positioned here the way vanilla's {@code SimpleOptionsScreen} does it.
+ * <p>Minecraft 1.20.4's {@code GameOptionsScreen} lays nothing out, and a resize runs
+ * {@code init} again, so the layout and the list are built there from the current size.
  */
 abstract class RtxOptionListScreen extends GameOptionsScreen {
 
-    protected OptionListWidget body;
+    private static final int HEADER_HEIGHT = 33;
+    private static final int FOOTER_HEIGHT = 33;
+
+    protected final DeferredSliderApply deferredSliders = new DeferredSliderApply(Util::getMeasuringTimeMs);
+    protected ThreePartsLayoutWidget layout;
+    protected RtxOptionList body;
 
     RtxOptionListScreen(Screen parent, GameOptions gameOptions, Text title) {
         super(parent, gameOptions, title);
@@ -26,17 +34,31 @@ abstract class RtxOptionListScreen extends GameOptionsScreen {
 
     @Override
     protected void init() {
-        this.body = this.addDrawableChild(new OptionListWidget(this.client, this.width, this.height, this));
+        // The sliders of the list a resize replaces must not lose a value still pending.
+        this.deferredSliders.applyAll();
+        this.deferredSliders.clear();
+
+        this.layout = new ThreePartsLayoutWidget(this, HEADER_HEIGHT, FOOTER_HEIGHT);
+        this.layout.addHeader(new TextWidget(this.title, this.textRenderer));
+        this.body = this.addDrawableChild(new RtxOptionList(
+                this.client, this.width, this.height - HEADER_HEIGHT - FOOTER_HEIGHT, HEADER_HEIGHT));
+        // Over a world the list stays see-through, so a setting's effect shows behind it.
+        this.body.setRenderBackground(this.client.world == null);
         this.addOptions();
-        super.init();
+        this.initFooter();
+        this.layout.forEachChild(this::addDrawableChild);
+        this.layout.refreshPositions();
     }
 
     /** Fills {@link #body}; called once per {@code init}. */
     protected abstract void addOptions();
 
+    /** Adds the footer to {@link #layout}; called once per {@code init}. */
+    protected abstract void initFooter();
+
     @Override
-    protected void initTabNavigation() {
-        super.initTabNavigation();
-        this.body.position(this.width, this.layout);
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        super.render(context, mouseX, mouseY, delta);
+        this.deferredSliders.applyDue();
     }
 }

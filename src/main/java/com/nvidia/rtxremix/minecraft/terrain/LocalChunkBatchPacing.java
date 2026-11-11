@@ -174,8 +174,8 @@ public final class LocalChunkBatchPacing {
         }
         int floor = Math.max(1, Math.min(chunksFor(applyNanosPerChunk, batchBudgetMs), batchMaxChunks));
         int ceiling = Math.max(floor, Math.min(chunksFor(applyNanosPerChunk, backlogBudgetMs), backlogMaxChunks));
-        int share = Math.ceilDiv(pending, backlogDivisor);
-        return Math.min(pending, Math.clamp(share, floor, ceiling));
+        int share = -Math.floorDiv(-pending, backlogDivisor);
+        return Math.min(pending, Math.min(ceiling, Math.max(share, floor)));
     }
 
     /** {@link #batchSize(int, double, double, double, int, int, int)} without chunk caps. */

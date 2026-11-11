@@ -5,7 +5,6 @@
 package com.nvidia.rtxremix.minecraft.entity;
 
 import com.nvidia.rtxremix.minecraft.mixin.MatrixStackAccessor;
-import com.nvidia.rtxremix.minecraft.mixin.MatrixStackEntryAccessor;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Quaternionf;
 
@@ -38,10 +37,6 @@ public final class RecyclingMatrixStack extends MatrixStack {
 
         next.getPositionMatrix().set(previous.getPositionMatrix());
         next.getNormalMatrix().set(previous.getNormalMatrix());
-        boolean canSkipNormalization = ((MatrixStackEntryAccessor) (Object) previous)
-                .rtxremix$getCanSkipNormalization();
-        ((MatrixStackEntryAccessor) (Object) next)
-                .rtxremix$setCanSkipNormalization(canSkipNormalization);
         stack.addLast(next);
     }
 

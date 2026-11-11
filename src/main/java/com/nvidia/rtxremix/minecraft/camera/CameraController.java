@@ -126,7 +126,7 @@ public final class CameraController {
             } else {
                 advanceRecordingClock(now);
                 long elapsedMs = recordingElapsedMs();
-                CameraPath.Waypoint lastWaypoint = recordedWaypoints.getLast();
+                CameraPath.Waypoint lastWaypoint = recordedWaypoints.get(recordedWaypoints.size() - 1);
                 if (elapsedMs > lastWaypoint.timeMs()) {
                     storeRecordingWaypoint(
                             recordedWaypoints,
@@ -358,7 +358,7 @@ public final class CameraController {
         captureExactFinalWaypoint(client);
 
         if (recordedWaypoints.size() < 2
-                || recordedWaypoints.getLast().timeMs() <= recordedWaypoints.getFirst().timeMs()) {
+                || recordedWaypoints.get(recordedWaypoints.size() - 1).timeMs() <= recordedWaypoints.get(0).timeMs()) {
             return fail("Camera recording is too short; record some movement before saving.");
         }
 

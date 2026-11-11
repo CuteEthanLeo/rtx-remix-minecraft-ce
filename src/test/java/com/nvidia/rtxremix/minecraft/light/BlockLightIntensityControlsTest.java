@@ -29,7 +29,7 @@ class BlockLightIntensityControlsTest {
     @Test
     void configuredMultiplierScalesControlledRulesOnly() {
         BlockLightIntensityControls.Control control =
-                BlockLightIntensityControls.controls().getFirst();
+                BlockLightIntensityControls.controls().get(0);
         Identifier externalRule =
                 new Identifier("example", "rtx_remix/block_lights/custom.json");
         try {

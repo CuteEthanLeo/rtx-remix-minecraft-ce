@@ -2,7 +2,7 @@
     "required": true,
     "minVersion": "0.8",
     "package": "com.nvidia.rtxremix.minecraft.mixin",
-    "compatibilityLevel": "JAVA_21",
+    "compatibilityLevel": "JAVA_17",
     "mixins": [
         "ChunkHolderMixin",
         "ServerChunkManagerMixin",
@@ -46,7 +46,6 @@
         "LightStorageMixin",
         "LivingEntityRendererNameMixin",
         "MatrixStackAccessor",
-        "MatrixStackEntryAccessor",
         "MinecraftClientAccessor",
         "MinecraftClientMixin",
         "ModelPartMixin",

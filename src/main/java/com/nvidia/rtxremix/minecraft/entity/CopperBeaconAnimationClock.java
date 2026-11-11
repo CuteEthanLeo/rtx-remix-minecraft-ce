@@ -30,20 +30,14 @@ public final class CopperBeaconAnimationClock {
 
     static double sample(
             World currentWorld, long currentTick, float tickDelta, long nowNanos) {
-        double vanillaFraction = Math.clamp(
-                Float.isFinite(tickDelta) ? tickDelta : 0.0f,
-                0.0f,
-                1.0f);
+        double vanillaFraction = Math.min(1.0f, Math.max(Float.isFinite(tickDelta) ? tickDelta : 0.0f, 0.0f));
         if (world != currentWorld || worldTick != currentTick) {
             world = currentWorld;
             worldTick = currentTick;
             tickStartNanos = nowNanos - (long) (vanillaFraction * NANOS_PER_TICK);
         }
 
-        double elapsedFraction = Math.clamp(
-                (nowNanos - tickStartNanos) / (double) NANOS_PER_TICK,
-                0.0,
-                1.0);
+        double elapsedFraction = Math.min(1.0, Math.max((nowNanos - tickStartNanos) / (double) NANOS_PER_TICK, 0.0));
         return currentTick + Math.max(vanillaFraction, elapsedFraction);
     }
 

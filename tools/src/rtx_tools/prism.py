@@ -37,10 +37,6 @@ HEAP_SIZE = re.compile(r"(\d+)([kKmMgGtT]?)")
 HEAP_UNIT_BYTES = {"": 1, "k": 1 << 10, "m": 1 << 20, "g": 1 << 30, "t": 1 << 40}
 # Prism's default MinMemAlloc (Application::Application in launcher/Application.cpp).
 PRISM_MIN_HEAP_MIB = 512
-# The only Java major Prism's metadata lists for Minecraft 1.21.1 (compatibleJavaMajors in
-# https://meta.prismlauncher.org/v1/net.minecraft/1.21.1.json). Prism refuses any other, newer ones included, unless
-# IgnoreJavaCompatibility is set (VerifyJavaInstall::executeTask in launcher/minecraft/launch/VerifyJavaInstall.cpp).
-GAME_JAVA_MAJOR = 21
 PE_MACHINE_ARCH = {0x8664: "win64", 0xAA64: "arm64"}
 JAVA_VERSION_LINE = re.compile(r'^JAVA_VERSION="(\d+(?:\.\d+)*)', re.MULTILINE)
 
@@ -330,14 +326,23 @@ def find_game_jdk(arch: str, java_home: Path | None) -> Path | None:
 
 
 def installer_constant(name: str) -> str:
-    """A `$script:NAME = '...'` string from packaging/installer.ps1, the one source of the pinned versions and the
-    recommended JVM arguments."""
+    """A `$script:NAME = '...'` string or `$script:NAME = 123` integer from packaging/installer.ps1, the one source
+    of the pinned versions, the game's Java major, and the recommended JVM arguments."""
     path = util.PROJECT_DIR / "packaging" / "installer.ps1"
-    pattern = rf"^[ \t]*\$script:{re.escape(name)}[ \t]*=[ \t]*'((?:[^']|'')*)'"
+    pattern = rf"^[ \t]*\$script:{re.escape(name)}[ \t]*=[ \t]*(?:'((?:[^']|'')*)'|(\d+)[ \t]*\r?$)"
     match = re.search(pattern, path.read_text(encoding="utf-8"), re.MULTILINE)
     if match is None:
-        raise RuntimeError(f"{path} has no $script:{name} string assignment")
+        raise RuntimeError(f"{path} has no $script:{name} string or integer assignment")
+    if match.group(2) is not None:
+        return match.group(2)
     return match.group(1).replace("''", "'")
+
+
+# The only Java major Prism's metadata lists for the pinned Minecraft version (compatibleJavaMajors in
+# https://meta.prismlauncher.org/v1/net.minecraft/<version>.json). Prism refuses any other, newer ones included,
+# unless IgnoreJavaCompatibility is set (VerifyJavaInstall::executeTask in
+# launcher/minecraft/launch/VerifyJavaInstall.cpp).
+GAME_JAVA_MAJOR = int(installer_constant("JAVA_MAJOR"))
 
 
 def _ini_value(value: str) -> str:

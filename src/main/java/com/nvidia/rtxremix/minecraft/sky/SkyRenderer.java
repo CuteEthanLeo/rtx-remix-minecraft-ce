@@ -47,6 +47,7 @@ import com.nvidia.rtxremix.minecraft.light.LightManager;
 import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
+import com.nvidia.rtxremix.minecraft.util.HalfFloat;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.DimensionEffects;
 import net.minecraft.client.texture.NativeImage;
@@ -157,11 +158,11 @@ public class SkyRenderer {
     public static void setDayAmbientBoost(float v)    { dayAmbientBoost = v; }
     public static float getMinimumCelestialWeatherVisibility()  { return minimumCelestialWeatherVisibility; }
     public static void setMinimumCelestialWeatherVisibility(float v) {
-        minimumCelestialWeatherVisibility = Math.clamp(v, 0.0f, 1.0f);
+        minimumCelestialWeatherVisibility = Math.min(1.0f, Math.max(v, 0.0f));
     }
     public static float getMieScatteringAnisotropy()  { return mieScatteringAnisotropy; }
     public static void setMieScatteringAnisotropy(float v) {
-        mieScatteringAnisotropy = Math.clamp(v, 0.0f, MAX_MIE_SCATTERING_ANISOTROPY);
+        mieScatteringAnisotropy = Math.min(MAX_MIE_SCATTERING_ANISOTROPY, Math.max(v, 0.0f));
     }
 
     /**
@@ -412,10 +413,10 @@ public class SkyRenderer {
             throw new IllegalArgumentException(
                     "Dome buffer is smaller than " + AtmosphericSkyGenerator.OUTPUT_BYTES);
         }
-        short r = Float.floatToFloat16(radiance[0]);
-        short g = Float.floatToFloat16(radiance[1]);
-        short b = Float.floatToFloat16(radiance[2]);
-        short a = Float.floatToFloat16(1.0f);
+        short r = HalfFloat.fromFloat(radiance[0]);
+        short g = HalfFloat.fromFloat(radiance[1]);
+        short b = HalfFloat.fromFloat(radiance[2]);
+        short a = HalfFloat.fromFloat(1.0f);
         pixels.clear();
         pixels.order(ByteOrder.nativeOrder());
         pixels.limit(AtmosphericSkyGenerator.OUTPUT_BYTES);
@@ -872,7 +873,7 @@ public class SkyRenderer {
 
         float weatherVisibility = Math.max(
                 minimumCelestialWeatherVisibility, 1.0f - clamp01(weatherOpacity));
-        float starBrightness = world.getStarBrightness(tickDelta);
+        float starBrightness = world.method_23787(tickDelta);
         if (!drawStarryNight(api, world, cameraPos, skyAngle, starBrightness, weatherVisibility)) {
             float starsOpacity = starOpacity(starBrightness) * weatherVisibility;
             if (starsOpacity > 0.0f) {

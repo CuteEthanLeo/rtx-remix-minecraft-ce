@@ -5,13 +5,10 @@
 package com.nvidia.rtxremix.minecraft.light;
 
 import com.google.gson.JsonParser;
-import net.minecraft.registry.VersionedIdentifier;
 import net.minecraft.resource.InputSupplier;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
 import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourcePackSource;
 import net.minecraft.resource.ResourceType;
 import net.minecraft.resource.metadata.ResourceMetadataReader;
 import net.minecraft.text.Text;
@@ -72,7 +69,7 @@ class BlockLightRuleManagerTest {
         lightsField.setAccessible(true);
         List<?> lights = (List<?>) lightsField.get(rule);
         assertEquals(1, lights.size());
-        Object spec = lights.getFirst();
+        Object spec = lights.get(0);
 
         for (var expected : Map.of(
                 "shape", LightShape.RECT,
@@ -347,7 +344,7 @@ class BlockLightRuleManagerTest {
         @Override
         public Optional<Resource> getResource(Identifier identifier) {
             List<Resource> found = resources.get(identifier);
-            return found == null || found.isEmpty() ? Optional.empty() : Optional.of(found.getLast());
+            return found == null || found.isEmpty() ? Optional.empty() : Optional.of(found.get(found.size() - 1));
         }
 
         @Override
@@ -400,8 +397,8 @@ class BlockLightRuleManagerTest {
         }
 
         @Override
-        public ResourcePackInfo getInfo() {
-            return new ResourcePackInfo(id, Text.literal(id), ResourcePackSource.NONE, Optional.<VersionedIdentifier>empty());
+        public String getName() {
+            return id;
         }
 
         @Override

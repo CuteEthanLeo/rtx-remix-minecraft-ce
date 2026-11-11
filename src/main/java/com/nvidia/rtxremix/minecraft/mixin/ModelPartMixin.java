@@ -94,7 +94,7 @@ public abstract class ModelPartMixin {
                 && cuboids instanceof ImmutableList<?>
                 && consumer.isRemixCaptureActive()) {
             Iterator<ModelPart.Cuboid> iterator =
-                    consumer.acquireSingletonCuboidIterator(cuboids.getFirst());
+                    consumer.acquireSingletonCuboidIterator(cuboids.get(0));
             if (iterator != null) {
                 return iterator;
             }

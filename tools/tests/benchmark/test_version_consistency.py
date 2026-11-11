@@ -212,6 +212,21 @@ class VersionConsistencyTests(unittest.TestCase):
         sources = metadata.get("contact", {}).get("sources", "")
         self.assertNotIn("rtxremix-java", sources)
 
+    def test_game_java_major_matches_the_compiled_and_declared_java(self):
+        installer = (REPO_ROOT / "packaging" / "installer.ps1").read_text(encoding="utf-8")
+        declared = re.search(r"(?m)^\$script:JAVA_MAJOR\s*=\s*(\d+)\s*$", installer)
+        assert declared is not None, "packaging/installer.ps1 has no $script:JAVA_MAJOR integer assignment"
+        java_major = declared.group(1)
+
+        build = (REPO_ROOT / "build.gradle").read_text(encoding="utf-8")
+        self.assertEqual([java_major], re.findall(r"(?m)^\s*options\.release\s*=\s*(\d+)\s*$", build))
+
+        resources = REPO_ROOT / "src" / "main" / "resources"
+        metadata = json.loads((resources / "fabric.mod.json").read_text(encoding="utf-8"))
+        self.assertEqual(f">={java_major}", metadata["depends"]["java"])
+        mixins = json.loads((resources / "rtx-remix-renderer.mixins.json").read_text(encoding="utf-8"))
+        self.assertEqual(f"JAVA_{java_major}", mixins["compatibilityLevel"])
+
     def test_readme_license_matches_repository_license(self):
         license_text = (REPO_ROOT / "LICENSE").read_text(encoding="utf-8")
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")

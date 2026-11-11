@@ -77,7 +77,7 @@ final class RtxSettingsCategoryScreen extends RtxOptionListScreen {
 
             List<SimpleOption<?>> options = new ArrayList<>();
             for (RtxSetting<?> setting : groupSettings) {
-                options.add(RtxOptionFactory.toOption(setting));
+                options.add(RtxOptionFactory.toOption(setting, this.deferredSliders));
             }
             if (fullWidthRows(group)) {
                 options.forEach(this.body::addSingleOptionEntry);
@@ -154,9 +154,7 @@ final class RtxSettingsCategoryScreen extends RtxOptionListScreen {
 
     @Override
     public void close() {
-        if (this.body != null) {
-            this.body.applyAllPendingValues();
-        }
+        this.deferredSliders.applyAll();
         if (saveSettings != null) {
             saveSettings.run();
         }

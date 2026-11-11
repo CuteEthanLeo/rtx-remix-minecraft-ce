@@ -255,7 +255,7 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
                 width,
                 Text.translatable(labelKey),
                 Text.translatable(labelKey + ".tip"),
-                Math.clamp(toSlider.applyAsDouble(current), 0.0, 1.0),
+                Math.min(1.0, Math.max(toSlider.applyAsDouble(current), 0.0)),
                 fromSlider,
                 valueText,
                 value -> queue(field, value.floatValue()),
@@ -273,7 +273,8 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
             return;
         }
         pending.forEach((field, value) -> ClientPlayNetworking.send(
-                new CopperBeaconUpdatePayload(handler.syncId, field, value)));
+                CopperBeaconUpdatePayload.ID,
+                new CopperBeaconUpdatePayload(handler.syncId, field, value).toBuffer()));
         pending.clear();
     }
 

@@ -62,7 +62,7 @@ class RemixCapturingConsumerTest {
         assertEquals(-0.01f, consumer.getPz()[0]);
         assertEquals(0, consumer.getBoneIndices()[0]);
         assertEquals(1, context.getBoneCount());
-        assertEquals(pose, context.getBoneTransforms().getFirst());
+        assertEquals(pose, context.getBoneTransforms().get(0));
     }
 
     private static int[] quadVertexData(float[][] positions) {
@@ -180,8 +180,8 @@ class RemixCapturingConsumerTest {
     private static void cardFaces(RemixCapturingConsumer consumer, Sprite sprite) {
         MatrixStack.Entry pose = new MatrixStack().peek();
         float[] ones = {1, 1, 1, 1};
-        consumer.quad(pose, cardFace(sprite, 7.5f / 16, Direction.NORTH, false), ones, 1, 1, 1, 1, new int[4], OverlayTexture.DEFAULT_UV, false);
-        consumer.quad(pose, cardFace(sprite, 8.5f / 16, Direction.SOUTH, true), ones, 1, 1, 1, 1, new int[4], OverlayTexture.DEFAULT_UV, false);
+        consumer.quad(pose, cardFace(sprite, 7.5f / 16, Direction.NORTH, false), ones, 1, 1, 1, new int[4], OverlayTexture.DEFAULT_UV, false);
+        consumer.quad(pose, cardFace(sprite, 8.5f / 16, Direction.SOUTH, true), ones, 1, 1, 1, new int[4], OverlayTexture.DEFAULT_UV, false);
         consumer.finishOpenVertex();
     }
 
@@ -573,7 +573,7 @@ class RemixCapturingConsumerTest {
 
         consumer.quad(new MatrixStack().peek(), bakedQuad(0xFFFFFFFF),
                 new float[]{1.0f, 1.0f, 1.0f, 1.0f},
-                1.0f, 0.0f, 0.0f, 1.0f,
+                1.0f, 0.0f, 0.0f,
                 new int[]{0, 0, 0, 0}, OverlayTexture.DEFAULT_UV, false);
 
         // A pure-red tint must arrive as pure red, not pure blue.
@@ -588,7 +588,7 @@ class RemixCapturingConsumerTest {
         // Base vertex colour r=0x80 g=0x40 b=0x20, tinted with blue at half strength.
         consumer.quad(new MatrixStack().peek(), bakedQuad(0xFF204080),
                 new float[]{1.0f, 1.0f, 1.0f, 1.0f},
-                1.0f, 1.0f, 0.5f, 1.0f,
+                1.0f, 1.0f, 0.5f,
                 new int[]{0, 0, 0, 0}, OverlayTexture.DEFAULT_UV, true);
 
         assertEquals(0xFF804010, consumer.getColors()[0]);
@@ -600,7 +600,7 @@ class RemixCapturingConsumerTest {
     private static void itemQuad(RemixCapturingConsumer consumer, MatrixStack.Entry pose) {
         consumer.quad(pose, bakedQuad(0xFFFFFFFF),
                 new float[]{1.0f, 1.0f, 1.0f, 1.0f},
-                1.0f, 1.0f, 1.0f, 1.0f,
+                1.0f, 1.0f, 1.0f,
                 new int[]{0, 0, 0, 0}, OverlayTexture.DEFAULT_UV, false);
     }
 

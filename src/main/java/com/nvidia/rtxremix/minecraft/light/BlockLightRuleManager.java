@@ -372,7 +372,7 @@ public final class BlockLightRuleManager {
             }
             rules.put(resourceId, JsonRule.parse(resourceId, root));
         } catch (Exception e) {
-            LOGGER.warn("Skipping block light rule {} from {}: {}", resourceId, resource.getPackId(), e.getMessage());
+            LOGGER.warn("Skipping block light rule {} from {}: {}", resourceId, resource.getResourcePackName(), e.getMessage());
         }
     }
 
