@@ -36,7 +36,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(TextureManager.class)
 public class TextureManagerMixin {
 
-    @Inject(method = "registerTexture", at = @At("HEAD"))
+    // Named in full: 1.21.11 adds a ReloadableTexture overload, and the bare name matched both.
+    @Inject(
+            method = "registerTexture(Lnet/minecraft/util/Identifier;Lnet/minecraft/client/texture/AbstractTexture;)V",
+            at = @At("HEAD"))
     private void rtxremix$onRegisterTexture(Identifier id, AbstractTexture texture, CallbackInfo ci) {
         if (texture instanceof NativeImageBackedTexture nib) {
             DynamicTextureCache.onRegisterTexture(id, texture, nib.getImage());

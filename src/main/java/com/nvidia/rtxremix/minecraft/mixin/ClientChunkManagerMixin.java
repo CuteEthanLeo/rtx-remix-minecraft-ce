@@ -10,11 +10,11 @@ import com.nvidia.rtxremix.minecraft.terrain.LocalChunkBatchPacing;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientChunkManager;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.ChunkData;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
@@ -24,6 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -71,7 +72,7 @@ public abstract class ClientChunkManagerMixin {
             int x,
             int z,
             PacketByteBuf buf,
-            NbtCompound nbt,
+            Map<Heightmap.Type, long[]> heightmaps,
             Consumer<ChunkData.BlockEntityVisitor> consumer,
             CallbackInfoReturnable<WorldChunk> cir) {
         if (!RtxRemixMod.isRtxEnabled()) {
@@ -99,7 +100,7 @@ public abstract class ClientChunkManagerMixin {
             int x,
             int z,
             PacketByteBuf buf,
-            NbtCompound nbt,
+            Map<Heightmap.Type, long[]> heightmaps,
             Consumer<ChunkData.BlockEntityVisitor> consumer,
             CallbackInfoReturnable<WorldChunk> cir) {
         if (LocalChunkBatchPacing.ENABLED) {
@@ -112,7 +113,7 @@ public abstract class ClientChunkManagerMixin {
             int x,
             int z,
             PacketByteBuf buf,
-            NbtCompound nbt,
+            Map<Heightmap.Type, long[]> heightmaps,
             Consumer<ChunkData.BlockEntityVisitor> consumer,
             CallbackInfoReturnable<WorldChunk> cir) {
         if (LocalChunkBatchPacing.ENABLED) {

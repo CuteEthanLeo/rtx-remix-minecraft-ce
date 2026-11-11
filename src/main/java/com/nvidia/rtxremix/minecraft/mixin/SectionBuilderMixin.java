@@ -4,6 +4,8 @@
  */
 package com.nvidia.rtxremix.minecraft.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.terrain.capture.SectionBlockData;
 import com.nvidia.rtxremix.minecraft.terrain.capture.BlockQuadEmitter;
@@ -137,13 +139,15 @@ public class SectionBuilderMixin {
     // While capturing, the block's quads were already emitted above, so vanilla's raster
     // path for it (layer buffer, matrix stack, renderBlock) is dead work. Reporting the
     // block invisible makes vanilla skip all of it.
-    @Redirect(method = "build",
-              at = @At(value = "INVOKE",
-                       target = "Lnet/minecraft/block/BlockState;getRenderType()Lnet/minecraft/block/BlockRenderType;"))
-    private BlockRenderType rtxremix$renderTypeForVanilla(BlockState state) {
-        return rtxremix$capturing()
-                ? BlockRenderType.INVISIBLE
-                : BlockQuadEmitter.getRenderTypeCached(state);
+    //
+    // Wrapped rather than redirected: Fabric's Indigo renderer for 1.21.11 redirects this same
+    // call to buffer the model itself, and two redirects of one call cannot both apply. The
+    // wrap leaves Indigo's hook in place for builds that are not captured.
+    @WrapOperation(method = "build",
+                   at = @At(value = "INVOKE",
+                            target = "Lnet/minecraft/block/BlockState;getRenderType()Lnet/minecraft/block/BlockRenderType;"))
+    private BlockRenderType rtxremix$renderTypeForVanilla(BlockState state, Operation<BlockRenderType> original) {
+        return rtxremix$capturing() ? BlockRenderType.INVISIBLE : original.call(state);
     }
 
     // renderFluid: emit fluid quads for Remix, skip GL
