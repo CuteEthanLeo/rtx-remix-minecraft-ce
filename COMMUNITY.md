@@ -75,7 +75,9 @@ RTX Remix for Minecraft 社区版是 NVIDIA 开源项目
 - 第三方模组的自定义流体外观被忽略，水和熔岩用原版流体模型。
 - 相机路径改时间只设置服务器时钟，客户端等同步后生效；区块加载时的邻居重标记过滤不生效。
 
-### Minecraft 26.1 分支（`mc/26.1`）移植状态
+### Minecraft 26.1.2 分支（`mc/26.1.2`）移植状态
+
+这个分支就是 `mc/26.1` 的移植，对着 26.1.2 重新编译和测试（26.1.2 是 26.1 的热修复版本，移植代码没有改动，Fabric API 为 0.155.3+26.1.2）。以下是 `mc/26.1` 的移植状态说明，同样适用于本分支。
 
 从 `mc/26.2` 回移到 26.1（Fabric API 0.145.1+26.1），构建方式不变。**同样只保证编译、JVM 测试和 Mixin 应用测试（`MixinTargetsApplyTest`）通过，尚未在游戏里验证。** 26.1 的渲染结构介于 1.21.11 和 26.2 之间：仍有 `MultiBufferSource`，区段脏标记仍在 `LevelRenderer` 和 `RenderSection` 上，最终画面经 `RenderTarget.blitToScreen` 和 `RenderSystem.flipFrame` 呈现，没有 `LevelExtractor`、`GlSurface` 和 `RotatingSectionStorage`。相对上面 26.2 的清单：
 
