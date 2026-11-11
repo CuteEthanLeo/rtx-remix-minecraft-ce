@@ -9,6 +9,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.9 - 2026-11-11
+
+### Changed
+
+- Every supported Minecraft version now carries the same Community Edition
+  version, so a package is identified by that one number and its Minecraft
+  version. Packages used to carry the number of the branch they were ported
+  from (ce.6, ce.6.1, ce.8, ce.8.1).
+
 ## Community Edition 0.1.0-ce.6.1 - 2026-11-11
 
 ### Fixed
