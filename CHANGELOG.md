@@ -9,6 +9,14 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.8.1 - 2026-11-11
+
+### Fixed
+
+- The Copper Beacon can be crafted on Minecraft 1.21.2. Its recipe still used
+  the ingredient format that 1.21.2 replaced, so the game skipped the recipe
+  when a world loaded.
+
 ## Community Edition 0.1.0-ce.8 - 2026-11-11
 
 ### Added
