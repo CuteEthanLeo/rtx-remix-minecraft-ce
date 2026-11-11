@@ -21,16 +21,9 @@
 > | Minecraft | Branch / 分支 | Download / 下载 |
 > |---|---|---|
 > | 1.21.1 | `main`, `mc/1.21.1` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.1`, such as [`v0.1.0-ce.7+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.7%2Bmc1.21.1) |
-> | 1.21.2 | `mc/1.21.2` | No package yet, build from source / 暂无安装包，需从源码构建 |
-> | 1.21.11 | `mc/1.21.11` | No package yet, build from source / 暂无安装包，需从源码构建 |
-> | 26.2 | `mc/26.2` | No package yet, build from source / 暂无安装包，需从源码构建 |
->
-> To build a version that has no package, check out its branch and run
-> `.\gradlew.bat releaseArchive -Parch=win64`; the ZIP is written to `build/distributions/`.
-> [Getting Started](docs/GETTING_STARTED.md) lists what the build needs.
->
-> 没有安装包的版本：检出对应分支，运行 `.\gradlew.bat releaseArchive -Parch=win64`，
-> ZIP 生成在 `build/distributions/`。构建所需环境见 [Getting Started](docs/GETTING_STARTED.md)。
+> | 1.21.2 | `mc/1.21.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.2`, such as [`v0.1.0-ce.8+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8%2Bmc1.21.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
+> | 1.21.11 | `mc/1.21.11` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.11`, such as [`v0.1.0-ce.6+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc1.21.11). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
+> | 26.2 | `mc/26.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc26.2`, such as [`v0.1.0-ce.6+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc26.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
 
 
 Play Minecraft Java Edition 1.21.11 with real-time path tracing on a GeForce RTX
