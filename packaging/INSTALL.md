@@ -151,9 +151,10 @@ enabled. For a direct comparison, type `/rtx off`, look around, then `/rtx on`.
 
 ## Updating
 
-Download the new archive from
-<https://github.com/NVIDIAGameWorks/rtx-remix-minecraft/releases/latest>,
-extract it, and run `install.bat` again. It
+Download the new archive for your Minecraft version from
+<https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases>, where each
+archive's tag ends in `+mc<Minecraft version>`, extract it, and run
+`install.bat` again. It
 preselects Upgrade and replaces the mod and its supporting files in the
 launcher that already has them. Launcher, Minecraft, Fabric, and other options
 are preserved. To install into the other launcher instead, choose Install.
