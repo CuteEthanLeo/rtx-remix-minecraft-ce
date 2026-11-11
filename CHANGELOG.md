@@ -13,6 +13,12 @@ also part of every mod file name.
 
 ### Fixed
 
+- Joining a server no longer crashes the game in the NVIDIA OpenGL driver.
+  Vanilla leaves its pixel-unpack row length and skips set after uploading
+  part of an image, and the volumetric clouds' noise upload inherited them,
+  so the driver read past the end of the noise data. Every client-memory
+  upload of the clouds now runs with the default unpack state and restores
+  vanilla's afterwards.
 - DLSS frame generation no longer loses the GPU device (`VK_ERROR_DEVICE_LOST`)
   within seconds in fullscreen while RivaTuner Statistics Server runs, as it
   does alongside MSI Afterburner. RTSS's Vulkan layer faulted the GPU in the
