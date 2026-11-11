@@ -13,6 +13,9 @@ also part of every mod file name.
 
 ### Added
 
+- A package for Minecraft 1.21.4, moved forward from the 1.21.3 branch with
+  every feature kept. Item rendering, rain and snow, stars, player skins and
+  Fabric model capture follow the APIs 1.21.4 changed.
 - A package for Minecraft 1.21.3: the 1.21.2 port, rebuilt and retested
   against 1.21.3.
 
