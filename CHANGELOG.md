@@ -13,6 +13,12 @@ also part of every mod file name.
 
 ### Fixed
 
+- Joining a server no longer crashes the game in the NVIDIA OpenGL driver.
+  Vanilla leaves its pixel-unpack row length and skips set after uploading
+  part of an image, and the volumetric clouds' noise upload inherited them,
+  so the driver read past the end of the noise data. Every client-memory
+  upload of the clouds now runs with the default unpack state and restores
+  vanilla's afterwards.
 - Near volumetric clouds hide the sun and moon discs without attenuating the
   ground's sunlight twice. Cirrus also attenuates the visible discs.
 - Time commands, sky-model changes, teleports and world changes reset cloud
