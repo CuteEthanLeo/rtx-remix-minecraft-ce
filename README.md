@@ -18,12 +18,12 @@
 > Minecraft 版本一致的 `…-win64.zip`，解压后运行 `install.bat`。安装包只适用于标签里的那个
 > Minecraft 版本，不能混用。
 >
-> | Minecraft | Branch / 分支 | Download / 下载 |
-> |---|---|---|
-> | 1.21.1 | `main`, `mc/1.21.1` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.1`, such as [`v0.1.0-ce.7+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.7%2Bmc1.21.1) |
-> | 1.21.2 | `mc/1.21.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.2`, such as [`v0.1.0-ce.8+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8%2Bmc1.21.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.11 | `mc/1.21.11` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.11`, such as [`v0.1.0-ce.6+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc1.21.11). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 26.2 | `mc/26.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc26.2`, such as [`v0.1.0-ce.6+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc26.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
+> This branch, `mc/26.2`, targets **Minecraft 26.2**. The table of every supported
+> Minecraft version, its branch, and its package is in the
+> [`main` branch README](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/blob/main/README.md).
+>
+> 本分支 `mc/26.2` 对应 **Minecraft 26.2**。所有支持的 Minecraft 版本及其分支、安装包的对照表见
+> [`main` 分支的 README](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/blob/main/README.md)。
 
 
 Play Minecraft Java Edition 26.2 with real-time path tracing on a GeForce RTX
