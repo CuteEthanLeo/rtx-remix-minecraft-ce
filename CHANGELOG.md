@@ -9,6 +9,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version in a release is the `mod_version` in `gradle.properties`, and it is
 also part of every mod file name.
 
+## Community Edition 0.1.0-ce.8 - Unreleased
+
+### Fixed
+
+- Joining a server no longer crashes the game in the NVIDIA OpenGL driver.
+  Vanilla leaves its pixel-unpack row length and skips set after uploading
+  part of an image, and the volumetric clouds' noise upload inherited them,
+  so the driver read past the end of the noise data. Every client-memory
+  upload of the clouds now runs with the default unpack state and restores
+  vanilla's afterwards.
+
 ## Community Edition 0.1.0-ce.7 - 2026-11-09
 
 ### Added
