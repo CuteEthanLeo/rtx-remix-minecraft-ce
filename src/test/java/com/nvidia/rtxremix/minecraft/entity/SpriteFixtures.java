@@ -29,7 +29,7 @@ final class SpriteFixtures {
                 new NativeImage(size, size, false));
         // The constructor is protected; an anonymous subclass reaches it without
         // widening access for the sake of a test.
-        Sprite sprite = new Sprite(ATLAS, contents, atlasSize, atlasSize, x, y, 0) {};
+        Sprite sprite = new Sprite(ATLAS, contents, atlasSize, atlasSize, x, y) {};
         // The rectangle is fixed at construction and no test reads pixels, so the
         // off-heap image is released at once.
         contents.close();

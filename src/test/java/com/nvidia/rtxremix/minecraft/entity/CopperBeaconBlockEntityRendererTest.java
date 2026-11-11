@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.nvidia.rtxremix.minecraft.block.CopperBeaconPose;
 import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.render.model.ModelRotation;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.AxisRotation;
 import net.minecraft.util.math.Direction;
@@ -291,10 +292,8 @@ class CopperBeaconBlockEntityRendererTest {
             directions.put(
                     mount,
                     // The x-then-y composition vanilla's ModelVariant.ModelState bakes.
-                    AxisRotation.method_76600(
-                                    AxisRotation.fromDegrees(x),
-                                    AxisRotation.fromDegrees(y),
-                                    AxisRotation.R0)
+                    ModelRotation.rotate(AxisRotation.fromDegrees(x), AxisRotation.fromDegrees(y))
+                            .getDirectionTransformation()
                             .map(unrotatedDirection));
         }
         return directions;

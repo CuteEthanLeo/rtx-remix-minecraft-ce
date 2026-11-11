@@ -437,8 +437,8 @@ public abstract class WorldRendererMixin
         return rtxremix$blockEntityChunkIterator.reset(rtxremix$blockEntityChunks, blockEntityChunks);
     }
 
-    // 1.21.11: setupTerrain became updateCamera(Camera, Frustum, boolean).
-    @Inject(method = "updateCamera", at = @At("HEAD"))
+    // setupTerrain's successor, taking (Camera, Frustum, boolean); Yarn 1.21.10 leaves it unnamed.
+    @Inject(method = "method_74752", at = @At("HEAD"))
     private void rtxremix$setupTerrainHead(CallbackInfo ci) {
         rtxremix$openJfrOnly(
                 rtxremix$setupTerrainScope,
@@ -446,7 +446,7 @@ public abstract class WorldRendererMixin
                 "Java.WorldRenderer.setupTerrain.ms");
     }
 
-    @Inject(method = "updateCamera", at = @At("RETURN"))
+    @Inject(method = "method_74752", at = @At("RETURN"))
     private void rtxremix$setupTerrainReturn(CallbackInfo ci) {
         rtxremix$close(rtxremix$setupTerrainScope);
     }

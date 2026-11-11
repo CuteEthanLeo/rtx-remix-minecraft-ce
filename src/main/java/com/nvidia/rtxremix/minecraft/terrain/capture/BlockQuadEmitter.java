@@ -22,7 +22,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColors;
-import net.minecraft.client.render.BlockRenderLayers;
+import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.render.model.BlockModelPart;
@@ -420,20 +420,24 @@ public final class BlockQuadEmitter {
     private void stageBakedQuad(BakedQuad bq, String layerName,
                                  BlockState state, BlockRenderView world,
                                  float lx, float ly, float lz) {
+        int[] vd = bq.vertexData();
+
         for (int v = 0; v < 4; v++) {
-            org.joml.Vector3fc position = bq.getPosition(v);
-            long uv = bq.getTexcoords(v);
-            tempPositions[v * 3]     = position.x() + lx;
-            tempPositions[v * 3 + 1] = position.y() + ly;
-            tempPositions[v * 3 + 2] = position.z() + lz;
-            tempUvs[v * 2]     = net.minecraft.client.util.math.Vector2f.getX(uv);
-            tempUvs[v * 2 + 1] = net.minecraft.client.util.math.Vector2f.getY(uv);
+            int off = v * 8;
+            tempPositions[v * 3]     = Float.intBitsToFloat(vd[off])     + lx;
+            tempPositions[v * 3 + 1] = Float.intBitsToFloat(vd[off + 1]) + ly;
+            tempPositions[v * 3 + 2] = Float.intBitsToFloat(vd[off + 2]) + lz;
+            tempUvs[v * 2]     = Float.intBitsToFloat(vd[off + 4]);
+            tempUvs[v * 2 + 1] = Float.intBitsToFloat(vd[off + 5]);
         }
 
-        // 1.21.11 baked quads carry no per-vertex normal; the geometric normal below is what
-        // the old path fell back to for vanilla's unwritten normal, with the face as backstop.
-        float nx = 0, ny = 0, nz = 0;
-        {
+        // A zero packed normal, which is what vanilla's baker leaves, falls back to the
+        // geometric normal, with the face as backstop.
+        int packedNormal = vd[7];
+        float nx = (byte) (packedNormal & 0xFF) / 127f;
+        float ny = (byte) ((packedNormal >> 8) & 0xFF) / 127f;
+        float nz = (byte) ((packedNormal >> 16) & 0xFF) / 127f;
+        if (nx * nx + ny * ny + nz * nz < 0.01f) {
             float e1x = tempPositions[3] - tempPositions[0], e1y = tempPositions[4] - tempPositions[1], e1z = tempPositions[5] - tempPositions[2];
             float e2x = tempPositions[6] - tempPositions[0], e2y = tempPositions[7] - tempPositions[1], e2z = tempPositions[8] - tempPositions[2];
             nx = e1y * e2z - e1z * e2y;
@@ -1037,10 +1041,9 @@ public final class BlockQuadEmitter {
         // translucent material with the frame as a diffuse layer.
         // Stained glass is already translucent and keeps vanilla's layer.
         if (state.isOf(Blocks.GLASS) || state.isOf(Blocks.GLASS_PANE)) return "glass";
-        // TODO(1.21.11): vanilla folded CUTOUT_MIPPED into CUTOUT, so "cutout_mipped" is no
-        // longer distinguished here.
-        return switch (BlockRenderLayers.getBlockLayer(state)) {
+        return switch (RenderLayers.getBlockLayer(state)) {
             case SOLID -> "solid";
+            case CUTOUT_MIPPED -> "cutout_mipped";
             case CUTOUT -> "cutout";
             case TRANSLUCENT -> "translucent";
             case TRIPWIRE -> "cutout";

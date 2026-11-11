@@ -10,6 +10,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.PersistentStateType;
 import org.junit.jupiter.api.Test;
@@ -166,7 +167,8 @@ class ZonePersistentStateTest {
         // Saving goes through the world's state manager and the state's registered type;
         // the save never reads the data fixer.
         PersistentStateManager manager =
-                new PersistentStateManager(tempDir, null, DynamicRegistryManager.EMPTY);
+                new PersistentStateManager(
+                        new PersistentState.Context(null, 0L), tempDir, null, DynamicRegistryManager.EMPTY);
         manager.set(persistentStateType(), state);
         manager.save();
 

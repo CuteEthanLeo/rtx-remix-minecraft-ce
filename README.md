@@ -18,15 +18,15 @@
 > Minecraft 版本一致的 `…-win64.zip`，解压后运行 `install.bat`。安装包只适用于标签里的那个
 > Minecraft 版本，不能混用。
 >
-> | Minecraft | Branch / 分支 | Download / 下载 |
-> |---|---|---|
-> | 1.21.1 | `main`, `mc/1.21.1` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.1`, such as [`v0.1.0-ce.7+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.7%2Bmc1.21.1) |
-> | 1.21.2 | `mc/1.21.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.2`, such as [`v0.1.0-ce.8+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.8%2Bmc1.21.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 1.21.11 | `mc/1.21.11` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc1.21.11`, such as [`v0.1.0-ce.6.1+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6.1%2Bmc1.21.11). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
-> | 26.2 | `mc/26.2` | [Releases](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases): tags ending `+mc26.2`, such as [`v0.1.0-ce.6+mc26.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.6%2Bmc26.2). Port, not yet verified in game / 移植版，尚未在游戏内验证。 |
+> This branch, `mc/1.21.10`, targets **Minecraft 1.21.10**. The table of every supported
+> Minecraft version, its branch, and its package is in the
+> [`main` branch README](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/blob/main/README.md).
+>
+> 本分支 `mc/1.21.10` 对应 **Minecraft 1.21.10**。所有支持的 Minecraft 版本及其分支、安装包的对照表见
+> [`main` 分支的 README](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/blob/main/README.md)。
 
 
-Play Minecraft Java Edition 1.21.11 with real-time path tracing on a GeForce RTX
+Play Minecraft Java Edition 1.21.10 with real-time path tracing on a GeForce RTX
 GPU, powered by NVIDIA RTX Remix.
 
 ## What To Expect
@@ -47,9 +47,8 @@ Three areas have had less attention than the rest:
   conflict with anything that changes rendering or the chunk pipeline.
 - **A full playthrough.** Blocks, mobs, dimensions, and situations the showcase
   never reaches have had less care, and some will look wrong or run slowly.
-- **Other versions.** It targets Minecraft 1.21.1 only, chosen because that is
-  where the modding community is today. Ports to newer versions are something
-  we hope the community takes on.
+- **Other versions.** This branch targets Minecraft 1.21.10 only. Every
+  supported Minecraft version has its own branch and package.
 
 We hope the community helps fill it out. If something breaks,
 [report it](docs/PLAYING.md#reporting-a-bug); if you can fix it, see
@@ -73,7 +72,7 @@ The step-by-step version, with launcher advice and troubleshooting, is in
 ## Requirements
 
 - Windows 10 or 11, x64 or ARM64.
-- Minecraft Java Edition 1.21.1, on a Microsoft account that owns the game.
+- Minecraft Java Edition 1.21.10, on a Microsoft account that owns the game.
 - A GeForce RTX 30-series or newer GPU with NVIDIA driver 616.92 or newer.
 - About 5 GB of free disk space while installing; about 3 GB stays in use.
 - An internet connection while the installer runs.

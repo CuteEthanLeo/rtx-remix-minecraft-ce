@@ -180,6 +180,5 @@ public class RemixVertexConsumerProvider implements VertexConsumerProvider {
         @Override public VertexConsumer overlay(int u, int v) { return this; }
         @Override public VertexConsumer light(int u, int v) { return this; }
         @Override public VertexConsumer normal(float x, float y, float z) { return this; }
-        @Override public VertexConsumer lineWidth(float width) { return this; }
     }
 }

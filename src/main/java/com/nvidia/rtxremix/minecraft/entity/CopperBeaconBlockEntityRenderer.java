@@ -17,14 +17,13 @@ import net.minecraft.client.model.ModelTransform;
 import net.minecraft.client.model.TexturedModelData;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
 import net.minecraft.client.render.command.ModelCommandRenderer;
 import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.state.CameraRenderState;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.util.math.Vec3d;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
@@ -144,7 +143,7 @@ public final class CopperBeaconBlockEntityRenderer
             State state,
             float tickDelta,
             Vec3d cameraPos,
-            ModelCommandRenderer.@Nullable CrumblingOverlayCommand crumblingOverlay) {
+            @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay) {
         BlockEntityRenderer.super.updateRenderState(beacon, state, tickDelta, cameraPos, crumblingOverlay);
         BlockState blockState = beacon.getCachedState();
         state.up = blockState.get(CopperBeaconBlock.MOUNT);
@@ -183,7 +182,7 @@ public final class CopperBeaconBlockEntityRenderer
         float yawRadians = pose.modelYawRadians();
         float pitchRadians = pose.modelPitchRadians();
         Sprite copperSprite = spriteHolder.getSprite(COPPER_TEXTURE);
-        RenderLayer copperLayer = COPPER_TEXTURE.getRenderLayer(RenderLayers::entitySolid);
+        RenderLayer copperLayer = COPPER_TEXTURE.getRenderLayer(RenderLayer::getEntitySolid);
         queue.submitCustom(matrices, copperLayer, (entry, buffer) -> {
             poseParts(yawRadians, pitchRadians);
             VertexConsumer copperVertices = copperUvConsumer.wrap(
@@ -193,7 +192,7 @@ public final class CopperBeaconBlockEntityRenderer
         SpriteIdentifier lensTexture = lensTexture(state.active, state.intensityMultiplier);
         Sprite lensSprite = spriteHolder.getSprite(lensTexture);
         int lensTint = state.lensTint;
-        queue.submitCustom(matrices, lensTexture.getRenderLayer(RenderLayers::entitySolid), (entry, buffer) -> {
+        queue.submitCustom(matrices, lensTexture.getRenderLayer(RenderLayer::getEntitySolid), (entry, buffer) -> {
             poseParts(yawRadians, pitchRadians);
             lens.render(stackAt(entry), lensSprite.getTextureSpecificVertexConsumer(buffer),
                     light, overlay, lensTint);
@@ -289,12 +288,6 @@ public final class CopperBeaconBlockEntityRenderer
         @Override
         public VertexConsumer light(int u, int v) {
             delegate.light(u, v);
-            return this;
-        }
-
-        @Override
-        public VertexConsumer lineWidth(float width) {
-            delegate.lineWidth(width);
             return this;
         }
 

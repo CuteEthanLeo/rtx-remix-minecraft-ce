@@ -31,12 +31,14 @@ import com.nvidia.rtxremix.minecraft.block.SpotLightBlock;
 import com.nvidia.rtxremix.minecraft.entity.CopperBeaconAnimationClock;
 import com.nvidia.rtxremix.minecraft.entity.RemixFirstPersonPass;
 import com.nvidia.rtxremix.minecraft.sky.AtmosphereModel;
+import com.nvidia.rtxremix.minecraft.sky.WorldSky;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.DimensionEffects;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
@@ -1103,16 +1105,12 @@ public class LightManager {
         // evaluating them would light a permanent noon or midnight that vanilla never draws.
         float rain = world.getRainGradient(0.0f);
         float thunder = world.getThunderGradient(0.0f);
-        skyLightState = world.getDimension().skybox() == net.minecraft.world.dimension.DimensionType.Skybox.OVERWORLD
+        skyLightState = WorldSky.skybox(world) == DimensionEffects.SkyType.NORMAL
                 ? evaluateSkyLightState(
-                        // 1.21.11: the sky angle is an environment attribute in degrees.
-                        world.getEnvironmentAttributes().getAttributeValue(
-                                net.minecraft.world.attribute.EnvironmentAttributes.SUN_ANGLE_VISUAL) / 360.0f,
+                        WorldSky.skyAngle(world, 0.0f),
                         rain,
                         thunder,
-                        NightLight.moonPhaseScale(net.minecraft.world.dimension.DimensionType.MOON_SIZES[
-                                world.getEnvironmentAttributes().getAttributeValue(
-                                        net.minecraft.world.attribute.EnvironmentAttributes.MOON_PHASE_VISUAL).getIndex()]))
+                        NightLight.moonPhaseScale(WorldSky.moonSize(world, 0.0f)))
                 : SkyLightState.empty();
         float sunVolumetricScale = SunShafts.sunVolumetricScale(
                 skyLightState.sunPosition()[1], rain, thunder, weatherSunDirectScale(rain, thunder));

@@ -24,22 +24,11 @@ accessible field net/minecraft/client/render/SpriteTexturedVertexConsumer delega
 accessible field net/minecraft/client/render/SpriteTexturedVertexConsumer sprite Lnet/minecraft/client/texture/Sprite;
 
 # RenderLayer texture extraction (for entity material identity)
-# 1.21.11-missing: accessible method net/minecraft/client/render/RenderLayer$MultiPhase getPhases ()Lnet/minecraft/client/render/RenderLayer$MultiPhaseParameters;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters texture Lnet/minecraft/client/render/RenderPhase$TextureBase;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters program Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters transparency Lnet/minecraft/client/render/RenderPhase$Transparency;
-# 1.21.11-missing: accessible method net/minecraft/client/render/RenderPhase$Texture getId ()Ljava/util/Optional;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase ADDITIVE_TRANSPARENCY Lnet/minecraft/client/render/RenderPhase$Transparency;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase TRANSLUCENT_TRANSPARENCY Lnet/minecraft/client/render/RenderPhase$Transparency;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase CRUMBLING_TRANSPARENCY Lnet/minecraft/client/render/RenderPhase$Transparency;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase BEACON_BEAM_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase ENTITY_SOLID_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase ENTITY_TRANSLUCENT_EMISSIVE_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase EYES_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase TEXT_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase TEXT_INTENSITY_PROGRAM Lnet/minecraft/client/render/RenderPhase$ShaderProgram;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters depthTest Lnet/minecraft/client/render/RenderPhase$DepthTest;
-# 1.21.11-missing: accessible field net/minecraft/client/render/RenderPhase ALWAYS_DEPTH_TEST Lnet/minecraft/client/render/RenderPhase$DepthTest;
+accessible field net/minecraft/client/render/RenderLayer$MultiPhase phases Lnet/minecraft/client/render/RenderLayer$MultiPhaseParameters;
+accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters texture Lnet/minecraft/client/render/RenderPhase$TextureBase;
+accessible method net/minecraft/client/render/RenderPhase$TextureBase getId ()Ljava/util/Optional;
+accessible method net/minecraft/client/render/RenderPhase$Texture getId ()Ljava/util/Optional;
+accessible method net/minecraft/client/render/RenderPhase$Textures getId ()Ljava/util/Optional;
 
 # SpriteContents animation data for flipbook texture extraction
 accessible class net/minecraft/client/texture/SpriteContents$Animation

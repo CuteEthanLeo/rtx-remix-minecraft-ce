@@ -260,7 +260,7 @@ validation of native integration.
 
 The JAR from `package` is the one players get: it embeds the runtime, gameplay
 conf payload, runtime textures, and baseline PBR textures. To try it in a
-normal installation of Minecraft 1.21.1 that already has Fabric Loader and
+normal installation of Minecraft 1.21.10 that already has Fabric Loader and
 Fabric API, drop it into the instance's `mods` folder; nothing else is needed.
 The release archive's installer also migrates old generated baseline packs and
 preserves user-pack ordering.

@@ -1409,7 +1409,7 @@ public class BenchmarkController {
         metadata.addProperty("renderDistance", mc.options.getViewDistance().getValue());
         metadata.addProperty("simulationDistance", mc.options.getSimulationDistance().getValue());
         metadata.addProperty("fov", mc.options.getFov().getValue());
-        metadata.addProperty("graphicsMode", mc.options.getPreset().getValue().toString());
+        metadata.addProperty("graphicsMode", mc.options.getGraphicsMode().getValue().toString());
         metadata.addProperty("entityDistanceScaling", mc.options.getEntityDistanceScaling().getValue());
         root.add("metadata", metadata);
 

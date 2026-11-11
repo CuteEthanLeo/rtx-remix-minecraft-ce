@@ -263,7 +263,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
      * stable between frames.
      */
     @Override
-    public VertexConsumer vertex(org.joml.Matrix4fc matrix, float x, float y, float z) {
+    public VertexConsumer vertex(Matrix4f matrix, float x, float y, float z) {
         beginVertex(detectBoneChange(matrix));
         vx = x; vy = y; vz = z;
         return this;
@@ -337,11 +337,6 @@ public class RemixCapturingConsumer implements VertexConsumer {
     @Override
     public VertexConsumer normal(MatrixStack.Entry matrix, float x, float y, float z) {
         return normal(x, y, z);
-    }
-
-    @Override
-    public VertexConsumer lineWidth(float width) {
-        return this;
     }
 
     @Override
@@ -629,35 +624,6 @@ public class RemixCapturingConsumer implements VertexConsumer {
     private final float[] quadUnitBrightness = {1.0f, 1.0f, 1.0f, 1.0f};
     private final int[] quadLightScratch = new int[4];
     private final int[] quadColors = new int[4];
-    /** 1.21.5 vertex-data layout rebuilt from the BakedQuad record; see {@link #packBakedQuad}. */
-    private final int[] bakedQuadScratch = new int[32];
-
-    /**
-     * Rebuilds the pre-1.21.5 {@code BakedQuad.getVertexData()} layout (eight ints per
-     * vertex: x, y, z, ABGR colour, u, v, light, packed normal) from the record that
-     * replaced it, so the capture below keeps reading one flat array. The colour is
-     * white and the light zero, as vanilla's baker wrote them.
-     */
-    static int[] packBakedQuad(BakedQuad quad, int[] out) {
-        org.joml.Vector3fc n = quad.face().getFloatVector();
-        int packedNormal = ((int) (n.x() * 127f) & 0xFF)
-                | (((int) (n.y() * 127f) & 0xFF) << 8)
-                | (((int) (n.z() * 127f) & 0xFF) << 16);
-        for (int v = 0; v < 4; v++) {
-            org.joml.Vector3fc pos = quad.getPosition(v);
-            long uv = quad.getTexcoords(v);
-            int off = v * 8;
-            out[off] = Float.floatToRawIntBits(pos.x());
-            out[off + 1] = Float.floatToRawIntBits(pos.y());
-            out[off + 2] = Float.floatToRawIntBits(pos.z());
-            out[off + 3] = -1;
-            out[off + 4] = Float.floatToRawIntBits(net.minecraft.client.util.math.Vector2f.getX(uv));
-            out[off + 5] = Float.floatToRawIntBits(net.minecraft.client.util.math.Vector2f.getY(uv));
-            out[off + 6] = 0;
-            out[off + 7] = packedNormal;
-        }
-        return out;
-    }
 
     /**
      * Allocation-free replacement for the vanilla default, which allocates two
@@ -671,7 +637,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
         quadLightScratch[2] = light;
         quadLightScratch[3] = light;
         this.quad(matrixEntry, quad, quadUnitBrightness, red, green, blue, alpha,
-                quadLightScratch, overlay);
+                quadLightScratch, overlay, false);
     }
 
     /**
@@ -682,7 +648,7 @@ public class RemixCapturingConsumer implements VertexConsumer {
      * {@code vertex(float, float, float)}, bypassing bone detection. This override instead:
      * <ol>
      *   <li>Pushes the {@code MatrixStack.Entry} as a bone via {@link #detectBoneChange}</li>
-     *   <li>Reads LOCAL (model-space) positions directly from {@link BakedQuad#getVertexData()}</li>
+     *   <li>Reads LOCAL (model-space) positions directly from {@link BakedQuad#vertexData()}</li>
      *   <li>Emits via {@link #acceptModelSpaceVertex}</li>
      * </ol>
      *
@@ -705,14 +671,13 @@ public class RemixCapturingConsumer implements VertexConsumer {
      */
     @Override
     public void quad(MatrixStack.Entry matrixEntry, BakedQuad quad, float[] brightnesses,
-                     float red, float green, float blue, float alpha, int[] lights, int overlay) {
-        // 1.21.5 dropped baked vertex colours; the quad colour is the tint alone.
-        boolean colorize = false;
+                     float red, float green, float blue, float alpha, int[] lights, int overlay,
+                     boolean colorize) {
         // The pose is fixed for the whole quad, so resolve the pivot once here
         // rather than per vertex below.
         int quadBoneIndex = detectBoneChange(matrixEntry.getPositionMatrix());
 
-        int[] vd = packBakedQuad(quad, bakedQuadScratch);
+        int[] vd = quad.vertexData();
         int boundsMin = 0;
         int boundsMax = 0;
         if (quad.sprite() != null) {

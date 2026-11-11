@@ -231,12 +231,6 @@ public final class RemixBlockDamagePass {
         }
 
         @Override
-        public VertexConsumer lineWidth(float width) {
-            target.lineWidth(width);
-            return this;
-        }
-
-        @Override
         public VertexConsumer normal(float x, float y, float z) {
             Direction face = Direction.getFacing(x, y, z);
             projected.set(this.x, this.y, this.z)

@@ -49,7 +49,7 @@ import com.nvidia.rtxremix.minecraft.logic.ConfLayerDriver;
 import com.nvidia.rtxremix.minecraft.profiling.ProfileScope;
 import com.nvidia.rtxremix.minecraft.util.DirectBufferPool;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.client.render.DimensionEffects;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.Identifier;
@@ -299,9 +299,9 @@ public class SkyRenderer {
      *
      * @return the constant, or null for a NORMAL sky, whose dome is the time-driven atmosphere
      */
-    static float[] fixedSkyRadiance(DimensionType.Skybox skyType) {
+    static float[] fixedSkyRadiance(DimensionEffects.SkyType skyType) {
         return switch (skyType) {
-            case OVERWORLD -> null;
+            case NORMAL -> null;
             case END -> END_SKY_RADIANCE;
             case NONE -> SKYLESS_SKY_RADIANCE;
         };

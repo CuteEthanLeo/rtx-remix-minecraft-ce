@@ -152,8 +152,9 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
                         : CopperBeaconUpdatePayload.Field.PITCH_POSITION);
 
         addDrawableChild(CyclingButtonWidget
-                .<CopperBeaconAnimationMode>builder(CopperBeaconScreen::modeText, state.mode())
+                .<CopperBeaconAnimationMode>builder(CopperBeaconScreen::modeText)
                 .values(CopperBeaconAnimationMode.values())
+                .initially(state.mode())
                 .build(
                         panelX,
                         panelY + 29,

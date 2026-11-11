@@ -126,19 +126,20 @@ public final class ModelSampling implements BlockLightRuleManager.ModelSampler {
         }
         if (model == null) return;
 
-        // 1.21.11: models resolve their parts once from the seeded random, as the emitter does.
+        // Models resolve their parts once from the seeded random, as the emitter does.
         random.setSeed(seed);
         java.util.List<net.minecraft.client.render.model.BlockModelPart> parts = model.getParts(random);
         for (Direction dir : DIRECTIONS) {
             for (net.minecraft.client.render.model.BlockModelPart part : parts) {
                 for (BakedQuad quad : part.getQuads(dir)) {
+                    int[] vd = quad.vertexData();
                     ensureCapacity(vertexCount + 4);
                     for (int v = 0; v < 4; v++) {
-                        org.joml.Vector3fc position = quad.getPosition(v);
+                        int off = v * 8;
                         int w = vertexCount * 3;
-                        vertices[w] = position.x();
-                        vertices[w + 1] = position.y();
-                        vertices[w + 2] = position.z();
+                        vertices[w] = Float.intBitsToFloat(vd[off]);
+                        vertices[w + 1] = Float.intBitsToFloat(vd[off + 1]);
+                        vertices[w + 2] = Float.intBitsToFloat(vd[off + 2]);
                         vertexCount++;
                     }
                 }

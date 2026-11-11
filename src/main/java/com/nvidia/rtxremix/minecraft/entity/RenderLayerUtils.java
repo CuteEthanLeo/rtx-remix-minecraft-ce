@@ -8,12 +8,9 @@ import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
-import com.nvidia.rtxremix.minecraft.mixin.RenderLayerSetupAccessor;
-import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTextureSpecAccessor;
-import com.nvidia.rtxremix.minecraft.mixin.RenderSetupTexturesAccessor;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderSetup;
+import net.minecraft.client.render.RenderPhase;
 import net.minecraft.util.Identifier;
 
 import java.util.Collections;
@@ -27,9 +24,9 @@ import java.util.WeakHashMap;
  * <p>A renderer requests its {@code VertexConsumer} by layer,
  * {@code provider.getBuffer(RenderLayer.getEntityCutout(textureId))}, so the
  * layer is where geometry and material meet and the one place material
- * identity is read. Its {@link RenderSetup} and {@link RenderPipeline}, the
- * setup reached through accessor mixins, give the texture the layer is
- * submitted under, if any, the
+ * identity is read. Its {@link RenderPhase} texture state, reached through the
+ * access widener, gives the texture the layer is submitted under, if any; its
+ * {@link RenderPipeline} gives the
  * {@link SurfaceMode} Remix shades with, and whether the geometry is streamed
  * afresh every frame; its draw mode gives the {@link Topology} and whether an
  * untextured layer carries geometry worth submitting at all.
@@ -103,16 +100,13 @@ final class RenderLayerUtils {
         return extractTexture(layer);
     }
 
-    /** The layer's base-colour texture: the one bound to {@code Sampler0}. */
+    /**
+     * The layer's base-colour texture: the one its texture phase binds to the first
+     * sampler, which for a multi-texture phase is the first texture it lists.
+     */
     private static Optional<Identifier> extractTexture(RenderLayer layer) {
-        RenderSetup setup = ((RenderLayerSetupAccessor) (Object) layer).rtxremix$getRenderSetup();
-        if (setup == null) {
-            return Optional.empty();
-        }
-        Map<String, ?> textures = ((RenderSetupTexturesAccessor) (Object) setup).rtxremix$getTextures();
-        Object spec = textures == null ? null : textures.get("Sampler0");
-        if (spec instanceof RenderSetupTextureSpecAccessor texture) {
-            return Optional.ofNullable(texture.rtxremix$getLocation());
+        if (layer instanceof RenderLayer.MultiPhase multiPhase) {
+            return multiPhase.phases.texture.getId();
         }
         return Optional.empty();
     }

@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.sky;
 
-import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.client.render.DimensionEffects;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -72,21 +72,21 @@ class SkyRendererDimensionSkyTest {
 
     @Test
     void normalSkyHasNoFixedRadiance() {
-        assertNull(SkyRenderer.fixedSkyRadiance(DimensionType.Skybox.OVERWORLD));
+        assertNull(SkyRenderer.fixedSkyRadiance(DimensionEffects.SkyType.NORMAL));
     }
 
     @Test
     void endSkyPublishesItsConstantForDomeAndAmbient() {
         assertSame(
                 SkyRenderer.END_SKY_RADIANCE,
-                SkyRenderer.fixedSkyRadiance(DimensionType.Skybox.END));
+                SkyRenderer.fixedSkyRadiance(DimensionEffects.SkyType.END));
     }
 
     @Test
     void skylessSkyIsBlackSoNoAmbientIsPublished() {
         assertArrayEquals(
                 new float[]{0.0f, 0.0f, 0.0f},
-                SkyRenderer.fixedSkyRadiance(DimensionType.Skybox.NONE));
+                SkyRenderer.fixedSkyRadiance(DimensionEffects.SkyType.NONE));
     }
 
     private static float luminance(float[] radiance) {
