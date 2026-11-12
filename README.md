@@ -20,10 +20,17 @@
 >
 > | Minecraft | Branch / 分支 | Download / 下载 | Status / 状态 |
 > |---|---|---|---|
+> | 1.20.1 | `mc/1.20.1` | [`v0.1.0-ce.9+mc1.20.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.1) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.20.4 | `mc/1.20.4` | [`v0.1.0-ce.9+mc1.20.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.4) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.20.6 | `mc/1.20.6` | [`v0.1.0-ce.9+mc1.20.6`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.6) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.1 | `main`, `mc/1.21.1` | [`v0.1.0-ce.9+mc1.21.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.1) | Tested in game / 已在游戏内实测 |
 > | 1.21.2 | `mc/1.21.2` | [`v0.1.0-ce.9+mc1.21.2`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.2) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.3 | `mc/1.21.3` | [`v0.1.0-ce.9+mc1.21.3`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.3) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.4 | `mc/1.21.4` | [`v0.1.0-ce.9+mc1.21.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.4) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.5 | `mc/1.21.5` | [`v0.1.0-ce.9+mc1.21.5`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.5) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.6 | `mc/1.21.6` | [`v0.1.0-ce.9+mc1.21.6`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.6) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.7 | `mc/1.21.7` | [`v0.1.0-ce.9+mc1.21.7`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.7) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
+> | 1.21.8 | `mc/1.21.8` | [`v0.1.0-ce.9+mc1.21.8`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.8) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.9 | `mc/1.21.9` | [`v0.1.0-ce.9+mc1.21.9`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.9) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.10 | `mc/1.21.10` | [`v0.1.0-ce.9+mc1.21.10`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.10) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.21.11 | `mc/1.21.11` | [`v0.1.0-ce.9+mc1.21.11`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.21.11) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
