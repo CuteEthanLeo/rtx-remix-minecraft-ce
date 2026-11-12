@@ -10,7 +10,7 @@ import net.minecraft.client.MinecraftClient;
 /**
  * The partial tick vanilla draws the current frame with.
  *
- * <p>Minecraft 1.20.1 has no single owner for it: the render tick counter keeps advancing
+ * <p>Minecraft 1.19.4 has no single owner for it: the render tick counter keeps advancing
  * while the game is paused and {@code MinecraftClient} holds the value it had at the pause.
  * This read is the one {@code GameRenderer.render} and {@code WorldRenderer.render} work
  * with; the tick rate cannot be frozen on this version.

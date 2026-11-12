@@ -10,7 +10,6 @@ package com.nvidia.rtxremix.minecraft.settings;
 import com.nvidia.rtxremix.minecraft.input.RemixInputGate;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
@@ -18,6 +17,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.GridWidget;
 import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.client.gui.widget.ThreePartsLayoutWidget;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 
@@ -56,7 +56,9 @@ public final class RtxSettingsScreen extends Screen {
         // Set apart from the categories because it leaves Minecraft's screens
         // for Remix's own menu rather than opening another page.
         categories.add(openRemixMenuButton(), categoryColumn.copyPositioner().marginTop(8));
-        this.layout.addBody(categoryColumn);
+        // Yarn names this layout's two lower parts the wrong way round on this version:
+        // addBody fills the bottom strip and addFooter the area between the strips.
+        this.layout.addFooter(categoryColumn);
 
         GridWidget footer = new GridWidget().setColumnSpacing(8);
         GridWidget.Adder buttons = footer.createAdder(2);
@@ -66,7 +68,7 @@ public final class RtxSettingsScreen extends Screen {
                 .width(98)
                 .build());
         buttons.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
-        this.layout.addFooter(footer);
+        this.layout.addBody(footer);
 
         this.layout.forEachChild(this::addDrawableChild);
         this.initTabNavigation();
@@ -90,9 +92,9 @@ public final class RtxSettingsScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context);
-        super.render(context, mouseX, mouseY, delta);
+    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+        this.renderBackground(matrices);
+        super.render(matrices, mouseX, mouseY, delta);
     }
 
     /**

@@ -151,7 +151,7 @@ must rebuild those bindings. `RtxSettingsFactory` defines controls,
 
 `RtxSetting.deferSliderApply()` makes `RtxOptionFactory.sliderApplier` hand
 the slider's option a debounced applier from the screen's
-`DeferredSliderApply`. Minecraft 1.20.1's option slider applies on every drag
+`DeferredSliderApply`. Minecraft 1.19.4's option slider applies on every drag
 step and keeps no pending value, so the pause is the mod's own: each step
 rearms a 600 ms wait, and `RtxOptionListScreen.render` applies the value once
 it has rested that long. Releasing the slider does not apply it. The

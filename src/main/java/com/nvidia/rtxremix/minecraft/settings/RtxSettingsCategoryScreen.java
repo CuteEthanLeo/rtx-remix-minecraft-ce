@@ -97,7 +97,9 @@ final class RtxSettingsCategoryScreen extends RtxOptionListScreen {
                 .width(98)
                 .build());
         buttons.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
-        this.layout.addFooter(footer);
+        // Yarn names this layout's two lower parts the wrong way round on this version:
+        // addBody fills the bottom strip and addFooter the area between the strips.
+        this.layout.addBody(footer);
     }
 
     private void confirmReset() {

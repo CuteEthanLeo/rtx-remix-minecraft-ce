@@ -96,7 +96,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
         context.begin(true);
 
         try {
-            // Minecraft 1.20.1 roots the hand stack at the camera and leaves the
+            // Minecraft 1.19.4 roots the hand stack at the camera and leaves the
             // model-view without the camera rotation. The stack is re-rooted here at
             // the inverse of that rotation, with the rotation taken into the
             // model-view, so the capture's space has world axes like every other

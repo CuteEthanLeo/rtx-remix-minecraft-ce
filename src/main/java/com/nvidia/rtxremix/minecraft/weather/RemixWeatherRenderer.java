@@ -5,7 +5,6 @@
 package com.nvidia.rtxremix.minecraft.weather;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
 import com.nvidia.rtxremix.minecraft.CameraFacing;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
@@ -156,7 +155,7 @@ public final class RemixWeatherRenderer {
         boolean[] colorMask = readColorMask();
         float[] shaderColor = RenderSystem.getShaderColor().clone();
 
-        RenderSystem.setProjectionMatrix(projection, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(projection);
         modelViewStack.push();
         modelViewStack.peek().getPositionMatrix().set(modelView);
         RenderSystem.applyModelViewMatrix();
@@ -199,7 +198,7 @@ public final class RemixWeatherRenderer {
             GL20.glBlendEquationSeparate(blendEquationRgb, blendEquationAlpha);
             modelViewStack.pop();
             RenderSystem.applyModelViewMatrix();
-            RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
+            RenderSystem.setProjectionMatrix(savedProjection);
             RenderSystem.setShaderColor(
                     shaderColor[0], shaderColor[1], shaderColor[2], shaderColor[3]);
         }

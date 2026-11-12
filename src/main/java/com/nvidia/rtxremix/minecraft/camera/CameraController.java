@@ -859,7 +859,7 @@ public final class CameraController {
             if (serverPlayer == null) {
                 return;
             }
-            serverPlayer.teleport(serverPlayer.getServerWorld(),
+            serverPlayer.teleport(serverPlayer.getWorld(),
                     shot.x(), shot.y(), shot.z(), shot.yaw(), shot.pitch());
             serverPlayer.setVelocity(0.0, 0.0, 0.0);
         });

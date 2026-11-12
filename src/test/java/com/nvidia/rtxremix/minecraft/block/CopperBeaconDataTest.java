@@ -12,11 +12,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 import net.minecraft.Bootstrap;
 import net.minecraft.SharedConstants;
 import net.minecraft.item.BlockItem;
-import net.minecraft.loot.LootDataType;
+import net.minecraft.loot.LootGsons;
 import net.minecraft.loot.LootTable;
 import net.minecraft.recipe.Recipe;
 import net.minecraft.recipe.RecipeManager;
@@ -67,11 +66,11 @@ class CopperBeaconDataTest {
 
     @Test
     void lootTableDecodes() throws IOException {
-        // The reader the loot manager loads data packs with; it logs the cause and returns empty.
-        Optional<LootTable> table = LootDataType.LOOT_TABLES.parse(
-                ID.withPrefixedPath("blocks/"), read(DATA + "loot_tables/blocks/copper_beacon.json"));
+        // The reader the loot manager loads data packs with; it throws on a file it cannot decode.
+        LootTable table = LootGsons.getTableGsonBuilder().create()
+                .fromJson(read(DATA + "loot_tables/blocks/copper_beacon.json"), LootTable.class);
 
-        assertTrue(table.isPresent(), "loot table does not decode; the cause is logged above");
+        assertNotNull(table, "loot table decodes to nothing");
     }
 
     @Test

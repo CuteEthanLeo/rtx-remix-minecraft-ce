@@ -16,13 +16,13 @@ import org.spongepowered.asm.mixin.injection.At;
 
 /**
  * Gives every glyph atlas page a {@link GlyphPageMirror} and brackets each glyph upload
- * so the upload mixins know which page the pixels are for.
+ * so the upload mixin knows which page the pixels are for.
  *
  * <p>{@code getGlyphRenderer} is the one place a page is written: it binds the texture
- * and calls the glyph's {@code upload} with the slot it found. The glyph implementations
- * reach GL through two different primitives, {@code NativeImage.uploadInternal} for
- * bitmap, TrueType and built-in glyphs and {@code GlStateManager._upload} for Unihex,
- * which is why the scope is opened here and the pixels are read where they are uploaded.
+ * and calls the glyph's {@code upload} with the slot it found. Every glyph implementation
+ * of this version (bitmap, TrueType, legacy Unicode and built-in) reaches GL through
+ * {@code NativeImage.uploadInternal}, so the scope is opened here and the pixels are read
+ * where they are uploaded.
  */
 @Mixin(GlyphAtlasTexture.class)
 public abstract class GlyphAtlasTextureMixin implements GlyphPageMirror.Owner {

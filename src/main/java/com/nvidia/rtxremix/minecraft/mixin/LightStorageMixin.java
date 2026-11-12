@@ -11,6 +11,8 @@ import com.nvidia.rtxremix.minecraft.terrain.LightStorageSnapshotAccess;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshotPolicy;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshotPolicy.Decision;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -48,6 +50,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <p>The integrated server's engines have real readers on other threads, so they keep a
  * separate snapshot, published as {@link ServerLightSnapshot}'s overlay view instead of a
  * whole-map clone. Its notifications run exactly as vanilla's do.
+ *
+ * <p>This version's engine drops a section from its map without marking it dirty, which a
+ * whole-map clone tolerates, since the next clone simply lacks the section. The overlay view
+ * is built from the dirty set alone, so for those engines a dropped section is marked dirty
+ * where it is unloaded, as the engine itself does from 1.20 on.
  */
 @Mixin(LightStorage.class)
 public abstract class LightStorageMixin<M extends ChunkToNibbleArrayMap<M>> implements LightStorageSnapshotAccess {
@@ -104,6 +111,17 @@ public abstract class LightStorageMixin<M extends ChunkToNibbleArrayMap<M>> impl
             case REPUBLISH_THEN_VANILLA -> rtxremix$publishRealCopy();
             case VANILLA -> {
             }
+        }
+    }
+
+    @WrapOperation(
+            method = "updateLight",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightStorage;onUnloadSection(J)V"))
+    private void rtxremix$markDroppedSectionDirty(LightStorage<M> self, long sectionPos, Operation<Void> original) {
+        original.call(self, sectionPos);
+        rtxremix$classify();
+        if (rtxremix$serverSnapshot != null) {
+            dirtySections.add(sectionPos);
         }
     }
 

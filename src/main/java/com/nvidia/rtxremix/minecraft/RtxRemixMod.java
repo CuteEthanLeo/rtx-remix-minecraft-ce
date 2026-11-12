@@ -16,7 +16,6 @@ import com.nvidia.rtxremix.minecraft.weather.RemixWeatherRenderer;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
 import com.nvidia.rtxremix.minecraft.terrain.WorldRendererTerrainAccess;
-import com.nvidia.rtxremix.minecraft.terrain.SkyLightSurfaceScanPolicy;
 import com.nvidia.rtxremix.minecraft.terrain.NeighbourReflagFilter;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshots;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshotPolicy;
@@ -371,7 +370,10 @@ public class RtxRemixMod implements ClientModInitializer {
         // ThreadedAnvilChunkStorage writes a column's data or unload the moment it enters or
         // leaves a player's view here; there is no per-player pending set or per-tick sender
         // (ChunkDataSender) to hold a batch in.
-        LOGGER.info(SkyLightSurfaceScanPolicy.effectiveStateLine());
+        // TODO(1.19.4): seed the client's sky-light surface walk at the chunk packet's
+        // WORLD_SURFACE height, as SeededSurfaceScan does from 1.20 on. This version's light
+        // engine keeps no per-chunk surface heights (ChunkSkyLight), so WorldChunk.loadFromPacket
+        // has no surface walk to seed.
 
         remixAvailable = checkRemixAvailability();
         

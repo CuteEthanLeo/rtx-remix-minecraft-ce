@@ -17,8 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Copies a glyph upload into its page mirror when {@link NativeImage} is the source.
  *
- * <p>Bitmap-font glyphs upload a window of the font's sheet, TrueType and built-in
- * glyphs a whole small image; both end in {@code uploadInternal}, whose arguments are
+ * <p>Bitmap-font and legacy Unicode glyphs upload a window of the font's sheet, TrueType
+ * and built-in glyphs a whole small image; both end in {@code uploadInternal}, whose arguments are
  * exactly the GL sub-image call: destination slot, source window and size. Only an upload
  * inside a glyph upload scope is mirrored, so every other texture upload in the game
  * costs one static read.

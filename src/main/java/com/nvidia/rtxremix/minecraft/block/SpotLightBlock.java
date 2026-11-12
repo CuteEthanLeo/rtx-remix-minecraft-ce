@@ -12,14 +12,14 @@ import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FacingBlock;
+import net.minecraft.block.MapColor;
+import net.minecraft.block.Material;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroup;
+import net.minecraft.item.ItemGroups;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.state.StateManager;
 import net.minecraft.util.BlockMirror;
@@ -64,15 +64,6 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
     /** Full block light level, matching a lantern. */
     protected static final int LUMINANCE = 15;
 
-    /**
-     * Vanilla's "Functional Blocks" creative tab, where torches and lanterns live.
-     *
-     * <p>Built from the registry id rather than {@code ItemGroups.FUNCTIONAL},
-     * which is private in 1.21.1 and would otherwise need an access-widener entry.
-     */
-    private static final RegistryKey<ItemGroup> FUNCTIONAL_BLOCKS =
-            RegistryKey.of(RegistryKeys.ITEM_GROUP, new Identifier("functional_blocks"));
-
     private final LightEntry.ColorOverride beamColor;
 
     protected SpotLightBlock(AbstractBlock.Settings settings, LightEntry.ColorOverride beamColor) {
@@ -81,9 +72,9 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
         setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.NORTH));
     }
 
-    /** Shared settings for every beacon variant. */
+    /** Shared settings for every beacon variant: metal, as vanilla's lantern is, with no map colour. */
     protected static AbstractBlock.Settings beaconSettings() {
-        return AbstractBlock.Settings.create()
+        return AbstractBlock.Settings.of(Material.METAL, MapColor.CLEAR)
                 .strength(3.0f)
                 .sounds(BlockSoundGroup.METAL)
                 .luminance(state -> LUMINANCE);
@@ -109,12 +100,12 @@ public abstract class SpotLightBlock extends FacingBlock implements OverridesIte
         CopperBeaconBlockEntity.register();
     }
 
-    /** Registers one variant, its item, and the creative tab entry. */
+    /** Registers one variant, its item, and its entry in the Functional Blocks creative tab. */
     private static void register(String path, SpotLightBlock block) {
         Identifier id = new Identifier(RtxRemixCommonMod.MOD_ID, path);
         Registry.register(Registries.BLOCK, id, block);
         BlockItem item = Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
-        ItemGroupEvents.modifyEntriesEvent(FUNCTIONAL_BLOCKS).register(entries -> entries.add(item));
+        ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(entries -> entries.add(item));
     }
 
     @Override

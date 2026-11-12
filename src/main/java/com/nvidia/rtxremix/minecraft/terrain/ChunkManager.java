@@ -469,7 +469,7 @@ public class ChunkManager {
             cntBucketGrows, cntBucketGrowKB, cntPendingBuilds, cntPendingMeshMB, cntCaptureQueue,
             cntCaptureQueueMB, cntCaptureBackpressure, cntCaptureEvicted, cntLightRebuildsSkipped,
             cntNeighbourReflagsDropped, cntNeighbourReflagsKept, cntIncompleteFirstBuilds,
-            cntSurfaceScansSeeded, cntReadyMeshes, cntMeshRetireQueue,
+            cntReadyMeshes, cntMeshRetireQueue,
             cntMeshRetireMB, cntLightOpsPending, cntLightTasks,
             cntKnownSections, cntColumns, cntPublishedColumns, cntGeometryColumns,
             cntMissingColumns, cntMissingSections, cntRetainedPages,
@@ -659,7 +659,6 @@ public class ChunkManager {
                 cntNeighbourReflagsDropped = timer.registerCounter("Chunk.NeighbourReflagsDropped");
                 cntNeighbourReflagsKept = timer.registerCounter("Chunk.NeighbourReflagsKept");
                 cntIncompleteFirstBuilds = timer.registerCounter("Chunk.IncompleteFirstBuilds");
-                cntSurfaceScansSeeded = timer.registerCounter("Chunk.SurfaceScansSeeded");
                 cntPagesInstalled = timer.registerCounter("Chunk.PagesInstalled");
                 cntInstallBytes = timer.registerCounter("Chunk.InstallBytes");
                 cntInstancesAdded = timer.registerCounter("Chunk.InstancesAdded");
@@ -711,7 +710,6 @@ public class ChunkManager {
                 timer.count(cntNeighbourReflagsDropped, SkippedSectionRebuilds.drainNeighbourInSnapshot());
                 timer.count(cntNeighbourReflagsKept, NeighbourReflagFilter.drainKept());
                 timer.count(cntIncompleteFirstBuilds, NeighbourReflagFilter.drainIncompleteFirstBuilds());
-                timer.count(cntSurfaceScansSeeded, SkyLightSurfaceScanPolicy.drainSeeded());
 
                 advanceZombieAudit(maintenanceDeadline);
                 submitDirtyBuilds(tex, pcx, pcz);

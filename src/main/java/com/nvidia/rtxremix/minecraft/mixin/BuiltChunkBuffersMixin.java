@@ -56,7 +56,7 @@ public abstract class BuiltChunkBuffersMixin {
         // Constructed on the render thread, like the sections themselves.
         if (rtxremix$scratchBuffers.isEmpty()) {
             for (RenderLayer layer : RenderLayer.getBlockLayers()) {
-                rtxremix$scratchBuffers.put(layer, new VertexBuffer(VertexBuffer.Usage.STATIC));
+                rtxremix$scratchBuffers.put(layer, new VertexBuffer());
             }
         }
         return Collector.of(

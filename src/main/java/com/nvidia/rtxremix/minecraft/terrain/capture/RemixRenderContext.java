@@ -80,7 +80,6 @@ final class RemixRenderContext implements RenderContext {
         return meshConsumer;
     }
 
-    @Override
     public boolean isFaceCulled(@Nullable Direction face) {
         if (face == null) return false;
         return cullTest != null && cullTest.test(face);
@@ -96,7 +95,6 @@ final class RemixRenderContext implements RenderContext {
         transformStack.pop();
     }
 
-    @Override
     public boolean hasTransform() {
         return !transformStack.isEmpty();
     }

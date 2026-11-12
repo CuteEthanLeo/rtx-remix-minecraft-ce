@@ -6,18 +6,18 @@ package com.nvidia.rtxremix.minecraft.settings;
 
 import java.util.List;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.ElementListWidget;
 import net.minecraft.client.option.SimpleOption;
+import net.minecraft.client.util.math.MatrixStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * A scrolling list of rows that hold one or two widgets each.
  *
- * <p>Minecraft 1.20.1's {@code OptionListWidget} takes only options, so a section header
+ * <p>Minecraft 1.19.4's {@code OptionListWidget} takes only options, so a section header
  * or a label beside a slider cannot be a row of it. This list lays rows out the same way:
  * 310 wide and centred, a second widget 160 to the right of the first.
  */
@@ -74,13 +74,13 @@ final class RtxOptionList extends ElementListWidget<RtxOptionList.Row> {
 
         @Override
         public void render(
-                DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
+                MatrixStack matrices, int index, int y, int x, int entryWidth, int entryHeight,
                 int mouseX, int mouseY, boolean hovered, float tickDelta) {
             int left = RtxOptionList.this.left + RtxOptionList.this.width / 2 - ROW_WIDTH / 2;
             for (int column = 0; column < widgets.size(); column++) {
                 ClickableWidget widget = widgets.get(column);
                 widget.setPosition(left + column * COLUMN_PITCH, y);
-                widget.render(context, mouseX, mouseY, tickDelta);
+                widget.render(matrices, mouseX, mouseY, tickDelta);
             }
         }
 

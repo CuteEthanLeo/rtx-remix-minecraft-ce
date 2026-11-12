@@ -232,7 +232,7 @@ class SettingsRowWidthTest {
      * computes them: the rightmost opaque column of a glyph cell plus one pixel
      * of spacing, scaled by the provider's height. Providers are consulted in
      * declaration order and the first that supplies a code point wins, as in
-     * {@code FontStorage}. Only the bitmap providers are loaded, so a string
+     * {@code FontStorage}. Only the space and bitmap providers are loaded, so a string
      * that needs the Unifont fallback fails loudly instead of measuring short.
      */
     private static final class DefaultFont {
@@ -241,10 +241,16 @@ class SettingsRowWidthTest {
 
         static DefaultFont load() {
             DefaultFont font = new DefaultFont();
-            font.loadSpaceProvider(readJson("/assets/minecraft/font/include/space.json"));
-            for (JsonElement provider
-                    : readJson("/assets/minecraft/font/include/default.json").getAsJsonArray("providers")) {
-                font.loadBitmapProvider(provider.getAsJsonObject());
+            // This version declares every provider of the default font in one file.
+            for (JsonElement element
+                    : readJson("/assets/minecraft/font/default.json").getAsJsonArray("providers")) {
+                JsonObject provider = element.getAsJsonObject();
+                switch (provider.get("type").getAsString()) {
+                    case "space" -> font.loadSpaceProvider(provider);
+                    case "bitmap" -> font.loadBitmapProvider(provider);
+                    default -> {
+                    }
+                }
             }
             return font;
         }
@@ -261,8 +267,7 @@ class SettingsRowWidthTest {
             return width;
         }
 
-        private void loadSpaceProvider(JsonObject spaceFont) {
-            JsonObject provider = spaceFont.getAsJsonArray("providers").get(0).getAsJsonObject();
+        private void loadSpaceProvider(JsonObject provider) {
             for (Map.Entry<String, JsonElement> advance
                     : provider.getAsJsonObject("advances").entrySet()) {
                 advances.putIfAbsent(advance.getKey().codePointAt(0), advance.getValue().getAsInt());

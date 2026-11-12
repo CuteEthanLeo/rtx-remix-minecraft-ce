@@ -135,7 +135,6 @@ public class LightManager {
             new FirstPersonShadowModelPlacement();
     // Scratch for the display-beacon transform. Render thread only, overwritten
     // per entity; keeps a spinning lighthouse from allocating every frame.
-    private final Quaternionf scratchBillboard = new Quaternionf();
     private final Vector3f scratchLens = new Vector3f();
     private final Vector3f scratchBeam = new Vector3f();
     private final Vector3f scratchDiskX = new Vector3f();
@@ -219,7 +218,9 @@ public class LightManager {
         lightOwnerIds.clear();
         float frameDtSeconds = entityLightFrameDtSeconds();
         boolean localFirstPersonRigUpdated = false;
-        LightningFlash.advance(world.getLightningTicksLeft(), frameDtSeconds);
+        // This version's getLightningTicksLeft ignores the Hide Lightning Flashes option.
+        boolean hideFlashes = MinecraftClient.getInstance().options.getHideLightningFlashes().getValue();
+        LightningFlash.advance(hideFlashes ? 0 : world.getLightningTicksLeft(), frameDtSeconds);
 
         for (Entity entity : world.getEntities()) {
             if (entity instanceof ItemEntity itemEntity) {
@@ -639,7 +640,7 @@ public class LightManager {
      * every frame:
      *
      * <pre>{@code
-     * /summon block_display ~ ~ ~ {Tags:["lighthouse"],teleport_duration:1,
+     * /summon block_display ~ ~ ~ {Tags:["lighthouse"],
      *     block_state:{Name:"rtx-remix-renderer:copper_beacon"}}
      * /execute as @e[tag=lighthouse] at @s run tp @s ~ ~ ~ ~5 ~
      * }</pre>
@@ -658,33 +659,19 @@ public class LightManager {
      * correctly for one viewer and wrong for every other.
      */
     private void ensureDisplayBeaconLight(DisplayEntity.BlockDisplayEntity display, float tickDelta) {
-        DisplayEntity.BlockDisplayEntity.Data data = display.getData();
-        if (data == null) return;
-
-        BlockState state = data.blockState();
+        BlockState state = display.getBlockState();
         if (!(state.getBlock() instanceof SpotLightBlock beacon)) return;
 
         int luminance = state.getLuminance();
         if (luminance <= 0) return;
 
-        // Rendering data arrives a tick after the entity spawns; until then there
-        // is no transformation to read and the beam would be misplaced.
-        DisplayEntity.RenderState renderState = display.getRenderState();
-        if (renderState == null) return;
-
         EntityLightKey key = EntityLightKey.blockDisplay(display.getId());
 
-        AffineTransformation transform =
-                renderState.transformation().interpolate(display.getLerpProgress(tickDelta));
+        AffineTransformation transform = display.lerpTransformation(display.getLerpProgress(tickDelta));
         Matrix4f matrix = transform.getMatrix();
 
-        // Matches DisplayEntityRenderer.getBillboardRotation for BillboardMode.FIXED.
-        float yaw = MathHelper.lerpAngleDegrees(tickDelta, display.prevYaw, display.getYaw());
-        float pitch = MathHelper.lerp(tickDelta, display.prevPitch, display.getPitch());
-        Quaternionf billboard = scratchBillboard.rotationYXZ(
-                -MathHelper.RADIANS_PER_DEGREE * yaw,
-                MathHelper.RADIANS_PER_DEGREE * pitch,
-                0.0f);
+        // DisplayEntityRenderer.getBillboardRotation for BillboardMode.FIXED; read, never written.
+        Quaternionf billboard = display.getFixedRotation();
 
         Direction facing = state.get(Properties.FACING);
         Direction mount = state.get(CopperBeaconBlock.MOUNT);

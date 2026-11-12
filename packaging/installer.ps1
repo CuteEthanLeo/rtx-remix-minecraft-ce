@@ -154,9 +154,9 @@ $script:PRISM_DATA_DIR_RECORD = Join-Path $env:LOCALAPPDATA 'RtxRemixMinecraft\p
 # the Mojang runtime component (Get-MojangJavaRuntimeComponents).
 $script:JAVA_MAJOR           = 17
 $script:MANAGED_JDK_DIR      = Join-Path $env:LOCALAPPDATA "RtxRemixMinecraft\jdk-$($script:JAVA_MAJOR)"
-$script:FABRIC_API_VERSION   = '0.92.12+1.20.1'
+$script:FABRIC_API_VERSION   = '0.87.2+1.19.4'
 $script:FABRIC_LOADER_VER    = '0.16.10'
-$script:MC_VERSION           = '1.20.1'
+$script:MC_VERSION           = '1.19.4'
 $script:FABRIC_INSTALLER_VER = '1.0.1'
 # Fabric installer 1.0.x writes launcher_profiles.json using an MC-only
 # profile key, but the underlying `versions/` directory name (and the

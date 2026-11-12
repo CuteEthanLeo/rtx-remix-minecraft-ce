@@ -140,7 +140,9 @@ class RemixRenderContextTest {
     @Test
     void meshOutputReplacesStaleNormalsOnTheSameEmitter() {
         MeshBuilderImpl builder = new MeshBuilderImpl();
-        builder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).normal(1, 0, 1, 0).emit();
+        QuadEmitter source = builder.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0);
+        source.normal(1, 0, 1, 0);
+        source.emit();
         Mesh mesh = builder.build();
         RemixRenderContext context = context();
         QuadEmitter emitter = context.getEmitter();
@@ -182,7 +184,8 @@ class RemixRenderContextTest {
     void emptyMeshDoesNotEmitAndClearsStaleEmitterState(MeshOutput output) {
         Mesh empty = new MeshBuilderImpl().build();
         RemixRenderContext context = context();
-        QuadEmitter emitter = context.getEmitter().normal(0, 1, 0, 0).tag(99);
+        QuadEmitter emitter = context.getEmitter().tag(99);
+        emitter.normal(0, 1, 0, 0);
         context.pushTransform(quad -> {
             assertFalse(quad.hasNormal(0));
             assertEquals(0, quad.tag());
@@ -202,7 +205,8 @@ class RemixRenderContextTest {
         source.getEmitter().square(Direction.UP, 0, 0, 1, 1, 0).tag(42).emit();
         source.getEmitter().square(Direction.NORTH, 0, 0, 1, 1, 0).tag(43).emit();
         MeshBuilderImpl target = new MeshBuilderImpl();
-        QuadEmitter emitter = target.getEmitter().normal(0, 1, 0, 0).tag(99);
+        QuadEmitter emitter = target.getEmitter().tag(99);
+        emitter.normal(0, 1, 0, 0);
 
         source.build().outputTo(emitter);
 

@@ -565,7 +565,7 @@ public final class BlockQuadEmitter {
         int top = Math.min(y + WetSurfaces.MAX_SHELTER_SCAN, baseY + 31);
         for (int scanY = y + 1; scanY <= top; scanY++) {
             BlockState above = getCachedBlockState(world, x, scanY, z);
-            if (above.blocksMovement() || !above.getFluidState().isEmpty()) {
+            if (above.getMaterial().blocksMovement() || !above.getFluidState().isEmpty()) {
                 return false;
             }
         }
@@ -598,7 +598,7 @@ public final class BlockQuadEmitter {
             int sz = wz + dir.getOffsetZ();
             if (getCachedFluidState(world, sx, wy, sz).isIn(FluidTags.WATER)) continue;
             BlockState shore = getCachedBlockState(world, sx, wy, sz);
-            if (shore.isAir() || !shore.isSolid()) continue;
+            if (shore.isAir() || !shore.getMaterial().isSolid()) continue;
 
             boolean alongX = side < 2;
             for (int corner = 0; corner < 4; corner++) {
@@ -958,7 +958,7 @@ public final class BlockQuadEmitter {
                     totalHeight += h;
                     count++;
                 } else if (!getCachedBlockState(world,
-                        fluidCheckPos.getX(), fluidCheckPos.getY(), fluidCheckPos.getZ()).isSolid()) {
+                        fluidCheckPos.getX(), fluidCheckPos.getY(), fluidCheckPos.getZ()).getMaterial().isSolid()) {
                     count++;
                 }
             }

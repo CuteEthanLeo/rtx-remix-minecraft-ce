@@ -80,10 +80,9 @@ public abstract class GameRendererMixin {
 
     /**
      * The GUI tail of GameRenderer.render, from vanilla's {@code swap("gui")} to
-     * the method's return: HUD, in-game screen or overlay, toasts, and the final
-     * DrawContext flush. Vanilla only reaches that swap while a world is loaded,
-     * so menu-only frames have no GUI zone. WorldRender.END accounts for the
-     * world half of the frame.
+     * the method's return: HUD, in-game screen or overlay, and toasts. Vanilla
+     * only reaches that swap while a world is loaded, so menu-only frames have
+     * no GUI zone. WorldRender.END accounts for the world half of the frame.
      */
     private ProfileScope rtxremix$guiScope;
 

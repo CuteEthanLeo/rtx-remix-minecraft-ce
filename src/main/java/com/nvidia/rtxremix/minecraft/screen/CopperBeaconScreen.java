@@ -15,12 +15,13 @@ import java.util.Map;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.client.gui.DrawContext;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.CheckboxWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
@@ -297,19 +298,20 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context);
-        super.render(context, mouseX, mouseY, delta);
-        drawMouseoverTooltip(context, mouseX, mouseY);
+    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+        renderBackground(matrices);
+        super.render(matrices, mouseX, mouseY, delta);
+        drawMouseoverTooltip(matrices, mouseX, mouseY);
     }
 
     @Override
     protected void drawBackground(
-            DrawContext context, float delta, int mouseX, int mouseY) {
-        context.drawBorder(x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
+            MatrixStack matrices, float delta, int mouseX, int mouseY) {
+        drawBorder(matrices, x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
+        RenderSystem.setShaderTexture(0, SLOT_TEXTURE);
         for (var slot : handler.slots) {
-            context.drawTexture(
-                    SLOT_TEXTURE,
+            drawTexture(
+                    matrices,
                     x + slot.x - 1,
                     y + slot.y - 1,
                     SLOT_TEXTURE_U,
@@ -320,42 +322,37 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
     }
 
     @Override
-    protected void drawForeground(DrawContext context, int mouseX, int mouseY) {
-        context.drawText(
-                textRenderer,
+    protected void drawForeground(MatrixStack matrices, int mouseX, int mouseY) {
+        textRenderer.draw(
+                matrices,
                 title,
                 titleX,
                 titleY,
-                0xFFE0E0E0,
-                false);
-        context.drawText(
-                textRenderer,
+                0xFFE0E0E0);
+        textRenderer.draw(
+                matrices,
                 playerInventoryTitle,
                 playerInventoryTitleX,
                 playerInventoryTitleY,
-                0xFFE0E0E0,
-                false);
-        context.drawText(
-                textRenderer,
+                0xFFE0E0E0);
+        textRenderer.draw(
+                matrices,
                 Text.translatable("container.rtx-remix-renderer.copper_beacon.yaw"),
                 OUTER_MARGIN,
                 55,
-                0xFFE0E0E0,
-                false);
-        context.drawText(
-                textRenderer,
+                0xFFE0E0E0);
+        textRenderer.draw(
+                matrices,
                 Text.translatable("container.rtx-remix-renderer.copper_beacon.pitch"),
                 OUTER_MARGIN + PANEL_WIDTH + PANEL_GAP,
                 55,
-                0xFFE0E0E0,
-                false);
-        context.drawText(
-                textRenderer,
+                0xFFE0E0E0);
+        textRenderer.draw(
+                matrices,
                 Text.translatable("container.rtx-remix-renderer.copper_beacon.dye"),
                 OUTER_MARGIN,
                 22,
-                0xFFE0E0E0,
-                false);
+                0xFFE0E0E0);
     }
 
     private static Text modeText(CopperBeaconAnimationMode mode) {

@@ -9,7 +9,7 @@ import org.lwjgl.opengl.GL15;
 import java.nio.ByteBuffer;
 
 /**
- * Upload policy for vanilla's {@code DYNAMIC} vertex and index buffer objects.
+ * Upload policy for the vertex and index buffer objects vanilla refills on every draw.
  *
  * <p>Vanilla re-specifies the same buffer object with {@code glBufferData} on
  * every upload so the previous storage is orphaned while the GPU may still read

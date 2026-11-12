@@ -153,13 +153,14 @@ move log. Integrated-server chunk delivery and unloads are not paced on this
 Minecraft version: the server writes a column the moment it enters or leaves a
 player's view and has no per-player sender to hold a batch in. While capture is
 on, a chunk-load neighbour re-flag is dropped if the
-neighbour's last build already saw the loading column (`NeighbourReflagFilter`);
+neighbour's last build already saw the loading column (`NeighbourReflagFilter`), and
 the client light engine publishes its live section map as its snapshot
 (`ClientLightSnapshotPolicy`, `LightStorageMixin`) while the integrated server's
 engines, which have real readers on other threads, publish an immutable layered
-view instead of vanilla's whole-map clone (`ServerLightSnapshot`); and the
-client's sky-light surface walk is seeded at the packet's `WORLD_SURFACE`
-height (`SeededSurfaceScan`, `SkyLightSurfaceScanPolicy`). `VanillaSectionBuilds`
+view instead of vanilla's whole-map clone (`ServerLightSnapshot`). The client's
+sky-light surface walk is not seeded on this Minecraft version: its light
+engine keeps no per-chunk surface heights, so a chunk apply has no surface walk
+to seed. `VanillaSectionBuilds`
 keeps real copies until every build that latched capture off has finished.
 Each policy has a `rtxremix.*` kill switch listed in `docs/TUNING.md`.
 
@@ -303,6 +304,10 @@ diluting the sampler's candidate pool.
 - Nothing a `ServerLightSnapshot` has published is ever mutated; the engine
   copies a nibble array before its first write after a publish
   (`LightStorageMixin`).
+- A light section an integrated-server engine drops is marked dirty where it is
+  unloaded. This version's engine does not mark it, and the layered view is
+  built from the dirty set alone, so the removal and its column-top change
+  would otherwise never reach readers (`LightStorageMixin`).
 - The camera schema stays strict version 1 and its discriminator stays
   `"catmull-rom"` (`CameraPathCodec`); still shots are a separate file with
   their own strict codec, never extra waypoint fields (`StillShotCodec`).

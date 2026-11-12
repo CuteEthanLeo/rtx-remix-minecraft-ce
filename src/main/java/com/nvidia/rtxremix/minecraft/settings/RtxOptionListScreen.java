@@ -4,19 +4,19 @@
  */
 package com.nvidia.rtxremix.minecraft.settings;
 
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.option.GameOptionsScreen;
 import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.client.gui.widget.ThreePartsLayoutWidget;
 import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Util;
 
 /**
  * An options screen whose body is one option list between a title and a footer.
  *
- * <p>Minecraft 1.20.1's {@code GameOptionsScreen} lays nothing out, and a resize runs
+ * <p>Minecraft 1.19.4's {@code GameOptionsScreen} lays nothing out, and a resize runs
  * {@code init} again, so the layout and the list are built there from the current size.
  * A screen draws its own background on this version, and the list is added first so the
  * header and footer strips it draws stay under the title and the footer buttons.
@@ -57,13 +57,16 @@ abstract class RtxOptionListScreen extends GameOptionsScreen {
     /** Fills {@link #body}; called once per {@code init}. */
     protected abstract void addOptions();
 
-    /** Adds the footer to {@link #layout}; called once per {@code init}. */
+    /**
+     * Adds the footer to {@link #layout}, through {@code addBody}: Yarn names the layout's
+     * bottom strip the body on this version. Called once per {@code init}.
+     */
     protected abstract void initFooter();
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context);
-        super.render(context, mouseX, mouseY, delta);
+    public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+        this.renderBackground(matrices);
+        super.render(matrices, mouseX, mouseY, delta);
         this.deferredSliders.applyDue();
     }
 }

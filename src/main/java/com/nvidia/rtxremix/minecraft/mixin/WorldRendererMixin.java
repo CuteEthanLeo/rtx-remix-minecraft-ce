@@ -57,7 +57,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.chunk.WorldChunk;
-import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
@@ -294,8 +293,6 @@ public abstract class WorldRendererMixin
         // Same gate as vanilla updateChunks: a section built before its light
         // is ready would bake bad light, and cancelRebuild below means nothing
         // re-flags it afterwards.
-        LightingProvider lightingProvider = world.getLightingProvider();
-
         ArrayList<ChunkBuilder.BuiltChunk> loadedSections = new ArrayList<>();
         for (ChunkBuilder.BuiltChunk builtChunk : chunks.chunks) {
             BlockPos origin = builtChunk.getOrigin();
@@ -307,7 +304,7 @@ public abstract class WorldRendererMixin
             }
             WorldChunk worldChunk = world.getChunkManager().getWorldChunk(cx, cz, false);
             if (worldChunk != null && !worldChunk.getSection(worldChunk.sectionCoordToIndex(sy)).isEmpty()
-                    && lightingProvider.isLightingEnabled(ChunkSectionPos.from(cx, sy, cz))) {
+                    && worldChunk.shouldRenderOnUpdate()) {
                 loadedSections.add(builtChunk);
             }
         }

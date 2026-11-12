@@ -5,7 +5,6 @@
 package com.nvidia.rtxremix.minecraft.gl;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
@@ -77,7 +76,7 @@ public class TextureOverlay {
         Matrix4f projMatrix = new Matrix4f().setOrtho(
             0.0f, (float) width, (float) height, 0.0f, -1000.0f, 1000.0f
         );
-        RenderSystem.setProjectionMatrix(projMatrix, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(projMatrix);
 
         RenderSystem.getModelViewStack().push();
         RenderSystem.getModelViewStack().loadIdentity();
@@ -102,7 +101,7 @@ public class TextureOverlay {
 
         RenderSystem.getModelViewStack().pop();
         RenderSystem.applyModelViewMatrix();
-        RenderSystem.setProjectionMatrix(savedProjection, VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(savedProjection);
 
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();

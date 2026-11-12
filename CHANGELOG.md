@@ -13,6 +13,11 @@ also part of every mod file name.
 
 ### Added
 
+- A package for Minecraft 1.19.4, ported back from the 1.20.1 branch. Every
+  feature is kept. Two performance policies are dropped: the pacing of the
+  integrated server's chunk delivery and unloads, as on 1.20.1, and the seeded
+  sky-light surface scan, because this version's light engine has no surface
+  walk to seed. This package needs Fabric Loader 0.16.10 or newer.
 - A package for Minecraft 1.20.1, ported back from the 1.20.4 branch. Every
   feature is kept. One performance policy is dropped: the pacing of the
   integrated server's chunk delivery and unloads has nothing to attach to on

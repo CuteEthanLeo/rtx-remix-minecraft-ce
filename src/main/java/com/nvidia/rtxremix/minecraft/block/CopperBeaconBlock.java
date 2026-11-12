@@ -38,9 +38,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Warm-white lighthouse beacon in a brass housing.
  *
- * <p>Waterloggable like a lantern. The housing is too small for vanilla to count the block as
- * solid, so without a fluid state of its own, flowing water would replace it the way it washes
- * away a torch.
+ * <p>Waterloggable like a lantern: the housing fills only part of the block, and without a
+ * fluid state of its own water would stop at it as it does at a full block.
  *
  * @see SpotLightBlock
  */
