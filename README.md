@@ -20,6 +20,7 @@
 >
 > | Minecraft | Branch / 分支 | Download / 下载 | Status / 状态 |
 > |---|---|---|---|
+> | 1.19.4 | `mc/1.19.4` | [`v0.1.0-ce.9+mc1.19.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.19.4) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.20.1 | `mc/1.20.1` | [`v0.1.0-ce.9+mc1.20.1`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.1) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.20.4 | `mc/1.20.4` | [`v0.1.0-ce.9+mc1.20.4`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.4) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
 > | 1.20.6 | `mc/1.20.6` | [`v0.1.0-ce.9+mc1.20.6`](https://github.com/CuteEthanLeo/rtx-remix-minecraft-ce/releases/tag/v0.1.0-ce.9%2Bmc1.20.6) | Port, not yet verified in game / 移植版，尚未在游戏内验证 |
