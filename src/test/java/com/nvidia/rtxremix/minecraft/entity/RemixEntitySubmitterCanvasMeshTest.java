@@ -66,8 +66,8 @@ class RemixEntitySubmitterCanvasMeshTest {
             Sprite sprite = patternSprites[layer];
             for (ModelPart.Quad quad : flag) {
                 for (ModelPart.Vertex vertex : quad.vertices) {
-                    assertEquals(sprite.getFrameU(vertex.u), tu[i], EPSILON, "u of vertex " + i);
-                    assertEquals(sprite.getFrameV(vertex.v), tv[i], EPSILON, "v of vertex " + i);
+                    assertEquals(sprite.getFrameU(vertex.u * 16.0f), tu[i], EPSILON, "u of vertex " + i);
+                    assertEquals(sprite.getFrameV(vertex.v * 16.0f), tv[i], EPSILON, "v of vertex " + i);
                     i++;
                 }
             }

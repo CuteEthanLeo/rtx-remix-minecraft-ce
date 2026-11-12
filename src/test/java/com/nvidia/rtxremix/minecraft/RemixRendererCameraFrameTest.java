@@ -21,11 +21,10 @@ class RemixRendererCameraFrameTest {
 
     @Test
     void cameraFrameAdvancesOnlyWhenMinecraftWillRenderAWorld() {
-        assertTrue(RemixRenderer.shouldAdvanceWorldRenderFrame(true, true, true));
+        assertTrue(RemixRenderer.shouldAdvanceWorldRenderFrame(true, true));
 
-        assertFalse(RemixRenderer.shouldAdvanceWorldRenderFrame(false, true, true));
-        assertFalse(RemixRenderer.shouldAdvanceWorldRenderFrame(true, false, true));
-        assertFalse(RemixRenderer.shouldAdvanceWorldRenderFrame(true, true, false));
+        assertFalse(RemixRenderer.shouldAdvanceWorldRenderFrame(false, true));
+        assertFalse(RemixRenderer.shouldAdvanceWorldRenderFrame(true, false));
     }
 
     @Test

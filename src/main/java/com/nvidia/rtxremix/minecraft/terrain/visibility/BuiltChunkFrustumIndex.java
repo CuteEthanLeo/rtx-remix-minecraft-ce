@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.visibility;
 
-import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.WorldRenderer.ChunkInfo;
 import net.minecraft.util.math.Box;
 
 import java.util.LinkedHashSet;
@@ -15,6 +15,8 @@ import java.util.function.Predicate;
 
 /**
  * A published coarse frustum index over the sections vanilla's visibility graph has reached.
+ * It holds the graph's own {@code ChunkInfo} nodes, because those are what this Minecraft
+ * version's frustum-filtered list is made of.
  *
  * <p>{@code state} is the vanilla visibility state the index was built from, so an apply can
  * refuse an index that outlived a publish, and {@code chunks} is that state's reached-section
@@ -33,9 +35,9 @@ public final class BuiltChunkFrustumIndex {
     private static final int IN_USE = 1;
     private static final int RETIRED = 2;
 
-    private static final HierarchicalFrustumCuller.EntryBounds<ChunkBuilder.BuiltChunk> CHUNK_BOUNDS =
-            (chunk, out) -> {
-                Box bounds = chunk.getBoundingBox();
+    private static final HierarchicalFrustumCuller.EntryBounds<ChunkInfo> CHUNK_BOUNDS =
+            (info, out) -> {
+                Box bounds = info.chunk.getBoundingBox();
                 out[0] = bounds.minX;
                 out[1] = bounds.minY;
                 out[2] = bounds.minZ;
@@ -46,7 +48,7 @@ public final class BuiltChunkFrustumIndex {
 
     private final Object state;
     private final LinkedHashSet<?> chunks;
-    private final HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> culler;
+    private final HierarchicalFrustumCuller<ChunkInfo> culler;
     private final IntConsumer rebucketMovedSlot;
     private final AtomicInteger use = new AtomicInteger(FRESH);
     private long reconciledSequence;
@@ -54,7 +56,7 @@ public final class BuiltChunkFrustumIndex {
     BuiltChunkFrustumIndex(
             Object state,
             LinkedHashSet<?> chunks,
-            HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> culler,
+            HierarchicalFrustumCuller<ChunkInfo> culler,
             long reconciledSequence) {
         this.state = state;
         this.chunks = chunks;
@@ -85,7 +87,7 @@ public final class BuiltChunkFrustumIndex {
      * Takes the culler back for reuse, or null while a use is in progress or once another
      * caller already took it. A retired index refuses every later acquire.
      */
-    public HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> tryRetire() {
+    public HierarchicalFrustumCuller<ChunkInfo> tryRetire() {
         return use.compareAndSet(FRESH, RETIRED) ? culler : null;
     }
 
@@ -95,13 +97,13 @@ public final class BuiltChunkFrustumIndex {
     }
 
     /** Indexes a section the graph reached after publication, using its current bounds. */
-    public void add(ChunkBuilder.BuiltChunk chunk) {
-        add(culler, chunk);
+    public void add(ChunkInfo info) {
+        add(culler, info);
     }
 
-    static void add(HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> culler, ChunkBuilder.BuiltChunk chunk) {
-        Box bounds = chunk.getBoundingBox();
-        culler.add(chunk, chunk.index,
+    static void add(HierarchicalFrustumCuller<ChunkInfo> culler, ChunkInfo info) {
+        Box bounds = info.chunk.getBoundingBox();
+        culler.add(info, info.chunk.index,
                 bounds.minX, bounds.minY, bounds.minZ,
                 bounds.maxX, bounds.maxY, bounds.maxZ);
     }
@@ -123,8 +125,8 @@ public final class BuiltChunkFrustumIndex {
 
     /** Emits the sections a frustum can see, in graph order; see {@link HierarchicalFrustumCuller#forEachVisible}. */
     public void forEachVisible(HierarchicalFrustumCuller.BoxClassifier cellClassifier,
-                               Predicate<? super ChunkBuilder.BuiltChunk> chunkTest,
-                               Consumer<? super ChunkBuilder.BuiltChunk> consumer) {
+                               Predicate<? super ChunkInfo> chunkTest,
+                               Consumer<? super ChunkInfo> consumer) {
         culler.forEachVisible(cellClassifier, chunkTest, consumer);
     }
 }

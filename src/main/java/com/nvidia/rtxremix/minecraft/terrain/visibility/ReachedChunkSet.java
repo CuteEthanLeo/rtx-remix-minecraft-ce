@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.visibility;
 
-import net.minecraft.client.render.ChunkRenderingDataPreparer.ChunkInfo;
+import net.minecraft.client.render.WorldRenderer.ChunkInfo;
 
 import java.util.Arrays;
 import java.util.Collection;

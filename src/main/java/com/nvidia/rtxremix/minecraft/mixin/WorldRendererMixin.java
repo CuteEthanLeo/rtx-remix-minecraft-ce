@@ -6,7 +6,7 @@ package com.nvidia.rtxremix.minecraft.mixin;
 
 import com.nvidia.rtxremix.minecraft.weather.RemixWeatherRenderer;
 import com.nvidia.rtxremix.minecraft.terrain.visibility.BuiltChunkStorageSectionAccess;
-import com.nvidia.rtxremix.minecraft.terrain.visibility.BuiltChunkArrayIterator;
+import com.nvidia.rtxremix.minecraft.terrain.visibility.ChunkInfoArrayIterator;
 import com.nvidia.rtxremix.minecraft.terrain.capture.RegionBuilderRelease;
 import com.nvidia.rtxremix.minecraft.terrain.capture.BlockQuadEmitter;
 import com.nvidia.rtxremix.minecraft.terrain.WorldRendererTerrainAccess;
@@ -111,7 +111,7 @@ public abstract class WorldRendererMixin
     private static final ThreadLocal<ArrayDeque<ProfileScope>> rtxremix$syncRebuildScope = new ThreadLocal<>();
 
     @Shadow
-    private ChunkBuilder field_45614;
+    private ChunkBuilder chunkBuilder;
 
     @Shadow
     @Nullable
@@ -132,7 +132,7 @@ public abstract class WorldRendererMixin
 
     @Shadow
     @Final
-    private ObjectArrayList<ChunkBuilder.BuiltChunk> field_45616;
+    private ObjectArrayList<WorldRenderer.ChunkInfo> chunkInfos;
 
     @Shadow
     @Final
@@ -153,10 +153,10 @@ public abstract class WorldRendererMixin
     private int rtxremix$phaseRenderLayerSkipsStart;
     private int rtxremix$blockEntityChunkScanCount = -1;
     private int rtxremix$blockEntityChunkCount = -1;
-    private ChunkBuilder.BuiltChunk[] rtxremix$blockEntityChunks =
-            new ChunkBuilder.BuiltChunk[rtxremix$BLOCK_ENTITY_CHUNK_LIST_INITIAL_CAPACITY];
+    private WorldRenderer.ChunkInfo[] rtxremix$blockEntityChunks =
+            new WorldRenderer.ChunkInfo[rtxremix$BLOCK_ENTITY_CHUNK_LIST_INITIAL_CAPACITY];
     private int rtxremix$blockEntityChunkBufferUsed;
-    private final BuiltChunkArrayIterator rtxremix$blockEntityChunkIterator = new BuiltChunkArrayIterator();
+    private final ChunkInfoArrayIterator rtxremix$blockEntityChunkIterator = new ChunkInfoArrayIterator();
     private RemixWeatherRenderer rtxremix$weatherRenderer;
     private Identifier rtxremix$weatherTexture;
     private float[] rtxremix$starVertices = new float[0];
@@ -287,7 +287,7 @@ public abstract class WorldRendererMixin
 
     @Override
     public LongSet rtxremix$queueSectionsForRemix(LongSet sections) {
-        if (chunks == null || field_45614 == null || world == null || sections.isEmpty()) {
+        if (chunks == null || chunkBuilder == null || world == null || sections.isEmpty()) {
             return LongSets.emptySet();
         }
 
@@ -330,7 +330,7 @@ public abstract class WorldRendererMixin
         LongOpenHashSet queued = new LongOpenHashSet(loadedSections.size());
         try {
             for (ChunkBuilder.BuiltChunk builtChunk : loadedSections) {
-                builtChunk.scheduleRebuild(field_45614, regionBuilder);
+                builtChunk.scheduleRebuild(chunkBuilder, regionBuilder);
                 // Prevent WorldRenderer.updateChunks from queueing this same slot a
                 // second time when it next walks vanilla's visible section list.
                 builtChunk.cancelRebuild();
@@ -647,8 +647,8 @@ public abstract class WorldRendererMixin
                     target = "Lit/unimi/dsi/fastutil/objects/ObjectArrayList;iterator()Lit/unimi/dsi/fastutil/objects/ObjectListIterator;"
             ),
             require = 0)
-    private ObjectListIterator<ChunkBuilder.BuiltChunk> rtxremix$iterateBlockEntityChunks(
-            ObjectArrayList<ChunkBuilder.BuiltChunk> chunks) {
+    private ObjectListIterator<WorldRenderer.ChunkInfo> rtxremix$iterateBlockEntityChunks(
+            ObjectArrayList<WorldRenderer.ChunkInfo> chunks) {
         if (!RtxRemixMod.isRemixWorldRendering()) {
             return chunks.iterator();
         }
@@ -656,8 +656,8 @@ public abstract class WorldRendererMixin
         int visibleChunks = chunks.size();
         int blockEntityChunks = 0;
         for (int i = 0; i < visibleChunks; i++) {
-            ChunkBuilder.BuiltChunk chunk = chunks.get(i);
-            if (chunk instanceof ChunkBuilderBlockEntityAccess access
+            WorldRenderer.ChunkInfo chunk = chunks.get(i);
+            if (chunk.chunk instanceof ChunkBuilderBlockEntityAccess access
                     && access.rtxremix$hasBlockEntities()) {
                 if (blockEntityChunks == rtxremix$blockEntityChunks.length) {
                     rtxremix$blockEntityChunks = Arrays.copyOf(
@@ -799,11 +799,11 @@ public abstract class WorldRendererMixin
     }
 
     private int rtxremix$chunksToUpload() {
-        return field_45614 == null ? -1 : field_45614.getChunksToUpload();
+        return chunkBuilder == null ? -1 : chunkBuilder.getChunksToUpload();
     }
 
     private int rtxremix$chunksToBatch() {
-        return field_45614 == null ? -1 : field_45614.getToBatchCount();
+        return chunkBuilder == null ? -1 : chunkBuilder.getToBatchCount();
     }
 
     private void rtxremix$transitionProfilerPhase(String vanillaPhaseName) {
@@ -835,8 +835,8 @@ public abstract class WorldRendererMixin
     }
 
     private void rtxremix$annotateProfilerPhase(ProfileScope scope) {
-        if (field_45616 != null) {
-            int visibleChunks = field_45616.size();
+        if (chunkInfos != null) {
+            int visibleChunks = chunkInfos.size();
             scope.visibleChunkCount(visibleChunks);
             scope.captureCount(visibleChunks);
         }

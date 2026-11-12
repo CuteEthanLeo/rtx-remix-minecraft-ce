@@ -4,7 +4,6 @@
  */
 package com.nvidia.rtxremix.minecraft.logic;
 
-import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -43,11 +42,6 @@ public final class ZonePersistentState extends PersistentState {
     private static final String SPHERE_SHAPE = "sphere";
     private static final String BOX_SHAPE = "box";
 
-    private static final PersistentState.Type<ZonePersistentState> TYPE =
-            new PersistentState.Type<>(ZonePersistentState::new,
-                    ZonePersistentState::fromNbt,
-                    DataFixTypes.SAVED_DATA_COMMAND_STORAGE);
-
     private final Map<String, ZoneDefinition> zonesByName = new HashMap<>();
     private final boolean writable;
 
@@ -69,7 +63,7 @@ public final class ZonePersistentState extends PersistentState {
      * object it does not need.</p>
      */
     public static ZonePersistentState getOrCreate(MinecraftServer server) {
-        return server.getOverworld().getPersistentStateManager().getOrCreate(TYPE, DATA_ID);
+        return server.getOverworld().getPersistentStateManager().getOrCreate(ZonePersistentState::fromNbt, ZonePersistentState::new, DATA_ID);
     }
 
     /**
@@ -84,7 +78,7 @@ public final class ZonePersistentState extends PersistentState {
      * depends on that behavior staying as it is.</p>
      */
     public static ZonePersistentState getIfPresent(MinecraftServer server) {
-        return server.getOverworld().getPersistentStateManager().get(TYPE, DATA_ID);
+        return server.getOverworld().getPersistentStateManager().get(ZonePersistentState::fromNbt, DATA_ID);
     }
 
     /** Immutable, name-sorted copy safe to publish to the client/render registry. */

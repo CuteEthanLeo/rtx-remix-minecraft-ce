@@ -96,7 +96,7 @@ public final class RemixFirstPersonPass implements AutoCloseable {
         context.begin(true);
 
         try {
-            // Minecraft 1.20.4 roots the hand stack at the camera and leaves the
+            // Minecraft 1.20.1 roots the hand stack at the camera and leaves the
             // model-view without the camera rotation. The stack is re-rooted here at
             // the inverse of that rotation, with the rotation taken into the
             // model-view, so the capture's space has world axes like every other
@@ -337,27 +337,20 @@ public final class RemixFirstPersonPass implements AutoCloseable {
     @Override
     public void close() {
         clearPending();
-        immediate.close();
     }
 
     /**
      * HeldItemRenderer requires an Immediate provider because it flushes it at
      * the end of the hand render. This adapter exposes the Remix capture
-     * provider while making those raster flushes no-ops.
+     * provider while making those raster flushes no-ops. The fallback builder the
+     * superclass requires is never written, and this Minecraft version gives a
+     * builder no release, so it lives as long as vanilla's own.
      */
-    private static final class CapturingImmediate extends VertexConsumerProvider.Immediate
-            implements AutoCloseable {
-        private final BufferBuilder ownedBuffer;
+    private static final class CapturingImmediate extends VertexConsumerProvider.Immediate {
         private final RemixVertexConsumerProvider captureProvider;
 
         private CapturingImmediate(RemixVertexConsumerProvider captureProvider) {
-            this(new BufferBuilder(256), captureProvider);
-        }
-
-        private CapturingImmediate(BufferBuilder buffer,
-                                   RemixVertexConsumerProvider captureProvider) {
-            super(buffer, new LinkedHashMap<>());
-            this.ownedBuffer = buffer;
+            super(new BufferBuilder(256), new LinkedHashMap<>());
             this.captureProvider = captureProvider;
         }
 
@@ -376,11 +369,6 @@ public final class RemixFirstPersonPass implements AutoCloseable {
 
         @Override
         public void draw(RenderLayer layer) {
-        }
-
-        @Override
-        public void close() {
-            ownedBuffer.close();
         }
     }
 }

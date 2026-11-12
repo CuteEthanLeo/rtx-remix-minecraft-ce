@@ -12,7 +12,7 @@ import org.joml.Quaternionf;
  * to its right, so the rotation turns a quad in the XY plane toward the viewer and its
  * conjugate is the view rotation.
  *
- * <p>Minecraft 1.20.4's {@code Camera.getRotation()} instead looks down +Z with +X to its
+ * <p>Minecraft 1.20.1's {@code Camera.getRotation()} instead looks down +Z with +X to its
  * left, half a turn about Y away.
  */
 public final class CameraFacing {

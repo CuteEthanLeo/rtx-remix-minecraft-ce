@@ -8,6 +8,10 @@
 package com.nvidia.rtxremix.minecraft.logic;
 
 import com.nvidia.rtxremix.RemixException;
+import net.minecraft.Bootstrap;
+import net.minecraft.SharedConstants;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,7 +38,17 @@ import static org.junit.jupiter.api.Assertions.fail;
  * send-threshold decision, layer discovery, and catalog invariants. No Remix
  * runtime needed; the layer catalog itself is plain data.
  */
+@Tag("fabric")
 class ConfLayerDriverTest {
+
+    // Touching a block or a registry key initialises the registries, which this Minecraft
+    // version refuses before the bootstrap has run, and the bootstrap needs the access
+    // changes Fabric Loader applies: hence the fabric suite.
+    @BeforeAll
+    static void bootstrap() {
+        SharedConstants.createGameVersion();
+        Bootstrap.initialize();
+    }
 
     @Test
     void weatherStrengthsBeginAtZero() {

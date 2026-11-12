@@ -705,11 +705,16 @@ public final class BlockQuadEmitter {
                     float sin = MathHelper.sin(angle) * 0.25f;
                     float cos = MathHelper.cos(angle) * 0.25f;
                     // Vanilla's corners in its order (0,0) (0,1) (1,1) (1,0), reordered to
-                    // this emitter's (0,0) (1,0) (1,1) (0,1).
-                    float c00u = flowSprite.getFrameU(0.5f - cos - sin), c00v = flowSprite.getFrameV(0.5f - cos + sin);
-                    float c01u = flowSprite.getFrameU(0.5f - cos + sin), c01v = flowSprite.getFrameV(0.5f + cos + sin);
-                    float c11u = flowSprite.getFrameU(0.5f + cos + sin), c11v = flowSprite.getFrameV(0.5f + cos - sin);
-                    float c10u = flowSprite.getFrameU(0.5f + cos - sin), c10v = flowSprite.getFrameV(0.5f - cos - sin);
+                    // this emitter's (0,0) (1,0) (1,1) (0,1). Sprite frame coordinates run
+                    // 0 to 16 on this Minecraft version.
+                    float c00u = flowSprite.getFrameU(8.0f + (-cos - sin) * 16.0f);
+                    float c00v = flowSprite.getFrameV(8.0f + (-cos + sin) * 16.0f);
+                    float c01u = flowSprite.getFrameU(8.0f + (-cos + sin) * 16.0f);
+                    float c01v = flowSprite.getFrameV(8.0f + (cos + sin) * 16.0f);
+                    float c11u = flowSprite.getFrameU(8.0f + (cos + sin) * 16.0f);
+                    float c11v = flowSprite.getFrameV(8.0f + (cos - sin) * 16.0f);
+                    float c10u = flowSprite.getFrameU(8.0f + (cos - sin) * 16.0f);
+                    float c10v = flowSprite.getFrameV(8.0f + (-cos - sin) * 16.0f);
                     setUv4(tempUvs, c00u, c00v, c10u, c10v, c11u, c11v, c01u, c01v);
                     writer.writeFluidQuad(tempPositions, tempUvs, 0, 1, 0, color,
                             flowId, fu0, fv0, fu1, fv1, layer, texManager);
@@ -801,11 +806,11 @@ public final class BlockQuadEmitter {
                 // sprite, so U spans its left half and V runs from the fluid surface
                 // ((1 - height) / 2) down to the half-way line. The full sprite over a
                 // one-block face showed the texture at twice the density.
-                float sideU0 = flowSprite.getFrameU(0.0f);
-                float sideU1 = flowSprite.getFrameU(0.5f);
-                float sideVBottom = flowSprite.getFrameV(0.5f);
-                float sideVTop0 = flowSprite.getFrameV((1.0f - sideH0) * 0.5f);
-                float sideVTop1 = flowSprite.getFrameV((1.0f - sideH1) * 0.5f);
+                float sideU0 = flowSprite.getFrameU(0.0);
+                float sideU1 = flowSprite.getFrameU(8.0);
+                float sideVBottom = flowSprite.getFrameV(8.0);
+                float sideVTop0 = flowSprite.getFrameV((1.0f - sideH0) * 16.0f * 0.5f);
+                float sideVTop1 = flowSprite.getFrameV((1.0f - sideH1) * 16.0f * 0.5f);
                 setUv4(tempUvs, sideU0, sideVBottom, sideU1, sideVBottom, sideU1, sideVTop1, sideU0, sideVTop0);
                 writer.writeFluidQuad(tempPositions, tempUvs, fnx, fny, fnz, color,
                         flowId, fu0, fv0, fu1, fv1, layer, texManager);

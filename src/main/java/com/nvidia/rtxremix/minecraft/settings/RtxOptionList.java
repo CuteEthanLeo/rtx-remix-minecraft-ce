@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A scrolling list of rows that hold one or two widgets each.
  *
- * <p>Minecraft 1.20.4's {@code OptionListWidget} takes only options, so a section header
+ * <p>Minecraft 1.20.1's {@code OptionListWidget} takes only options, so a section header
  * or a label beside a slider cannot be a row of it. This list lays rows out the same way:
  * 310 wide and centred, a second widget 160 to the right of the first.
  */
@@ -28,8 +28,9 @@ final class RtxOptionList extends ElementListWidget<RtxOptionList.Row> {
     private static final int COLUMN_WIDTH = 150;
     private static final int COLUMN_PITCH = 160;
 
-    RtxOptionList(MinecraftClient client, int width, int height, int y) {
-        super(client, width, height, y, ITEM_HEIGHT);
+    /** A list as wide and tall as the screen whose rows show between {@code top} and {@code bottom}. */
+    RtxOptionList(MinecraftClient client, int width, int height, int top, int bottom) {
+        super(client, width, height, top, bottom, ITEM_HEIGHT);
         this.centerListVertically = false;
     }
 
@@ -75,7 +76,7 @@ final class RtxOptionList extends ElementListWidget<RtxOptionList.Row> {
         public void render(
                 DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
                 int mouseX, int mouseY, boolean hovered, float tickDelta) {
-            int left = RtxOptionList.this.getX() + RtxOptionList.this.getWidth() / 2 - ROW_WIDTH / 2;
+            int left = RtxOptionList.this.left + RtxOptionList.this.width / 2 - ROW_WIDTH / 2;
             for (int column = 0; column < widgets.size(); column++) {
                 ClickableWidget widget = widgets.get(column);
                 widget.setPosition(left + column * COLUMN_PITCH, y);

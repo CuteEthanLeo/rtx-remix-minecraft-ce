@@ -10,7 +10,7 @@ How to build and run the mod from source. If you only want to play, read
 - **Java 21**, a JDK matching your machine's architecture. Eclipse Adoptium is
   a good choice. Set `JAVA_HOME` to that JDK: the native build reads it to find
   `jni.h`. The build needs JDK 21, but the mod is compiled for Java 17 and
-  Prism runs Minecraft 1.20.4 only on Java 17, not a newer version, so a
+  Prism runs Minecraft 1.20.1 only on Java 17, not a newer version, so a
   **JDK 17** must be installed as well: the developer tools launch the game
   on `JAVA_HOME` when it is a JDK 17 and otherwise look for one in Gradle's
   toolchains and in the Eclipse Adoptium, Microsoft, and Java folders under
@@ -262,7 +262,7 @@ validation of native integration.
 
 The JAR from `package` is the one players get: it embeds the runtime, gameplay
 conf payload, runtime textures, and baseline PBR textures. To try it in a
-normal installation of Minecraft 1.20.4 that already has Fabric Loader and
+normal installation of Minecraft 1.20.1 that already has Fabric Loader and
 Fabric API, drop it into the instance's `mods` folder; nothing else is needed.
 The release archive's installer also migrates old generated baseline packs and
 preserves user-pack ordering.
@@ -478,7 +478,7 @@ removes its stale registration.
 | A launch reports that Prism Launcher is not installed | Install it from [prismlauncher.org](https://prismlauncher.org), or point `prism.executable` in `tools/config.local.json` at its `prismlauncher.exe` |
 | A launch opens Prism and stops with sign-in steps | No Microsoft account that owns Minecraft is signed in to the selected Prism profile, or `prism.account` names another. See [Sign In To Prism](#sign-in-to-prism) |
 | A launch reports that Prism is already running | Close the selected Prism window and launch again |
-| A launch reports that Minecraft 1.20.4 in Prism needs a 64-bit JDK 17 | The game runs on Java 17 while `JAVA_HOME` names the JDK 21 the build needs, and no JDK 17 for this machine is installed where the tools look. Install one in its default folder |
+| A launch reports that Minecraft 1.20.1 in Prism needs a 64-bit JDK 17 | The game runs on Java 17 while `JAVA_HOME` names the JDK 21 the build needs, and no JDK 17 for this machine is installed where the tools look. Install one in its default folder |
 | A JVM option set in `JAVA_TOOL_OPTIONS` has no effect | Prism does not pass it to the game. Use `launch.jvmArgs`; see [JVM Arguments](TUNING.md#jvm-arguments) |
 | `Failed to initialize RTX Remix` with error code 8, and the game renders vanilla | The staged runtime predates the API in `rtxremix-java/native/include/remix_c.h`. Stage one of the runtimes listed in [Get A Runtime](#get-a-runtime) |
 | `UnsatisfiedLinkError` naming `remixbridge` | The bridge did not compile, or it was compiled for the other architecture. Re-run the build and check that `-Parch` matches the staged runtime |

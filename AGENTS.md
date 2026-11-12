@@ -149,11 +149,10 @@ and the render thread publishes them under a frame budget and retires replaced
 pages through a bounded queue. Concurrent vanilla section builds are capped.
 Visibility rebuilds use a low-priority executor and produce a coarse frustum
 index that survives chunk slots being re-originned by replaying a render-thread
-move log. While capture is on, integrated-server chunk delivery and chunk
-unloads are paced by measured render-thread cost under separate budgets, with
-chunk caps on delivery and a ring-edge bypass for unloads
-(`LocalChunkBatchPacing`, `PacedUnloadQueue`, `ChunkDataSenderMixin`); a
-chunk-load neighbour re-flag is dropped if the
+move log. Integrated-server chunk delivery and unloads are not paced on this
+Minecraft version: the server writes a column the moment it enters or leaves a
+player's view and has no per-player sender to hold a batch in. While capture is
+on, a chunk-load neighbour re-flag is dropped if the
 neighbour's last build already saw the loading column (`NeighbourReflagFilter`);
 the client light engine publishes its live section map as its snapshot
 (`ClientLightSnapshotPolicy`, `LightStorageMixin`) while the integrated server's
@@ -167,7 +166,7 @@ Each policy has a `rtxremix.*` kill switch listed in `docs/TUNING.md`.
 **Allocation.** The collector's concurrent work is what stretches frames at
 high render distance, so the hot vanilla paths that run per section or per
 frame are ported allocation-free and kept that way: the chunk visibility walk
-and its far-section probe (`ChunkRenderingDataPreparerMixin`,
+and its far-section probe (`WorldRendererVisibilityMixin`,
 `terrain/visibility/`), block model variant and part selection
 (`WeightedBakedModelMixin`, `MultipartBakedModelMixin`), biome colour blending,
 and the integrated server's per-tick chunk list. Retained section meshes live
@@ -300,10 +299,7 @@ diluting the sampler's candidate pool.
   `RenderRegionStoragePool`).
 - The visibility walk port produces vanilla's visible set exactly;
   `-Drtxremix.vanillaVisibilityWalk` and `-Drtxremix.logVisibleSet` are how to
-  prove it on a live world (`ChunkRenderingDataPreparerMixin`, `FarChunkProbeTest`).
-- A queued chunk unload is cancelled by the column's re-send, and a queued
-  column that reaches the client ring's edge is sent at once regardless of
-  budget (`PacedUnloadQueue`).
+  prove it on a live world (`WorldRendererVisibilityMixin`, `FarChunkProbeTest`).
 - Nothing a `ServerLightSnapshot` has published is ever mutated; the engine
   copies a nibble array before its first write after a publish
   (`LightStorageMixin`).

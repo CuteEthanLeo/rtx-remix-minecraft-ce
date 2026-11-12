@@ -13,7 +13,7 @@ import java.util.function.LongSupplier;
 /**
  * Debounces the appliers of one screen's deferred sliders.
  *
- * <p>Minecraft 1.20.4's option slider applies its value on every drag step and has no
+ * <p>Minecraft 1.20.1's option slider applies its value on every drag step and has no
  * pending value of its own, so the pause lives here: a slider's applier runs once its
  * value has rested for {@link #DELAY_MS}, or when the screen applies everything on
  * close. A value that returns to the one last applied is not applied again.

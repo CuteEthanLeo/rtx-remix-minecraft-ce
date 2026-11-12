@@ -6,24 +6,22 @@ package com.nvidia.rtxremix.minecraft.block;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.DynamicOps;
-import com.mojang.serialization.JsonOps;
 import com.nvidia.rtxremix.minecraft.RtxRemixCommonMod;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import net.minecraft.Bootstrap;
 import net.minecraft.SharedConstants;
 import net.minecraft.item.BlockItem;
+import net.minecraft.loot.LootDataType;
 import net.minecraft.loot.LootTable;
 import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeManager;
 import net.minecraft.recipe.ShapedRecipe;
-import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryOps;
 import net.minecraft.util.Identifier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -35,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Decodes the Copper Beacon's data files with the targeted Minecraft version's own codecs and
+ * Decodes the Copper Beacon's data files with the targeted Minecraft version's own readers and
  * checks they sit where that version looks for them. Data formats and folder names change
  * between versions, a file the game cannot decode is only logged at world load, and no other
  * test reads these files, so a stale format otherwise ships as a block with no recipe or drop.
@@ -49,8 +47,6 @@ class CopperBeaconDataTest {
     private static final String ASSETS = "/assets/" + RtxRemixCommonMod.MOD_ID + "/";
     private static final Identifier ID = new Identifier(RtxRemixCommonMod.MOD_ID, CopperBeaconBlock.ID);
 
-    private static DynamicOps<JsonElement> ops;
-
     @BeforeAll
     static void bootstrap() {
         SharedConstants.createGameVersion();
@@ -59,23 +55,23 @@ class CopperBeaconDataTest {
         if (!Registries.ITEM.containsId(ID)) {
             SpotLightBlock.registerAll();
         }
-        ops = RegistryOps.of(JsonOps.INSTANCE, DynamicRegistryManager.of(Registries.REGISTRIES));
     }
 
     @Test
     void recipeDecodesAsAShapedRecipe() throws IOException {
-        DataResult<Recipe<?>> recipe = Recipe.CODEC.parse(ops, read(DATA + "recipes/copper_beacon.json"));
+        // The reader the recipe manager loads data packs with; it throws on a file it cannot decode.
+        Recipe<?> recipe = RecipeManager.deserialize(ID, read(DATA + "recipes/copper_beacon.json").getAsJsonObject());
 
-        assertTrue(recipe.error().isEmpty(), () -> "recipe does not decode: " + recipe.error().get().message());
-        assertInstanceOf(ShapedRecipe.class, recipe.result().orElseThrow());
+        assertInstanceOf(ShapedRecipe.class, recipe);
     }
 
     @Test
     void lootTableDecodes() throws IOException {
-        DataResult<LootTable> table =
-                LootTable.CODEC.parse(ops, read(DATA + "loot_tables/blocks/copper_beacon.json"));
+        // The reader the loot manager loads data packs with; it logs the cause and returns empty.
+        Optional<LootTable> table = LootDataType.LOOT_TABLES.parse(
+                ID.withPrefixedPath("blocks/"), read(DATA + "loot_tables/blocks/copper_beacon.json"));
 
-        assertTrue(table.error().isEmpty(), () -> "loot table does not decode: " + table.error().get().message());
+        assertTrue(table.isPresent(), "loot table does not decode; the cause is logged above");
     }
 
     @Test

@@ -5,6 +5,8 @@
 package com.nvidia.rtxremix.minecraft.light;
 
 import com.google.gson.JsonParser;
+import net.minecraft.Bootstrap;
+import net.minecraft.SharedConstants;
 import net.minecraft.resource.InputSupplier;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
@@ -13,6 +15,8 @@ import net.minecraft.resource.ResourceType;
 import net.minecraft.resource.metadata.ResourceMetadataReader;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -44,7 +48,17 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("fabric")
 class BlockLightRuleManagerTest {
+
+    // Touching a block or a registry key initialises the registries, which this Minecraft
+    // version refuses before the bootstrap has run, and the bootstrap needs the access
+    // changes Fabric Loader applies: hence the fabric suite.
+    @BeforeAll
+    static void bootstrap() {
+        SharedConstants.createGameVersion();
+        Bootstrap.initialize();
+    }
 
     @Test
     void parseJsonRulePreservesTheAuthoredRectSpec() throws Exception {

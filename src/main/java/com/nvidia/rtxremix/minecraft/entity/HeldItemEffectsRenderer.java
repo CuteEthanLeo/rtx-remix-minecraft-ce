@@ -107,7 +107,7 @@ public final class HeldItemEffectsRenderer {
 
         Quaternionfc facing = CameraFacing.get(client.gameRenderer.getCamera(), scratchFacing);
         Quaternionfc frame = HeldItemFlame.riseFrame(mode, facing);
-        double ticks = client.world.getTime() + ClientTickDelta.ticking(client);
+        double ticks = client.world.getTime() + ClientTickDelta.frame(client);
         float phase = mode.ordinal();
         float cameraOffset = HeldItemFlame.cameraOffset(mode);
         // Null when the capture does not know where the eye is; the poses then stay at depth 1.

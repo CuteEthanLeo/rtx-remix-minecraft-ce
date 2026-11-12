@@ -235,7 +235,7 @@ dependencies {
     def lwjglNatives = System.getProperty('os.arch').toLowerCase() in ['aarch64', 'arm64']
             ? 'natives-windows-arm64' : 'natives-windows'
     ['lwjgl', 'lwjgl-glfw', 'lwjgl-opengl'].each { module ->
-        testRuntimeOnly "org.lwjgl:${module}:3.3.2:${lwjglNatives}"
+        testRuntimeOnly "org.lwjgl:${module}:3.3.1:${lwjglNatives}"
     }
     fabricTestRuntime "net.fabricmc:fabric-loader-junit:${fabricLoaderVersion}"
 }

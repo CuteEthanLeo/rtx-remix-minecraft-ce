@@ -1281,8 +1281,9 @@ public class RemixCapturingConsumer implements VertexConsumer {
             float qny = quad.direction.y();
             float qnz = quad.direction.z();
             for (ModelPart.Vertex vertex : quad.vertices) {
-                float u = sprite == null ? vertex.u : sprite.getFrameU(vertex.u);
-                float v = sprite == null ? vertex.v : sprite.getFrameV(vertex.v);
+                // Sprite frame coordinates run 0 to 16 on this Minecraft version.
+                float u = sprite == null ? vertex.u : sprite.getFrameU(vertex.u * 16.0f);
+                float v = sprite == null ? vertex.v : sprite.getFrameV(vertex.v * 16.0f);
                 acceptModelSpaceVertex(
                         vertex.pos.x / 16f + qnx * shellExpand,
                         vertex.pos.y / 16f + qny * shellExpand,

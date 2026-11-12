@@ -9,7 +9,6 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtSizeTracker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -162,7 +161,7 @@ class ZonePersistentStateTest {
         state.save(file.toFile());
 
         assertFalse(state.isDirty());
-        NbtCompound root = NbtIo.readCompressed(file, NbtSizeTracker.ofUnlimitedBytes());
+        NbtCompound root = NbtIo.readCompressed(file.toFile());
         ZonePersistentState loaded = ZonePersistentState.fromNbt(root.getCompound("data"));
         assertEquals(List.of(zone), new ArrayList<>(loaded.snapshot()));
     }

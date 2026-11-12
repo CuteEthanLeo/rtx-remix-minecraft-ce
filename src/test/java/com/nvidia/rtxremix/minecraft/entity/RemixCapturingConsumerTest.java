@@ -14,7 +14,7 @@ import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteContents;
 import net.minecraft.client.texture.SpriteDimensions;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.resource.metadata.ResourceMetadata;
+import net.minecraft.client.resource.metadata.AnimationResourceMetadata;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
 import org.joml.Matrix4f;
@@ -169,7 +169,7 @@ class RemixCapturingConsumerTest {
             for (int x = 0; x < 8; x++) image.setColor(x, y, rows[y].charAt(x) == '#' ? 0xFF808080 : 0);
         }
         return new SpriteContents(new Identifier("minecraft", id), new SpriteDimensions(8, 8), image,
-                ResourceMetadata.NONE);
+                AnimationResourceMetadata.EMPTY);
     }
 
     private static Sprite atlasSprite(SpriteContents contents) {

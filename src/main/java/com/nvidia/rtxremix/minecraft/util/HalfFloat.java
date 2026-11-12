@@ -6,7 +6,7 @@ package com.nvidia.rtxremix.minecraft.util;
 
 /**
  * IEEE 754 binary16 conversions, the ones {@code Float.floatToFloat16} and
- * {@code Float.float16ToFloat} provide from Java 20. Minecraft 1.20.4 runs on Java 17.
+ * {@code Float.float16ToFloat} provide from Java 20. Minecraft 1.20.1 runs on Java 17.
  */
 public final class HalfFloat {
 

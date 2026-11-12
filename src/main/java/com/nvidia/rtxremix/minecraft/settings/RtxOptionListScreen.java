@@ -16,8 +16,10 @@ import net.minecraft.util.Util;
 /**
  * An options screen whose body is one option list between a title and a footer.
  *
- * <p>Minecraft 1.20.4's {@code GameOptionsScreen} lays nothing out, and a resize runs
+ * <p>Minecraft 1.20.1's {@code GameOptionsScreen} lays nothing out, and a resize runs
  * {@code init} again, so the layout and the list are built there from the current size.
+ * A screen draws its own background on this version, and the list is added first so the
+ * header and footer strips it draws stay under the title and the footer buttons.
  */
 abstract class RtxOptionListScreen extends GameOptionsScreen {
 
@@ -41,9 +43,11 @@ abstract class RtxOptionListScreen extends GameOptionsScreen {
         this.layout = new ThreePartsLayoutWidget(this, HEADER_HEIGHT, FOOTER_HEIGHT);
         this.layout.addHeader(new TextWidget(this.title, this.textRenderer));
         this.body = this.addDrawableChild(new RtxOptionList(
-                this.client, this.width, this.height - HEADER_HEIGHT - FOOTER_HEIGHT, HEADER_HEIGHT));
+                this.client, this.width, this.height, HEADER_HEIGHT, this.height - FOOTER_HEIGHT));
         // Over a world the list stays see-through, so a setting's effect shows behind it.
-        this.body.setRenderBackground(this.client.world == null);
+        boolean opaque = this.client.world == null;
+        this.body.setRenderBackground(opaque);
+        this.body.setRenderHorizontalShadows(opaque);
         this.addOptions();
         this.initFooter();
         this.layout.forEachChild(this::addDrawableChild);
@@ -58,6 +62,7 @@ abstract class RtxOptionListScreen extends GameOptionsScreen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        this.renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
         this.deferredSliders.applyDue();
     }

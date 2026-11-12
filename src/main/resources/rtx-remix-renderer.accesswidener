@@ -50,25 +50,26 @@ accessible field net/minecraft/client/texture/SpriteContents$Animation frames Lj
 accessible field net/minecraft/client/texture/SpriteContents$AnimationFrame index I
 accessible field net/minecraft/client/texture/SpriteContents$AnimationFrame time I
 
-# Allocation-free port of vanilla's chunk visibility walk (ChunkRenderingDataPreparerMixin)
-accessible class net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfoList
-accessible class net/minecraft/client/render/ChunkRenderingDataPreparer$RenderableChunks
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo <init> (Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;Lnet/minecraft/util/math/Direction;I)V
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo updateCullingState (BLnet/minecraft/util/math/Direction;)V
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo canCull (Lnet/minecraft/util/math/Direction;)Z
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo addDirection (Lnet/minecraft/util/math/Direction;)V
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo hasDirection (I)Z
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo hasAnyDirection ()Z
-accessible field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo chunk Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;
-accessible field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo cullingState B
-accessible field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo propagationLevel I
+# Allocation-free port of vanilla's chunk visibility walk (WorldRendererVisibilityMixin)
+accessible class net/minecraft/client/render/WorldRenderer$ChunkInfo
+accessible class net/minecraft/client/render/WorldRenderer$ChunkInfoList
+accessible class net/minecraft/client/render/WorldRenderer$RenderableChunks
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo <init> (Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;Lnet/minecraft/util/math/Direction;I)V
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo updateCullingState (BLnet/minecraft/util/math/Direction;)V
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo canCull (Lnet/minecraft/util/math/Direction;)Z
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo addDirection (Lnet/minecraft/util/math/Direction;)V
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo hasDirection (I)Z
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfo hasAnyDirection ()Z
+accessible field net/minecraft/client/render/WorldRenderer$ChunkInfo chunk Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;
+accessible field net/minecraft/client/render/WorldRenderer$ChunkInfo cullingState B
+accessible field net/minecraft/client/render/WorldRenderer$ChunkInfo propagationLevel I
 accessible method net/minecraft/client/render/BuiltChunkStorage getRenderedChunk (Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/client/render/chunk/ChunkBuilder$BuiltChunk;
 
 # Visibility walk buffers reused across walks (RenderableChunksMixin, ChunkInfoPool)
-accessible method net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfoList <init> (I)V
-accessible field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfoList current [Lnet/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo;
-accessible field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo direction B
-mutable field net/minecraft/client/render/ChunkRenderingDataPreparer$ChunkInfo propagationLevel I
+accessible method net/minecraft/client/render/WorldRenderer$ChunkInfoList <init> (I)V
+accessible field net/minecraft/client/render/WorldRenderer$ChunkInfoList current [Lnet/minecraft/client/render/WorldRenderer$ChunkInfo;
+accessible field net/minecraft/client/render/WorldRenderer$ChunkInfo direction B
+mutable field net/minecraft/client/render/WorldRenderer$ChunkInfo propagationLevel I
 
 # Integrated-server light snapshot published as an overlay view (LightStorageMixin)
 accessible field net/minecraft/world/chunk/ChunkToNibbleArrayMap arrays Lit/unimi/dsi/fastutil/longs/Long2ObjectOpenHashMap;

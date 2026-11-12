@@ -38,7 +38,10 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
     private static final int RANGE_SLIDER_GAP = 6;
     private static final int RANGE_SLIDER_WIDTH =
             (PANEL_WIDTH - RANGE_SLIDER_GAP) / 2;
-    private static final Identifier SLOT_TEXTURE = new Identifier("container/slot");
+    /** A chest screen's texture; its first slot's 18-pixel frame is the slot background drawn here. */
+    private static final Identifier SLOT_TEXTURE = new Identifier("textures/gui/container/generic_54.png");
+    private static final int SLOT_TEXTURE_U = 7;
+    private static final int SLOT_TEXTURE_V = 17;
 
     private final Map<CopperBeaconUpdatePayload.Field, Float> pending =
             new EnumMap<>(CopperBeaconUpdatePayload.Field.class);
@@ -82,18 +85,21 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
                 value -> Text.literal(String.format(Locale.ROOT, "%.0f%%", value * 100.0)),
                 CopperBeaconUpdatePayload.Field.SATURATION);
 
-        addDrawableChild(CheckboxWidget.builder(
-                        Text.translatable(
-                                "container.rtx-remix-renderer.copper_beacon.redstone"),
-                        textRenderer)
-                .pos(x + 158, y + 17)
-                .checked(beacon.isRedstoneControlled())
-                .tooltip(Tooltip.of(Text.translatable(
-                        "container.rtx-remix-renderer.copper_beacon.redstone.tip")))
-                .callback((checkbox, checked) -> queue(
-                        CopperBeaconUpdatePayload.Field.REDSTONE_CONTROLLED,
-                        checked ? 1.0f : 0.0f))
-                .build());
+        Text redstoneLabel = Text.translatable("container.rtx-remix-renderer.copper_beacon.redstone");
+        // This version's checkbox is a 20-pixel box with its label to the right; raised two
+        // pixels so it centres on the 16-pixel slider beside it.
+        CheckboxWidget redstone = new CheckboxWidget(
+                x + 158, y + 15, 24 + textRenderer.getWidth(redstoneLabel), 20,
+                redstoneLabel, beacon.isRedstoneControlled()) {
+            @Override
+            public void onPress() {
+                super.onPress();
+                queue(CopperBeaconUpdatePayload.Field.REDSTONE_CONTROLLED, isChecked() ? 1.0f : 0.0f);
+            }
+        };
+        redstone.setTooltip(Tooltip.of(Text.translatable(
+                "container.rtx-remix-renderer.copper_beacon.redstone.tip")));
+        addDrawableChild(redstone);
 
         addSlider(
                 x + OUTER_MARGIN,
@@ -292,6 +298,7 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
         drawMouseoverTooltip(context, mouseX, mouseY);
     }
@@ -301,10 +308,12 @@ public final class CopperBeaconScreen extends HandledScreen<CopperBeaconScreenHa
             DrawContext context, float delta, int mouseX, int mouseY) {
         context.drawBorder(x, y, backgroundWidth, backgroundHeight, 0xFF8B8B8B);
         for (var slot : handler.slots) {
-            context.drawGuiTexture(
+            context.drawTexture(
                     SLOT_TEXTURE,
                     x + slot.x - 1,
                     y + slot.y - 1,
+                    SLOT_TEXTURE_U,
+                    SLOT_TEXTURE_V,
                     18,
                     18);
         }

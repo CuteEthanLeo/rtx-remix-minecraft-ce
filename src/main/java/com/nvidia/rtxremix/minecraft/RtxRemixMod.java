@@ -18,7 +18,6 @@ import com.nvidia.rtxremix.minecraft.texture.AtlasAnimationForwarder;
 import com.nvidia.rtxremix.minecraft.terrain.WorldRendererTerrainAccess;
 import com.nvidia.rtxremix.minecraft.terrain.SkyLightSurfaceScanPolicy;
 import com.nvidia.rtxremix.minecraft.terrain.NeighbourReflagFilter;
-import com.nvidia.rtxremix.minecraft.terrain.LocalChunkBatchPacing;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshots;
 import com.nvidia.rtxremix.minecraft.terrain.ClientLightSnapshotPolicy;
 import com.nvidia.rtxremix.minecraft.terrain.ChunkManager;
@@ -177,7 +176,7 @@ public class RtxRemixMod implements ClientModInitializer {
     }
     
     // Volatile: read off the render thread by RebuildTaskCaptureMixin's chunk-builder
-    // workers and by ChunkDataSenderMixin on the integrated-server thread.
+    // workers and by WorldRendererVisibilityMixin on the visibility thread.
     private static volatile boolean rtxEnabled = true;
     private static boolean entitiesEnabled = true;
     private static boolean worldEnabled = true;
@@ -367,7 +366,11 @@ public class RtxRemixMod implements ClientModInitializer {
         TracyGCListener.install();
         LOGGER.info(NeighbourReflagFilter.effectiveStateLine());
         LOGGER.info(ClientLightSnapshotPolicy.effectiveStateLine());
-        LOGGER.info(LocalChunkBatchPacing.effectiveStateLine());
+        // TODO(1.20.1): pace the integrated server's chunk delivery and unloads by measured
+        // render-thread cost, as LocalChunkBatchPacing and PacedUnloadQueue do from 1.20.2 on.
+        // ThreadedAnvilChunkStorage writes a column's data or unload the moment it enters or
+        // leaves a player's view here; there is no per-player pending set or per-tick sender
+        // (ChunkDataSender) to hold a batch in.
         LOGGER.info(SkyLightSurfaceScanPolicy.effectiveStateLine());
 
         remixAvailable = checkRemixAvailability();
@@ -448,10 +451,11 @@ public class RtxRemixMod implements ClientModInitializer {
                             }
                             buttonY -= overflow;
                         }
-                        button.setDimensionsAndPosition(308, 20, scaledWidth / 2 - 154, buttonY);
+                        button.setWidth(308);
+                        button.setPosition(scaledWidth / 2 - 154, buttonY);
                     } else {
-                        button.setDimensionsAndPosition(
-                                200, 20, scaledWidth / 2 - 100, scaledHeight - 27);
+                        button.setWidth(200);
+                        button.setPosition(scaledWidth / 2 - 100, scaledHeight - 27);
                     }
                     menuButtons.add(button);
                 });

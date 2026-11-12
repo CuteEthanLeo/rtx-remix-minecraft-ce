@@ -737,7 +737,7 @@ public class RemixRenderer {
         if (!initialized || remixApi == null || client == null) {
             return;
         }
-        if (!shouldAdvanceWorldRenderFrame(tick, client.isFinishedLoading(), client.world != null)) {
+        if (!shouldAdvanceWorldRenderFrame(tick, client.world != null)) {
             return;
         }
 
@@ -745,8 +745,8 @@ public class RemixRenderer {
         benchmarkController.onFrameStart(perfTimer);
     }
 
-    static boolean shouldAdvanceWorldRenderFrame(boolean tick, boolean finishedLoading, boolean worldLoaded) {
-        return tick && finishedLoading && worldLoaded;
+    static boolean shouldAdvanceWorldRenderFrame(boolean tick, boolean worldLoaded) {
+        return tick && worldLoaded;
     }
 
     /**

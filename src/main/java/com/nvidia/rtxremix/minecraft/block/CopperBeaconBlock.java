@@ -4,7 +4,6 @@
  */
 package com.nvidia.rtxremix.minecraft.block;
 
-import com.mojang.serialization.MapCodec;
 import com.nvidia.rtxremix.minecraft.light.LightEntry;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
@@ -12,7 +11,6 @@ import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.FacingBlock;
 import net.minecraft.block.Waterloggable;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -57,8 +55,6 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
     public static final LightEntry.ColorOverride BEAM_COLOR =
             LightEntry.ColorOverride.of(1.0f, 0.88f, 0.70f);
 
-    public static final MapCodec<CopperBeaconBlock> CODEC = createCodec(CopperBeaconBlock::new);
-
     public static final CopperBeaconBlock INSTANCE = new CopperBeaconBlock(beaconSettings());
 
     public CopperBeaconBlock(AbstractBlock.Settings settings) {
@@ -67,11 +63,6 @@ public class CopperBeaconBlock extends SpotLightBlock implements BlockEntityProv
                 .with(MOUNT, Direction.UP)
                 .with(POWERED, false)
                 .with(WATERLOGGED, false));
-    }
-
-    @Override
-    protected MapCodec<? extends FacingBlock> getCodec() {
-        return CODEC;
     }
 
     @Override

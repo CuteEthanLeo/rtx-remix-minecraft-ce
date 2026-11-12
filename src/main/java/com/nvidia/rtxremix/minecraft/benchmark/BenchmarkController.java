@@ -23,6 +23,7 @@ import jdk.jfr.Name;
 import jdk.jfr.Recording;
 import jdk.jfr.RecordingState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.util.ScreenshotRecorder;
 import net.minecraft.server.MinecraftServer;
@@ -338,13 +339,31 @@ public class BenchmarkController {
 
         try {
             IntegratedServerLoader loader = client.createIntegratedServerLoader();
-            loader.start(BENCHMARK_WORLD_NAME, () -> {
-                LOGGER.warn("World load was cancelled");
-                clearPendingAutoBenchmark();
-            });
+            loader.start(new LoadCancelledScreen(client.currentScreen), BENCHMARK_WORLD_NAME);
         } catch (Exception e) {
             LOGGER.error("Failed to auto-load benchmark world", e);
             clearPendingAutoBenchmark();
+        }
+    }
+
+    /**
+     * The screen the world loader returns to when a load is cancelled, which is the only
+     * cancellation signal it gives: it clears the pending benchmark and hands over to the
+     * screen that was showing before the load.
+     */
+    private final class LoadCancelledScreen extends Screen {
+        private final Screen previous;
+
+        LoadCancelledScreen(Screen previous) {
+            super(Text.empty());
+            this.previous = previous;
+        }
+
+        @Override
+        protected void init() {
+            LOGGER.warn("World load was cancelled");
+            clearPendingAutoBenchmark();
+            this.client.setScreen(previous);
         }
     }
 

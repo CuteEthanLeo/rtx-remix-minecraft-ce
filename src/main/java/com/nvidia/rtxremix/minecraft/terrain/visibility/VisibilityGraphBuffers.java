@@ -4,18 +4,14 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.visibility;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import net.minecraft.client.render.ChunkRenderingDataPreparer.ChunkInfo;
-import net.minecraft.client.render.ChunkRenderingDataPreparer.ChunkInfoList;
-import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.WorldRenderer.ChunkInfo;
+import net.minecraft.client.render.WorldRenderer.ChunkInfoList;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * The buffers behind vanilla's visibility state, kept across walks instead of allocated per
- * walk: the reached-section set, the per-slot info list, the unbuilt-neighbour map and the
- * {@link ChunkInfoPool}. Two sets of them alternate, because at most two states exist at
+ * walk: the reached-section set, the per-slot info list and the {@link ChunkInfoPool}. Two sets of them alternate, because at most two states exist at
  * once: the published one the render thread reads and extends incrementally, and the one a
  * full walk is filling on the visibility thread. Vanilla submits a full walk only from the
  * render thread at the start of a frame and only when the previous walk has published, so
@@ -30,7 +26,6 @@ public final class VisibilityGraphBuffers {
     public static final class Buffers {
         public final ReachedChunkSet chunks;
         public final ChunkInfoList infos;
-        public final Long2ObjectOpenHashMap<List<ChunkBuilder.BuiltChunk>> unbuiltNeighbours = new Long2ObjectOpenHashMap<>();
         public final ChunkInfoPool infoPool;
 
         Buffers(int chunkCount) {
@@ -42,7 +37,6 @@ public final class VisibilityGraphBuffers {
         void reset() {
             chunks.clear();
             Arrays.fill(infos.current, null);
-            unbuiltNeighbours.clear();
             infoPool.beginWalk();
         }
     }
@@ -68,6 +62,19 @@ public final class VisibilityGraphBuffers {
         }
         current ^= 1;
         sets[current].reset();
+    }
+
+    /**
+     * The pool behind the state that owns {@code infos}, or null for a state built on buffers
+     * a storage change has since dropped.
+     */
+    public static synchronized ChunkInfoPool poolFor(ChunkInfoList infos) {
+        for (Buffers buffers : sets) {
+            if (buffers.infos == infos) {
+                return buffers.infoPool;
+            }
+        }
+        return null;
     }
 
     /** The buffers the state being constructed should use. */

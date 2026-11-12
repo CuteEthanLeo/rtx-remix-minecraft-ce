@@ -13,6 +13,11 @@ also part of every mod file name.
 
 ### Added
 
+- A package for Minecraft 1.20.1, ported back from the 1.20.4 branch. Every
+  feature is kept. One performance policy is dropped: the pacing of the
+  integrated server's chunk delivery and unloads has nothing to attach to on
+  this version, so in single player a row of chunks can arrive in one frame.
+  This package needs Fabric Loader 0.16.10 or newer.
 - A package for Minecraft 1.20.6, ported back from 1.21.1 with every feature
   kept.
 - A package for Minecraft 1.20.4, ported back from the 1.20.6 branch with

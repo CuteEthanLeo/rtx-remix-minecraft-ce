@@ -10,12 +10,12 @@ package com.nvidia.rtxremix.minecraft.settings;
 import com.nvidia.rtxremix.minecraft.input.RemixInputGate;
 import com.nvidia.rtxremix.minecraft.texture.BlockTextureManager;
 import com.nvidia.rtxremix.minecraft.RtxRemixMod;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.DirectionalLayoutWidget;
-import net.minecraft.client.gui.widget.Positioner;
+import net.minecraft.client.gui.widget.GridWidget;
 import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.client.gui.widget.ThreePartsLayoutWidget;
 import net.minecraft.screen.ScreenTexts;
@@ -38,11 +38,10 @@ public final class RtxSettingsScreen extends Screen {
 
     @Override
     protected void init() {
-        DirectionalLayoutWidget header =
-                this.layout.addHeader(DirectionalLayoutWidget.vertical());
-        header.add(new TextWidget(this.title, this.textRenderer), Positioner::alignHorizontalCenter);
+        this.layout.addHeader(new TextWidget(this.title, this.textRenderer));
 
-        DirectionalLayoutWidget categories = DirectionalLayoutWidget.vertical().spacing(8);
+        GridWidget categoryColumn = new GridWidget().setRowSpacing(8);
+        GridWidget.Adder categories = categoryColumn.createAdder(1);
         for (SettingCategory category : SettingCategory.values()) {
             if (settings.category(category).isEmpty()) {
                 continue;
@@ -56,16 +55,17 @@ public final class RtxSettingsScreen extends Screen {
         }
         // Set apart from the categories because it leaves Minecraft's screens
         // for Remix's own menu rather than opening another page.
-        categories.add(openRemixMenuButton(), positioner -> positioner.marginTop(8));
-        this.layout.addBody(categories);
+        categories.add(openRemixMenuButton(), categoryColumn.copyPositioner().marginTop(8));
+        this.layout.addBody(categoryColumn);
 
-        DirectionalLayoutWidget footer = DirectionalLayoutWidget.horizontal().spacing(8);
-        footer.add(ButtonWidget.builder(
+        GridWidget footer = new GridWidget().setColumnSpacing(8);
+        GridWidget.Adder buttons = footer.createAdder(2);
+        buttons.add(ButtonWidget.builder(
                         Text.translatable("rtxremix.settings.resetAll"), button -> confirmReset())
                 .tooltip(Tooltip.of(Text.translatable("rtxremix.settings.resetAll.tip")))
                 .width(98)
                 .build());
-        footer.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
+        buttons.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
         this.layout.addFooter(footer);
 
         this.layout.forEachChild(this::addDrawableChild);
@@ -87,6 +87,12 @@ public final class RtxSettingsScreen extends Screen {
     @Override
     protected void initTabNavigation() {
         this.layout.refreshPositions();
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        this.renderBackground(context);
+        super.render(context, mouseX, mouseY, delta);
     }
 
     /**

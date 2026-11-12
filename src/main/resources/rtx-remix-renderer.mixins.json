@@ -12,16 +12,14 @@
         "BakedQuadMixin",
         "BillboardParticleAccessor",
         "BiomeMixin",
-        "BlockBufferBuilderPoolMixin",
         "BlockEntityRenderDispatcherMixin",
         "BuiltChunkBuffersMixin",
         "BuiltChunkMixin",
         "BuiltChunkStorageMixin",
-        "ChunkDataSenderMixin",
+        "ChunkBuilderMixin",
         "ChunkLightProviderAccessor",
         "ChunkRendererRegionBuilderMixin",
         "ChunkRendererRegionMixin",
-        "ChunkRenderingDataPreparerMixin",
         "ChunkSkyLightMixin",
         "ClientChunkManagerMixin",
         "ClientChunkMixin",
@@ -79,7 +77,8 @@
         "WeightedBakedModelMixin",
         "WindowMixin",
         "WorldChunkMixin",
-        "WorldRendererMixin"
+        "WorldRendererMixin",
+        "WorldRendererVisibilityMixin"
     ],
     "injectors": {
         "defaultRequire": 1

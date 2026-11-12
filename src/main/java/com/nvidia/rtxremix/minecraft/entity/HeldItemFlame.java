@@ -109,7 +109,7 @@ public final class HeldItemFlame {
                 || block.getDefaultState().getLuminance() <= 0) {
             return null;
         }
-        return ((TorchBlockAccessor) block).getParticle();
+        return ((TorchBlockAccessor) block).getParticle() instanceof DefaultParticleType particle ? particle : null;
     }
 
     /** Whether an item render mode is a hand, in first or third person. */

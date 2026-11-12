@@ -35,19 +35,11 @@ long a worker may wait.
 | `rtxremix.blockDataQueue.maxDrainItems` | Captures drained per render-thread pass | `BlockDataQueue` |
 | `rtxremix.blockDataQueue.maxDrainBytes` | Bytes drained per pass | `BlockDataQueue` |
 | `rtxremix.blockDataQueue.publishWaitBudgetNs` | Initial worker wait budget before attempting FIFO eviction. In-flight reservations can require additional waits; it is not a total-wait limit | `BlockDataQueue` |
-| `rtxremix.chunk.localBatchPacing` | Pace the integrated server's chunk delivery while capture is on, spreading chunk-load bursts across frames. Set to false to restore vanilla's single batch per tick | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localBatchBudgetMs` | Measured render-thread chunk-apply time, in milliseconds, the paced batch may fill per tick | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localBacklogBudgetMs` | Ceiling, in milliseconds, the per-tick budget rises to while a backlog is waiting, so a join burst streams in rather than landing in one frame | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localBatchBacklogDivisor` | Share of the backlog, one chunk per this many waiting, added to the per-tick budget | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localBatchMaxChunks` | Cap on chunks in one paced batch, whichever of the time budget and this cap is smaller; keeps a row spread even where the apply is cheap, because the rebuilds a row triggers cost the frame more than its deserialization | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localBacklogMaxChunks` | Ceiling that cap rises to while a backlog is waiting | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localUnloadPacing` | Pace the integrated server's chunk unload packets alongside its chunk data, so a crossing's trailing row does not land in the same drain as the new row. Set to false to send unloads the tick a column leaves the filter; off whenever `rtxremix.chunk.localBatchPacing` is off | `LocalChunkBatchPacing` |
-| `rtxremix.chunk.localUnloadBudgetMs` | Measured render-thread unload time, in milliseconds, the paced unloads may fill per tick | `LocalChunkBatchPacing` |
 | `rtxremix.chunk.neighbourReflagFilter` | Drop vanilla's chunk-load and light-data neighbour rebuild flags when the neighbour's last build already saw the loading column. Set to false to restore those flags. Block updates and the loading column itself stay vanilla | `NeighbourReflagFilter` |
 | `rtxremix.light.vanillaSnapshot` | Set to true to make the client light engine clone its section map every pass as vanilla does. With false, while capture is on, the live map is published as the snapshot, which rests on nothing but the render thread reading client light | `ClientLightSnapshotPolicy` |
 | `rtxremix.light.vanillaSurfaceScan` | Set to true to start each column's sky-light surface walk at the top of the chunk as vanilla does. With false the walk is seeded at the packet's `WORLD_SURFACE` height, which skips the air-over-air pairs that were most of the render thread's chunk-apply cost; the remedy for a sender whose heightmaps do not match its blocks | `SkyLightSurfaceScanPolicy` |
-| `rtxremix.vanillaVisibilityWalk` | Set to true to leave the chunk visibility walk to vanilla with RTX on instead of the mod's allocation-free port, which must produce the same visible set | `ChunkRenderingDataPreparerMixin` |
-| `rtxremix.logVisibleSet` | Log the size and a position hash of every full visibility walk's result whenever it changes, to compare the port against vanilla over one camera | `ChunkRenderingDataPreparerMixin` |
+| `rtxremix.vanillaVisibilityWalk` | Set to true to leave the chunk visibility walk to vanilla with RTX on instead of the mod's allocation-free port, which must produce the same visible set | `WorldRendererVisibilityMixin` |
+| `rtxremix.logVisibleSet` | Log the size and a position hash of every full visibility walk's result whenever it changes, to compare the port against vanilla over one camera | `WorldRendererVisibilityMixin` |
 | `rtxremix.joinHold` | Keep vanilla's terrain-download screen up until frame times settle after a world join, with a short bounded hold, so the first-sight mesh, pipeline, and BLAS costs land behind the screen. Set to false to disable the hold | `JoinBurstHold` |
 
 `BlockDataQueue.acquireCapacity` is authoritative for waiting: a worker

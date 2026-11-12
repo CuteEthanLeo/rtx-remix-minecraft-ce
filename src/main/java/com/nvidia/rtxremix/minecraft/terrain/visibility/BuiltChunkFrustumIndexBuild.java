@@ -4,7 +4,7 @@
  */
 package com.nvidia.rtxremix.minecraft.terrain.visibility;
 
-import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.WorldRenderer.ChunkInfo;
 
 import java.util.LinkedHashSet;
 
@@ -18,14 +18,14 @@ import java.util.LinkedHashSet;
  */
 public final class BuiltChunkFrustumIndexBuild {
     private final long moveSequence;
-    private final HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> culler;
+    private final HierarchicalFrustumCuller<ChunkInfo> culler;
     private LinkedHashSet<?> chunks;
 
     /**
      * @param recycled a culler taken back from a retired index, cleared here before reuse, or
      *                 null to start from an empty one
      */
-    public BuiltChunkFrustumIndexBuild(long moveSequence, HierarchicalFrustumCuller<ChunkBuilder.BuiltChunk> recycled) {
+    public BuiltChunkFrustumIndexBuild(long moveSequence, HierarchicalFrustumCuller<ChunkInfo> recycled) {
         this.moveSequence = moveSequence;
         if (recycled != null) {
             recycled.clear();
@@ -41,13 +41,13 @@ public final class BuiltChunkFrustumIndexBuild {
      * @param chunks the reached-section set the walk is filling; one build serves one set
      * @throws IllegalStateException if the walk switches to another set mid-build
      */
-    public void add(LinkedHashSet<?> chunks, ChunkBuilder.BuiltChunk chunk) {
+    public void add(LinkedHashSet<?> chunks, ChunkInfo info) {
         if (this.chunks == null) {
             this.chunks = chunks;
         } else if (this.chunks != chunks) {
             throw new IllegalStateException("Full visibility build changed storage");
         }
-        BuiltChunkFrustumIndex.add(culler, chunk);
+        BuiltChunkFrustumIndex.add(culler, info);
     }
 
     /**

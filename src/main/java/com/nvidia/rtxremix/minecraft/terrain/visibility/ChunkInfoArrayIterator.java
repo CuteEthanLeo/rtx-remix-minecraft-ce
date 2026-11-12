@@ -5,19 +5,19 @@
 package com.nvidia.rtxremix.minecraft.terrain.visibility;
 
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
-import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.client.render.WorldRenderer.ChunkInfo;
 
 import java.util.NoSuchElementException;
 
 /**
- * Reusable iterator for a compact render-thread BuiltChunk buffer.
+ * Reusable iterator for a compact render-thread buffer of visibility-graph nodes.
  */
-public final class BuiltChunkArrayIterator implements ObjectListIterator<ChunkBuilder.BuiltChunk> {
-    private ChunkBuilder.BuiltChunk[] chunks;
+public final class ChunkInfoArrayIterator implements ObjectListIterator<ChunkInfo> {
+    private ChunkInfo[] chunks;
     private int size;
     private int index;
 
-    public BuiltChunkArrayIterator reset(ChunkBuilder.BuiltChunk[] chunks, int size) {
+    public ChunkInfoArrayIterator reset(ChunkInfo[] chunks, int size) {
         this.chunks = chunks;
         this.size = size;
         this.index = 0;
@@ -30,7 +30,7 @@ public final class BuiltChunkArrayIterator implements ObjectListIterator<ChunkBu
     }
 
     @Override
-    public ChunkBuilder.BuiltChunk next() {
+    public ChunkInfo next() {
         if (!hasNext()) {
             throw new NoSuchElementException();
         }
@@ -43,7 +43,7 @@ public final class BuiltChunkArrayIterator implements ObjectListIterator<ChunkBu
     }
 
     @Override
-    public ChunkBuilder.BuiltChunk previous() {
+    public ChunkInfo previous() {
         if (!hasPrevious()) {
             throw new NoSuchElementException();
         }

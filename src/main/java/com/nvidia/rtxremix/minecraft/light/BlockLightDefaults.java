@@ -256,11 +256,7 @@ final class BlockLightDefaults {
         return Set.of(
                 Blocks.GLOWSTONE, Blocks.SEA_LANTERN, Blocks.SHROOMLIGHT, Blocks.JACK_O_LANTERN,
                 Blocks.OCHRE_FROGLIGHT, Blocks.VERDANT_FROGLIGHT, Blocks.PEARLESCENT_FROGLIGHT,
-                Blocks.REDSTONE_LAMP,
-                Blocks.COPPER_BULB, Blocks.EXPOSED_COPPER_BULB,
-                Blocks.WEATHERED_COPPER_BULB, Blocks.OXIDIZED_COPPER_BULB,
-                Blocks.WAXED_COPPER_BULB, Blocks.WAXED_EXPOSED_COPPER_BULB,
-                Blocks.WAXED_WEATHERED_COPPER_BULB, Blocks.WAXED_OXIDIZED_COPPER_BULB);
+                Blocks.REDSTONE_LAMP);
     }
 
     private static LightEntry amethystCrystal(Identifier id, BlockState state, BlockPos pos,

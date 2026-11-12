@@ -16,7 +16,7 @@ import net.minecraft.client.gui.screen.ConfirmScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.DirectionalLayoutWidget;
+import net.minecraft.client.gui.widget.GridWidget;
 import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.client.option.SimpleOption;
 import net.minecraft.screen.ScreenTexts;
@@ -89,13 +89,14 @@ final class RtxSettingsCategoryScreen extends RtxOptionListScreen {
 
     @Override
     protected void initFooter() {
-        DirectionalLayoutWidget footer = DirectionalLayoutWidget.horizontal().spacing(8);
-        footer.add(ButtonWidget.builder(
+        GridWidget footer = new GridWidget().setColumnSpacing(8);
+        GridWidget.Adder buttons = footer.createAdder(2);
+        buttons.add(ButtonWidget.builder(
                         Text.translatable("rtxremix.settings.reset"), button -> confirmReset())
                 .tooltip(Tooltip.of(Text.translatable("rtxremix.settings.reset.tip")))
                 .width(98)
                 .build());
-        footer.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
+        buttons.add(ButtonWidget.builder(ScreenTexts.DONE, button -> close()).width(98).build());
         this.layout.addFooter(footer);
     }
 
